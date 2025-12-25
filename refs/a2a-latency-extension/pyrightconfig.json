@@ -1,0 +1,6 @@
+{
+  "venvPath": "samples/python",
+  "venv": "venv",
+  "typeCheckingMode": "strict",
+  "extraPaths": ["backend"]
+}

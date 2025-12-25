@@ -1,0 +1,75 @@
+# Node.js dependencies
+node_modules/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Build output
+dist/
+build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory
+coverage/
+.nyc_output/
+
+# Environment variables
+.env
+.env.*.local
+
+# Editor directories and files
+.vscode/
+.idea/
+
+# Mac system files
+.DS_Store
+
+# ESLint cache
+.eslintcache
+
+# Dependency directories
+bower_components/
+jspm_packages/
+web_modules/
+
+# Optional npm cache directory
+.npm/
+
+# Yarn integrity file
+.yarn-integrity
+
+# Grunt intermediate storage
+.grunt/
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons
+build/Release/
+
+# TernJS port file
+.tern-port
+
+# VSCode extension test files
+.vscode-test/
+
+# Rollup and Microbundle cache
+.rollup.cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+twilio-oai
+
+__pycache__

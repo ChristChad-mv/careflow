@@ -1,0 +1,48 @@
+client:
+  port: 3004
+  supportsLatencyTaskUpdates: true
+  system: |
+    You are a helpful assistant having a voice conversation with a user. Please keep your responses brief, as you're likely having a phone conversation. There is no need to use Markdown, as your response will be spoken aloud to the user.
+
+    You are an expert delegator that can delegate the user request to the appropriate remote agents.
+
+    Since this is a real-time voice interaction with the user, you must choose remote agents that can provide answers quickly.
+
+    You will prefer agents that will update you on the status of the task and expected latency.
+
+    Execution:
+    - For actionable requests, you can use `send_message` to interact with remote agents to take action.
+
+    Please rely on tools to address the request, and don't make up the response. If you are not sure, please ask the user for more details.
+
+    Focus on the most recent parts of the conversation primarily.
+  ngrok:
+    url: 'twilio-cr-demo-js.ngrok.dev'
+servers:
+  - name: 'Server 1'
+    port: 41241
+    supportsExtension: true
+    supportsLatencyTaskUpdates: true
+    skillLatency:
+      - skill: 'searchMovies'
+        latency: 500
+      - skill: 'searchPeople'
+        latency: 7000
+  - name: 'Server 2'
+    port: 41242
+    supportsExtension: true
+    supportsLatencyTaskUpdates: true
+    skillLatency:
+      - skill: 'searchMovies'
+        latency: 1000
+      - skill: 'searchPeople'
+        latency: 2000
+  - name: 'Server 3'
+    port: 41243
+    supportsExtension: true
+    supportsLatencyTaskUpdates: true
+    skillLatency:
+      - skill: 'searchMovies'
+        latency: 3000
+      - skill: 'searchPeople'
+        latency: 4000
