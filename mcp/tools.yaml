@@ -127,6 +127,41 @@ tools:
     source: careflow-firestore
     description: "List all available collections in the Firestore database"
 
+  # Create a new critical alert
+  create_alert:
+    kind: firestore-add-documents
+    source: careflow-firestore
+    description: >
+      Create a new critical alert. 
+      REQUIRED: 
+      1. collectionPath: "alerts"
+      2. documentData: A JSON object where keys are fields (patientId, priority, etc.) and values are Firestore-typed (e.g., {"stringValue": "RED"}).
+      Example documentData:
+      {
+        "patientId": {"stringValue": "ID_HERE"},
+        "priority": {"stringValue": "critical"},
+        "trigger": {"stringValue": "Pain 8/10"},
+        "status": {"stringValue": "active"},
+        "createdAt": {"stringValue": "2023-10-10T10:00:00Z"}
+      }
+
+  # Update patient risk level
+  update_patient_risk:
+    kind: firestore-update-document
+    source: careflow-firestore
+    description: >
+      Update a patient's risk level.
+      REQUIRED:
+      1. documentPath: "patients/{patientId}"
+      2. documentData: Firestore-typed fields to update.
+      3. updateMask: List of fields to update (e.g. ["riskLevel", "lastAssessment"])
+
+  # Log interaction
+  log_patient_interaction:
+    kind: firestore-add-documents
+    source: careflow-firestore
+    description: "Log a call interaction. collectionPath='patients/{id}/interactions'. documentData must include content, type, sender, timestamp."
+
 toolsets:
   patient_tools:
     - get_all_patients
@@ -137,3 +172,6 @@ toolsets:
     - get_patient_by_phone
     - query_patients_by_diagnosis
     - list_collections
+    - create_alert
+    - update_patient_risk
+    - log_patient_interaction
