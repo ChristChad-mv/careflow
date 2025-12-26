@@ -9,8 +9,8 @@ from typing import List
 sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 
 from agent import Agent
-from utils.conversation_relay import SessionData, ConversationMessage
-from utils.config import NGROK_URL
+from .app_utils.conversation_relay import SessionData, ConversationMessage
+from .app_utils.config import NGROK_URL
 
 class MockWebSocket:
     """Mocks the WebSocket to print agent responses to the console."""
