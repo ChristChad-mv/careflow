@@ -6,7 +6,7 @@ import yaml
 from pathlib import Path
 from typing import List, Dict, Any, AsyncGenerator, Optional, Mapping
 from urllib.parse import urljoin
-from utils.config import NGROK_URL
+from .app_utils.config import NGROK_URL
 from fastapi import WebSocket
 from langchain_core.messages import (
     AIMessage,
@@ -18,9 +18,9 @@ from langchain_core.messages import (
 from langchain_core.tools import tool # type: ignore[import]
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent # type: ignore[import]
-from utils.llm import get_model, ModelConfig
+from .app_utils.llm import get_model, ModelConfig
 from pydantic import BaseModel, Field
-from utils.conversation_relay import SessionData
+from .app_utils.conversation_relay import SessionData
 from a2a.types import (
     AgentCard,
 )
