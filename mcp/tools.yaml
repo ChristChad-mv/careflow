@@ -1,0 +1,105 @@
+# MCP Toolbox for Database Configuration for CareFlow Pulse
+# Defines Firestore data source and patient management tools
+
+sources:
+  careflow-firestore:
+    kind: "firestore"
+    project: "careflow-478811"  # Google cloud project ID
+    database: "careflow-db"  # Firestore database ID
+
+tools:
+  # Get all patients from the database
+  get_all_patients:
+    kind: firestore-query
+    source: careflow-firestore
+    description: "Retrieve all patients from the database with their complete information"
+    collectionPath: "patients"
+    orderBy:
+      field: "id"
+      direction: "ASCENDING"
+    limit: 100
+  
+  # Get patients with critical risk level
+  get_critical_patients:
+    kind: firestore-query
+    source: careflow-firestore
+    description: "Retrieve all patients with critical (RED) risk level requiring urgent attention"
+    collectionPath: "patients"
+    filters: |
+      {
+        "field": "riskLevel",
+        "op": "==",
+        "value": {"stringValue": "RED"}
+      }
+    orderBy:
+      field: "id"
+      direction: "ASCENDING"
+  
+  # Get patients by risk level (parameterized)
+  get_patients_by_risk_level:
+    kind: firestore-query
+    source: careflow-firestore
+    description: "Retrieve patients filtered by their risk level (RED, YELLOW, GREEN)"
+    collectionPath: "patients"
+    filters: |
+      {
+        "field": "riskLevel",
+        "op": "==",
+        "value": {"stringValue": "{{.riskLevel}}"}
+      }
+    parameters:
+      - name: riskLevel
+        type: string
+        description: "Risk level to filter by (RED, YELLOW, or GREEN)"
+        required: true
+  
+  # Get specific patient by ID using query
+  get_patient_by_id:
+    kind: firestore-query
+    source: careflow-firestore
+    description: "Retrieve detailed information for a specific patient by their ID"
+    collectionPath: "patients"
+    filters: |
+      {
+        "field": "id",
+        "op": "==",
+        "value": {"stringValue": "{{.patientId}}"}
+      }
+    parameters:
+      - name: patientId
+        type: string
+        description: "The unique identifier of the patient (the id field value)"
+        required: true
+  
+  # Query patients by diagnosis
+  query_patients_by_diagnosis:
+    kind: firestore-query
+    source: careflow-firestore
+    description: "Find all patients with a specific diagnosis"
+    collectionPath: "patients"
+    filters: |
+      {
+        "field": "diagnosis",
+        "op": "==",
+        "value": {"stringValue": "{{.diagnosis}}"}
+      }
+    parameters:
+      - name: diagnosis
+        type: string
+        description: "The diagnosis to search for"
+        required: true
+
+  # List all available collections
+  list_collections:
+    kind: firestore-list-collections
+    source: careflow-firestore
+    description: "List all available collections in the Firestore database"
+
+toolsets:
+  patient_tools:
+    - get_all_patients
+    - get_critical_patients
+    - get_patients_by_risk_level
+    - get_patient_by_id
+    - query_patients_by_diagnosis
+    - list_collections
