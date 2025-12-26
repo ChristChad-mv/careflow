@@ -11,15 +11,18 @@ logger = logging.getLogger(__name__)
 # Target the CareFlow Agent (Orchestrator)
 CAREFLOW_AGENT_URL = "http://localhost:8000"
 
-async def trigger_daily_job():
+async def trigger_daily_job(schedule_hour: int = 8):
     """
     Simulates a Cloud Scheduler job triggering the CareFlow Agent.
-    Sends a message to start the daily rounds.
+    Sends a message to start the daily rounds for a specific medication schedule hour.
+    
+    Args:
+        schedule_hour: The medication schedule hour (8 for morning, 12 for noon, 20 for evening)
     """
-    logger.info("⏰ Starting Daily Patient Rounds Job...")
+    logger.info(f"⏰ Starting Daily Patient Rounds Job for {schedule_hour}:00...")
     
     request_id = int(uuid.uuid1().int >> 64)
-    message_text = "start daily rounds"
+    message_text = f"start daily rounds for {schedule_hour}:00"
     
     rpc_request = {
         "jsonrpc": "2.0",
@@ -69,4 +72,7 @@ async def trigger_daily_job():
         logger.error(f"❌ Error triggering job: {str(e)}")
 
 if __name__ == "__main__":
-    asyncio.run(trigger_daily_job())
+    import sys
+    # Allow specifying schedule hour from command line: python run_daily_job.py 8
+    schedule_hour = int(sys.argv[1]) if len(sys.argv) > 1 else 8
+    asyncio.run(trigger_daily_job(schedule_hour))
