@@ -3,6 +3,7 @@ import json
 import uuid
 import os
 import yaml
+import datetime
 from pathlib import Path
 from typing import List, Dict, Any, AsyncGenerator, Optional, Mapping
 from urllib.parse import urljoin
@@ -285,177 +286,183 @@ class Agent:
 
             return "Available remote A2A servers:\n\n" + "\n\n".join(formatted_cards)
 
-        class SendRemoteAgentTaskInput(BaseModel):
-            server_url: str = Field(description="The URL of the remote A2A server to send the task to.")
-            task: str = Field(description="The task message to send to the remote agent. This should be a clear and concise description of the task.")
+        class SendMessageInput(BaseModel):
+            server_url: str = Field(description="The URL of the remote A2A server.")
+            message: str = Field(description="The message content to send.")
+            task_id: Optional[str] = Field(default=None, description="Optional taskId to continue an existing conversation.")
 
-        @tool("send_remote_agent_task", args_schema=SendRemoteAgentTaskInput)
-        async def send_remote_agent_task(server_url: str, task: str) -> str:
+        @tool("send_message", args_schema=SendMessageInput)
+        async def send_message(server_url: str, message: str, task_id: Optional[str] = None) -> str:
             """
-            Send a task to a specified remote agent for processing using SSE streaming.
-            The tool waits for the complete response and only returns the final result.
-            Requires serverUrl and task parameters.
+            Send a message to a remote agent. Use this to start a conversation or reply to an existing one.
+            If you are replying or following up, you MUST provide the 'task_id' from the previous response.
             """
-            logger.info(f"calling send_remote_agent_task tool with server: {server_url}, task: {task}")
+            logger.info(f"calling send_message tool with server: {server_url}, task_id: {task_id}")
 
             if server_url not in self.a2a_servers:
                 self.add_a2a_server(server_url)
 
             try:
-                # Generate a unique request ID for this RPC call
                 request_id = int(uuid.uuid1().int >> 64)
-
-                # Generate a unique task ID
-                task_id = f"task_{int(uuid.uuid1().int >> 64)}_{uuid.uuid4().hex[:9]}"
-
-                # Prepare the JSON-RPC request for message/stream
-                rpc_request = {
-                    "jsonrpc": "2.0",
-                    "method": "message/stream",
-                    "id": request_id,
-                    "params": {
-                        "message": {
-                            "messageId": task_id,
-                            "kind": "message",
-                            "role": "user",
-                            "parts": [
-                                {
-                                    "kind": "text",
-                                    "text": task,
-                                }
-                            ],
-                        }
-                    }
+                
+                # Use provided task_id or generate new one if starting new conversation
+                # current_task_id = task_id or f"task_{int(uuid.uuid1().int >> 64)}_{uuid.uuid4().hex[:9]}"
+                
+                message_payload = {
+                    "messageId": str(uuid.uuid4()),
+                    "kind": "message",
+                    "role": "user",
+                    "parts": [{"kind": "text", "text": message}],
+                }
+                
+                if task_id:
+                    message_payload["taskId"] = task_id
+                
+                params = {
+                    "message": message_payload
                 }
 
-                # Send the streaming request
-                import aiohttp
+                rpc_request = {
+                    "jsonrpc": "2.0",
+                    "method": "message/stream", # Use streaming to get immediate response
+                    "id": request_id,
+                    "params": params
+                }
 
+                import aiohttp
                 async with aiohttp.ClientSession() as session:
                     async with session.post(
                         server_url,
-                        headers={
-                            "Content-Type": "application/json",
-                            "Accept": "text/event-stream, application/json",  # Accept both SSE and JSON
-                        },
+                        headers={"Content-Type": "application/json", "Accept": "text/event-stream"},
                         json=rpc_request
                     ) as response:
                         if not response.ok:
-                            error_body = await response.text()
-                            try:
-                                error_json = json.loads(error_body)
-                                if error_json.get("error"):
-                                    raise ValueError(f"A2A Server Error: {error_json['error'].get('message')} "
-                                                    f"(Code: {error_json['error'].get('code')})")
-                            except json.JSONDecodeError:
-                                pass
-                            raise ValueError(f"HTTP error {response.status}: {response.reason}. "
-                                           f"Response: {error_body or '(empty)'}")
+                            return f"Error: {response.status} {await response.text()}"
 
-                        # Check content type and handle accordingly
-                        content_type = response.headers.get("Content-Type", "")
-                        is_sse = content_type.startswith("text/event-stream")
-                        is_json = content_type.startswith("application/json")
-
-                        logger.info(f"Response Content-Type: {content_type}, isSSE: {is_sse}, isJSON: {is_json}")
-
-                        if not is_sse and not is_json:
-                            logger.warning(f"Unexpected Content-Type: {content_type}. Attempting to process as JSON.")
-
+                        # Process SSE response similar to before
                         final_result = None
+                        returned_task_id = None
+                        
+                        raw_content = ""
+                        async for line in response.content:
+                            line = line.decode('utf-8').strip()
+                            raw_content += line + "\n"
+                            if line.startswith("data:"):
+                                try:
+                                    data = json.loads(line[5:].strip())
+                                    if data.get("result", {}).get("final"):
+                                        final_result = self._extract_final_message(data["result"])
+                                        returned_task_id = data["result"].get("taskId")
+                                except:
+                                    pass
+                        
+                        logger.info(f"DEBUG: Raw response from CareFlow: {raw_content}")
+                        
+                        result_str = f"Response: {final_result}"
+                        
+                        # --- EXPLICIT CONVERSATION LOGGING ---
+                        print(f"\n[CALLER -> CAREFLOW]: {message}")
+                        print(f"[CAREFLOW -> CALLER]: {final_result}\n")
+                        # -------------------------------------
 
-                        if is_sse:
-                            event_data_buffer = ""
+                        if returned_task_id:
+                            result_str += f"\nTaskId: {returned_task_id}"
+                        return result_str
 
-                            async for line in response.content:
-                                line = line.decode('utf-8')
-                                if line.strip() == "":
-                                    # Empty line signifies end of an event
-                                    if event_data_buffer:
-                                        result = self._process_sse_event_data(event_data_buffer, request_id)
+            except Exception as e:
+                return f"Failed to send message: {str(e)}"
 
-                                        logger.info(f"SSE event: {result}")
+        class SubscribeInput(BaseModel):
+            server_url: str = Field(description="The URL of the remote A2A server.")
+            task_id: str = Field(description="The ID of the task to subscribe to.")
 
-                                        if result and result.get("kind") == "status-update":
-                                            # Handle latency task updates
-                                            if (result.get("status", {}).get("message", {}).get("parts", [{}])[0].get("kind") == "data" and
-                                                result["status"]["message"]["parts"][0].get("data", {}).get("latency") and
-                                                os.environ.get("SUPPORTS_LATENCY_TASK_UPDATES") and
-                                                not self.sent_interstitial_message):
+        @tool("subscribe_to_task", args_schema=SubscribeInput)
+        async def subscribe_to_task(server_url: str, task_id: str) -> str:
+            """
+            Subscribe to real-time updates for a specific task.
+            Use this when you want to monitor a long-running process.
+            """
+            # In a real implementation, this would likely open a persistent connection
+            # For this agent, we might just verify we CAN subscribe or poll
+            # But let's implement the RPC call
+            return f"Subscribed to task {task_id} (Simulation: Real-time updates would flow here)"
 
-                                                latency = result["status"]["message"]["parts"][0]["data"]["latency"]
-                                                logger.info(f"Received latency update: {latency}ms")
+        class RegisterWebhookInput(BaseModel):
+            server_url: str = Field(description="The URL of the remote A2A server.")
+            task_id: str = Field(description="The ID of the task.")
+            webhook_url: str = Field(description="The URL where notifications should be sent.")
 
-                                                if latency > 3000:
-                                                    await self.send_message_to_ws_channel_async(text=f"Processing your request, this should take about {latency // 1000} seconds...")
-                                                elif latency > 1000:
-                                                    await self.send_message_to_ws_channel_async(text="Please hold for just a couple of seconds while I process your request..")
+        @tool("register_webhook", args_schema=RegisterWebhookInput)
+        async def register_webhook(server_url: str, task_id: str, webhook_url: str) -> str:
+            """
+            Register a webhook to receive push notifications for a task.
+            """
+            try:
+                request_id = int(uuid.uuid1().int >> 64)
+                rpc_request = {
+                    "jsonrpc": "2.0",
+                    "method": "tasks/pushNotificationConfig/set",
+                    "id": request_id,
+                    "params": {
+                        "taskId": task_id,
+                        "pushNotificationConfig": {
+                            "url": webhook_url,
+                            "format": "json"
+                        }
+                    }
+                }
+                
+                import aiohttp
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        server_url,
+                        headers={"Content-Type": "application/json"},
+                        json=rpc_request
+                    ) as response:
+                        if not response.ok:
+                            return f"Error registering webhook: {await response.text()}"
+                        return f"Successfully registered webhook {webhook_url} for task {task_id}"
+            except Exception as e:
+                return f"Failed to register webhook: {str(e)}"
 
-                                                if NGROK_URL:
-                                                    await self.send_message_to_ws_channel_async(source=f"https://{NGROK_URL}/keyboard-typing.mp3")
+        class CallPatientInput(BaseModel):
+            message: str = Field(description="The message to speak/send to the patient.")
+            patient_name: str = Field(description="Name of the patient.")
+            patient_id: str = Field(description="ID of the patient.")
+            expect_reply: bool = Field(default=True, description="If True (default), waits for the patient to reply. If False, sends the message and returns immediately (use for 'One moment...' messages).")
 
-                                                self.sent_interstitial_message = True
+        @tool("call_patient", args_schema=CallPatientInput)
+        async def call_patient(message: str, patient_name: str, patient_id: str, expect_reply: bool = True) -> str:
+            """
+            Simulate a call to the patient.
+            Sends the message to the patient's phone (simulated server) and returns their reply.
+            """
+            import aiohttp
+            
+            phone_server_url = "http://localhost:9000/incoming_call"
+            
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        phone_server_url,
+                        json={
+                            "message": message,
+                            "patient_name": patient_name,
+                            "patient_id": patient_id,
+                            "expect_reply": expect_reply
+                        }
+                    ) as response:
+                        if not response.ok:
+                            return f"Failed to call patient: {response.status}"
+                        
+                        data = await response.json()
+                        if not expect_reply:
+                            return "Message sent to patient. (No reply expected yet)"
+                        return f"Patient Replied: {data.get('response')}"
+            except Exception as e:
+                return f"Failed to connect to patient phone: {str(e)}"
 
-                                            if result.get("final"):
-                                                final_result = self._extract_final_message(result)
-                                                self.sent_interstitial_message = False
-                                                break
-
-                                        event_data_buffer = ""
-                                elif line.startswith("data:"):
-                                    event_data_buffer += line[5:].strip() + "\n"
-
-                            # Process any final buffered event data
-                            if event_data_buffer.strip():
-                                result = self._process_sse_event_data(event_data_buffer, request_id)
-                                if (result and result.get("kind") == "status-update" and result.get("final")):
-                                    final_result = self._extract_final_message(result)
-                        else:
-                            # Handle regular JSON response
-                            json_response = await response.json()
-
-                            logger.info('Received JSON response:', json.dumps(json_response, indent=2))
-
-                            # Validate JSON-RPC response structure
-                            if json_response.get("jsonrpc") != "2.0":
-                                raise ValueError("Invalid JSON-RPC response format")
-
-                            # Check for JSON-RPC errors
-                            if json_response.get("error"):
-                                raise ValueError(f"A2A Server Error: {json_response['error'].get('message')} "
-                                              f"(Code: {json_response['error'].get('code')})")
-
-                            # Extract the result
-                            if json_response.get("result"):
-                                logger.info('Processing result:', json.dumps(json_response["result"], indent=2))
-
-                                # Try to extract message from various possible structures
-                                if json_response["result"].get("message", {}).get("text"):
-                                    final_result = json_response["result"]["message"]["text"]
-                                elif json_response["result"].get("message", {}).get("parts"):
-                                    parts = json_response["result"]["message"]["parts"]
-                                    text_parts = [p.get("text") for p in parts if p.get("kind") == "text" and p.get("text")]
-                                    final_result = "".join(text_parts)
-                                elif json_response["result"].get("text"):
-                                    final_result = json_response["result"]["text"]
-                                elif isinstance(json_response["result"], str):
-                                    final_result = json_response["result"]
-                                else:
-                                    # Fallback: stringify the result
-                                    final_result = json.dumps(json_response["result"])
-                            else:
-                                final_result = "Task completed but no result was returned."
-
-                # Return the final result
-                if final_result is not None:
-                    return f"A2A task completed successfully. Response: {final_result}"
-                return "A2A task completed but no final message was received."
-
-            except Exception as error:
-                logger.error(f"Error sending task to A2A server {server_url}:", error)
-                return f"Failed to send task to A2A server at {server_url}: {str(error)}"
-
-        return [list_remote_agents, send_remote_agent_task]
+        return [list_remote_agents, send_message, subscribe_to_task, register_webhook, call_patient]
 
     def set_ws_channel(self, ws: WebSocket) -> None:
         """Set the WebSocket channel for communication."""
@@ -642,6 +649,32 @@ config = read_config()
 a2a_server_urls = [s.get('url') or f"http://localhost:{s['port']}" for s in config['servers'] if s.get('url') or s.get('port')]
 
 agent = Agent(
-    system_message=config['client']['system'],
+    system_message=config['client']['system'] + """
+    
+    IMPORTANT: You are a **Nurse Caller Agent**.
+    
+    **Your Goal:**
+    - You will receive tasks from the CareFlow Agent to interview specific patients.
+    - The task will include the Patient Name, ID, and what to ask (e.g., Risk Level, Status).
+    - You must use the `call_patient` tool to "speak" with the patient.
+    **Interview Process:**
+        1.  Start by introducing yourself.
+        2.  Ask the questions requested by CareFlow ONE BY ONE. Wait for the patient's reply.
+        3.  **Handling Questions (CRITICAL):** 
+            - If the patient asks for information you do not have (e.g., "What is the name of my medication?", "What is my latest risk score?"):
+            - **Step A:** Tell the patient: "One moment, let me check with the care team." 
+              -> **USE `call_patient` with `expect_reply=False`**. This allows you to act immediately without waiting for the patient to say "Okay".
+            - **Step B:** **IMMEDIATELY** use `send_message` to ask the CareFlow Agent: "The patient is asking for [Information]. Can you provide it?"
+            - **Step C:** When CareFlow replies with the info, use `call_patient` (with `expect_reply=True`) to tell the patient the answer.
+        4.  If the patient reports an issue (e.g., "I feel dizzy"), ask a follow-up question.
+        5.  Once you have the information, thank the patient and end the call.
+        6.  **CRITICAL:** Report the summary of the interview back to the CareFlow Agent as your final answer.
+    
+    **Collaboration Rules:**
+    - Do NOT ask for the list of patients. Wait to be assigned a patient.
+    - Use `call_patient` for the interview.
+    - Use `send_message` to communicate with the 'CareFlow Pulse Agent' (to report back OR to ask for help).
+    - ALWAYS pass the 'task_id' to maintain the conversation context.
+    """,
     a2a_servers=a2a_server_urls
 )
