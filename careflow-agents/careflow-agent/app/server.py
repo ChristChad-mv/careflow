@@ -9,7 +9,10 @@ from a2a.server.apps import A2AStarletteApplication
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
+from a2a.server.tasks.inmemory_push_notification_config_store import InMemoryPushNotificationConfigStore
+from a2a.server.tasks.base_push_notification_sender import BasePushNotificationSender
 from a2a.server.events import EventQueue
+import httpx
 from a2a.types import (
     AgentCard,
     AgentCapabilities,
@@ -186,7 +189,7 @@ class CareFlowAgentExecutor(AgentExecutor):
                 taskId=taskId,
                 contextId=contextId,
                 status=TaskStatus(
-                    state=TaskState.completed,
+                    state=TaskState.working,
                     message=final_message,
                     timestamp=datetime.now().isoformat(),
                 ),
@@ -233,7 +236,7 @@ def create_app():
         version="1.0.0",
         capabilities=AgentCapabilities(
             streaming=True,
-            pushNotifications=False,
+            pushNotifications=True,
             stateTransitionHistory=True,
         ),
         defaultInputModes=["text"],
@@ -258,10 +261,18 @@ def create_app():
     # Initialize Executor and Handler
     executor = CareFlowAgentExecutor(root_agent)
     task_store = InMemoryTaskStore()
+    push_config_store = InMemoryPushNotificationConfigStore()
+    
+    # Create HTTP client for push notifications
+    # Note: In a real app, you might want to manage the client lifecycle better
+    http_client = httpx.AsyncClient()
+    push_sender = BasePushNotificationSender(http_client, push_config_store)
     
     request_handler = DefaultRequestHandler(
         agent_executor=executor,
-        task_store=task_store
+        task_store=task_store,
+        push_config_store=push_config_store,
+        push_sender=push_sender
     )
 
     # Create App
