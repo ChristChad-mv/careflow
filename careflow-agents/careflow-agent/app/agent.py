@@ -142,6 +142,22 @@ AGENT_INSTRUCTION = f"""
 
     Remember: Your goal is to prevent readmissions through early detection and proactive intervention.
     Every alert you generate could save a life or prevent unnecessary suffering.
+
+    **Collaboration Guidelines (Orchestrator Mode):**
+    - You are the **Orchestrator**. Your job is to manage the daily patient rounds.
+    - When you receive the message "start daily rounds":
+        1. **Retrieve Patients:** Use `get_all_patients` to get the list of patients.
+        2. **Iterate & Task:** For EACH patient in the list:
+            a. Construct a task message for the Caller Agent. Include: Patient Name, ID, and Risk Level.
+            b. Use `send_remote_agent_task` to send this task to the Caller Agent.
+               - Note: You can find the Caller Agent URL using `list_remote_agents` if needed, or assume it is available.
+            c. **Save Report:** When the Caller Agent returns the interview summary, use `save_patient_report` to save it.
+    
+    - **Handling Ad-Hoc Questions:**
+        - The Caller Agent might ask you for specific details during the interview (e.g., "What is the medication for patient X?").
+        - Use your tools (like `get_patient_by_id`) to find the answer and reply immediately.
+    
+    - You have full autonomy to execute these steps using your tools.
     """
 
 
@@ -174,6 +190,41 @@ async def list_remote_agents() -> str:
         formatted_cards.append(f"{i+1}. {card.name} ({card.url}) - {card.description}")
     
     return "Available remote agents:\n" + "\n".join(formatted_cards)
+
+async def save_patient_report(patient_id: str, report_data: str) -> str:
+    """
+    Save the patient report to a CSV file.
+    """
+    import csv
+    from pathlib import Path
+    import datetime
+
+    # Adjust path to be relative to the project root or a known data directory
+    # Assuming the script is in `careflow_pulse_agent/` and we want to save in `data/` at project root
+    project_root = Path(__file__).resolve().parent.parent.parent
+    data_dir = project_root / 'data'
+    data_dir.mkdir(parents=True, exist_ok=True) # Ensure data directory exists
+    file_path = data_dir / 'daily_rounds_report.csv'
+    
+    file_exists = file_path.exists()
+    
+    try:
+        with open(file_path, 'a', newline='', encoding='utf-8') as csvfile:
+            fieldnames = ['patient_id', 'report', 'timestamp']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            if not file_exists:
+                writer.writeheader()
+
+            writer.writerow({
+                'patient_id': patient_id,
+                'report': report_data,
+                'timestamp': datetime.datetime.now().isoformat()
+            })
+        return f"Saved report for {patient_id} to {file_path}"
+    except Exception as e:
+        return f"Failed to save report for {patient_id}: {str(e)}"
+
 
 async def send_remote_agent_task(server_url: str, task: str) -> str:
     """
