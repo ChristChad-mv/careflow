@@ -2,9 +2,9 @@
 
 | | |
 | :--- | :--- |
-| **Document Version:** | 2.0 |
-| **Date:** | 2025-11-15 |
-| **Status:** | **In Progress** |
+| **Document Version:** | 3.0 |
+| **Date:** | 2025-12-03 |
+| **Status:** | **Current** |
 | **Author:** | Christ |
 
 ---
@@ -14,6 +14,7 @@
 | :--- | :--- | :--- | :--- |
 | 1.0 | 2025-11-15 | Christ | Initial Draft - Basic architecture overview |
 | 2.0 | 2025-11-15 | Christ | Complete rewrite with comprehensive database structure, API endpoints, and implementation details |
+| 3.0 | 2025-12-03 | Christ | Major architecture update: Dual-agent system (CareFlow Pulse + Caller), MCP protocol integration, A2A inter-agent communication, Twilio ConversationRelay, Cloud Run deployment |
 
 ---
 
@@ -42,15 +43,28 @@
    - 3.8. Security Rules
    - 3.9. Data Migration & Seeding
 
-### **4. Backend: AI Agent System (Google ADK)**
-   - 4.1. Agent Architecture Overview
-   - 4.2. Agent: `CareFlow-Main` (Orchestrator)
-   - 4.3. Agent: `CareFlow-Connect` (Connector)
-   - 4.4. Agent: `CareFlow-Analyze` (Medical Triage)
-   - 4.5. Agent: `CareFlow-Brief` (Synthesis)
-   - 4.6. ADK Tools & Integrations
-   - 4.7. Prompt Engineering Strategy
-   - 4.8. Error Handling & Fallback Logic
+### **4. Backend: Dual-Agent AI System**
+   - 4.1. Architecture Overview: Two Specialized Agents
+   - 4.2. CareFlow Pulse Agent (Medical Intelligence)
+      - 4.2.1. Google ADK Implementation
+      - 4.2.2. MCP Protocol Integration
+      - 4.2.3. Firestore Tools (6 MCP Tools)
+      - 4.2.4. A2A Server Configuration
+   - 4.3. CareFlow Caller Agent (Voice Interface)
+      - 4.3.1. LangGraph REACT Architecture
+      - 4.3.2. Twilio ConversationRelay Integration
+      - 4.3.3. ElevenLabs TTS Configuration
+      - 4.3.4. A2A Client for Medical Agent Delegation
+   - 4.4. MCP (Model Context Protocol)
+      - 4.4.1. Toolbox Executable Setup
+      - 4.4.2. Firestore Connection Configuration
+      - 4.4.3. Available MCP Tools
+   - 4.5. A2A (Agent-to-Agent Protocol)
+      - 4.5.1. Protocol Overview (JSON-RPC + SSE)
+      - 4.5.2. AgentCard Definition
+      - 4.5.3. Inter-Agent Communication Flow
+   - 4.6. Prompt Engineering Strategy
+   - 4.7. Error Handling & Fallback Logic
 
 ### **5. Backend: API Endpoints**
    - 5.1. Endpoint Overview
@@ -61,20 +75,23 @@
    - 5.6. Rate Limiting & Security
 
 ### **6. External Integrations**
-   - 6.1. Twilio (Voice & SMS)
-      - 6.1.1. Voice Call Flow
-      - 6.1.2. SMS Flow
+   - 6.1. Twilio ConversationRelay (Voice AI)
+      - 6.1.1. WebSocket Connection Setup
+      - 6.1.2. Real-Time Voice Streaming
       - 6.1.3. Webhook Configuration
-   - 6.2. Deepgram (Voice AI Agent)
-      - 6.2.1. Real-Time STT/TTS
-      - 6.2.2. Barge-In & Conversation Management
-      - 6.2.3. Critical Keyword Detection
-   - 6.3. Google Cloud Scheduler
-      - 6.3.1. Scheduled Jobs Configuration
-      - 6.3.2. Trigger Mechanism
-   - 6.4. Google Vertex AI Agent Engine
-      - 6.4.1. Deployment Configuration
-      - 6.4.2. Scaling & Performance
+      - 6.1.4. TwiML Endpoint Implementation
+   - 6.2. ElevenLabs (Text-to-Speech)
+      - 6.2.1. Voice Selection & Configuration
+      - 6.2.2. Integration with ConversationRelay
+      - 6.2.3. Latency Optimization
+   - 6.3. Twilio SMS
+      - 6.3.1. SMS Messaging Flow
+      - 6.3.2. Patient Response Handling
+   - 6.4. Google Cloud Run
+      - 6.4.1. Deployment Configuration (2 Services)
+      - 6.4.2. Environment Variables Setup
+      - 6.4.3. Service Communication
+      - 6.4.4. Scaling & Performance
 
 ### **7. Frontend: Next.js Application**
    - 7.1. Application Structure
@@ -113,11 +130,12 @@
    - 10.4. Google Cloud Configuration
 
 ### **11. Deployment Guide**
-   - 11.1. Backend Deployment (Vertex AI Agent Engine)
+   - 11.1. Backend Deployment (Google Cloud Run - 2 Services)
    - 11.2. Frontend Deployment (Vercel)
    - 11.3. Database Setup (Firestore)
-   - 11.4. CI/CD Pipeline
-   - 11.5. Monitoring & Logging
+   - 11.4. MCP Toolbox Setup
+   - 11.5. CI/CD Pipeline
+   - 11.6. Monitoring & Logging
 
 ### **12. Testing Strategy**
    - 12.1. Unit Testing
@@ -279,23 +297,29 @@ The following external resources are referenced throughout this document:
 | Technology | Documentation URL |
 | :--- | :--- |
 | **Google ADK** | [https://cloud.google.com/vertex-ai/generative-ai/docs/agent-development-kit](https://cloud.google.com/vertex-ai/generative-ai/docs/agent-development-kit) |
+| **LangGraph** | [https://langchain-ai.github.io/langgraph/](https://langchain-ai.github.io/langgraph/) |
+| **MCP Protocol** | [https://modelcontextprotocol.io/](https://modelcontextprotocol.io/) |
+| **A2A Protocol** | [https://github.com/google/generative-ai-docs/tree/main/a2a](https://github.com/google/generative-ai-docs/tree/main/a2a) |
 | **Firestore** | [https://firebase.google.com/docs/firestore](https://firebase.google.com/docs/firestore) |
 | **Next.js 16** | [https://nextjs.org/docs](https://nextjs.org/docs) |
 | **NextAuth v5** | [https://authjs.dev/](https://authjs.dev/) |
-| **Twilio Voice** | [https://www.twilio.com/docs/voice](https://www.twilio.com/docs/voice) |
+| **Twilio ConversationRelay** | [https://www.twilio.com/docs/voice/conversationrelay](https://www.twilio.com/docs/voice/conversationrelay) |
 | **Twilio SMS** | [https://www.twilio.com/docs/sms](https://www.twilio.com/docs/sms) |
-| **Deepgram** | [https://developers.deepgram.com/](https://developers.deepgram.com/) |
-| **Vertex AI** | [https://cloud.google.com/vertex-ai/docs](https://cloud.google.com/vertex-ai/docs) |
-| **Cloud Scheduler** | [https://cloud.google.com/scheduler/docs](https://cloud.google.com/scheduler/docs) |
+| **ElevenLabs** | [https://elevenlabs.io/docs](https://elevenlabs.io/docs) |
+| **Google Cloud Run** | [https://cloud.google.com/run/docs](https://cloud.google.com/run/docs) |
 | **shadcn/ui** | [https://ui.shadcn.com/](https://ui.shadcn.com/) |
 
 #### **Technology Stack Dependencies**
 
 **Backend:**
 - Python 3.10-3.12
-- google-adk >= 1.6.1
+- google-adk >= 1.6.1 (CareFlow Pulse Agent)
+- langgraph (CareFlow Caller Agent)
+- langchain-google-genai >= 2.0.7
+- a2a-sdk (Agent-to-Agent communication)
+- toolbox-core (MCP protocol)
 - python-dotenv
-- Deployed on Google Cloud Vertex AI Agent Engine
+- Deployed on Google Cloud Run (2 separate services)
 
 **Frontend:**
 - Node.js 18+ / npm or bun
@@ -311,9 +335,12 @@ The following external resources are referenced throughout this document:
 - Google Cloud Firestore (NoSQL document database)
 
 **External Services:**
-- Twilio (Voice & SMS)
-- Deepgram (Voice AI)
-- Google Cloud Scheduler
+- Twilio ConversationRelay (Real-time voice streaming)
+- Twilio SMS (Text messaging)
+- ElevenLabs (Text-to-speech synthesis)
+- Google Cloud Run (Container hosting)
+- Google Cloud Firestore (Database)
+- Google Cloud Artifact Registry (Container images)
 
 #### **Conventions Used in This Document**
 
@@ -332,12 +359,13 @@ Throughout this technical specification, the following conventions are used:
 
 ### **2.1. High-Level Architecture Diagram**
 
-CareFlow Pulse is built on a **decoupled, cloud-native architecture** that separates concerns between AI logic, data persistence, and user interfaces. This design ensures scalability, maintainability, and the ability to evolve each component independently.
+CareFlow Pulse is built on a **modern dual-agent architecture** using cutting-edge protocols (MCP, A2A) for healthcare data access and inter-agent communication. The system separates concerns between medical intelligence, voice interaction, and user interfaces.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         CAREFLOW PULSE ARCHITECTURE                      │
-└─────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────┐
+│                         CAREFLOW PULSE ARCHITECTURE v3.0                    │
+│                  Dual-Agent System with MCP & A2A Protocols                 │
+└────────────────────────────────────────────────────────────────────────────┘
 
                               ┌──────────────┐
                               │   PATIENTS   │
@@ -348,61 +376,73 @@ CareFlow Pulse is built on a **decoupled, cloud-native architecture** that separ
                     │                │                │
                     ▼                ▼                ▼
               ┌──────────┐    ┌──────────┐    ┌──────────┐
-              │  Voice   │    │   SMS    │    │  (Future)│
-              │  Calls   │    │ Messages │    │ Mobile   │
+              │  Phone   │    │   SMS    │    │  (Future)│
+              │  Calls   │    │ Messages │    │ Dashboard│
               └────┬─────┘    └────┬─────┘    └──────────┘
                    │               │
                    │               │
            ┌───────▼───────────────▼────────┐
            │                                 │
-           │        TWILIO SERVICE           │
-           │   (Voice & SMS Gateway)         │
-           │                                 │
+           │  TWILIO CONVERSATIONRELAY       │
+           │  • Real-time Voice Streaming    │
+           │  • WebSocket Connection         │
+           │  • SMS Gateway                  │
            └──────────┬──────────────────────┘
                       │
-                      │ Webhooks
+                      │ Webhooks (/twiml)
                       ▼
-    ┌─────────────────────────────────────────────────────┐
-    │                                                       │
-    │         GOOGLE VERTEX AI AGENT ENGINE                │
-    │              (Backend - Python ADK)                  │
-    │                                                       │
-    │  ┌──────────────────────────────────────────────┐   │
-    │  │         CareFlow-Main (Orchestrator)         │   │
-    │  │  • Workflow Management                       │   │
-    │  │  • Request Routing                           │   │
-    │  │  • Firestore Synchronization                 │   │
-    │  └────┬──────────────┬──────────────┬───────────┘   │
-    │       │              │              │                │
-    │  ┌────▼────┐   ┌─────▼─────┐  ┌────▼─────┐         │
-    │  │CareFlow-│   │ CareFlow- │  │CareFlow- │         │
-    │  │Connect  │   │  Analyze  │  │  Brief   │         │
-    │  │         │   │           │  │          │         │
-    │  │• Prompt │   │• Medical  │  │• Summary │         │
-    │  │  Gen    │   │  Triage   │  │  Gen     │         │
-    │  │• Outbnd │   │• Risk     │  │• Alert   │         │
-    │  │  Calls  │   │  Classify │  │  Context │         │
-    │  └─────────┘   └───────────┘  └──────────┘         │
-    │                                                       │
-    └───────────────────────┬───────────────────────────────┘
-                            │
-                   ┌────────┼────────┐
-                   │                 │
-         ┌─────────▼──────┐  ┌──────▼──────────┐
-         │  DEEPGRAM API  │  │ CLOUD SCHEDULER │
-         │                │  │                 │
-         │  • Real-time   │  │ • 8:15 AM      │
-         │    STT/TTS     │  │ • 12:15 PM     │
-         │  • Barge-in    │  │ • 8:15 PM      │
-         │  • Keyword     │  │                 │
-         │    Detection   │  │ (Daily Triggers)│
-         └────────────────┘  └─────────────────┘
-
-
+    ┌─────────────────────────────────────────────────────────────┐
+    │                  GOOGLE CLOUD RUN (us-central1)              │
+    │                                                               │
+    │  ┌─────────────────────────────────────────────────────┐   │
+    │  │   CareFlow Caller Agent (Port 8080)                 │   │
+    │  │   LangGraph REACT Architecture                      │   │
+    │  │                                                       │   │
+    │  │  • Voice conversation management                    │   │
+    │  │  • Twilio ConversationRelay integration             │   │
+    │  │  • ElevenLabs TTS (voice: UgBBYS2sOqTuMpoF3BR0)    │   │
+    │  │  • A2A Client for medical agent delegation          │   │
+    │  │  • Conversation state tracking                      │   │
+    │  └──────────────────┬──────────────────────────────────┘   │
+    │                     │                                        │
+    │                     │ A2A Protocol (JSON-RPC + SSE)         │
+    │                     │ http://careflow-pulse-agent:8000      │
+    │                     ▼                                        │
+    │  ┌─────────────────────────────────────────────────────┐   │
+    │  │   CareFlow Pulse Agent (Port 8000)                  │   │
+    │  │   Google ADK Implementation                         │   │
+    │  │                                                       │   │
+    │  │  • Medical reasoning & triage                       │   │
+    │  │  • MCP Toolbox integration (6 Firestore tools)      │   │
+    │  │  • Clinical decision support                        │   │
+    │  │  • Risk assessment (GREEN/ORANGE/RED)               │   │
+    │  │  • A2A Server for caller agent requests             │   │
+    │  │  • AgentCard: /.well-known/agent.json              │   │
+    │  └──────────────────┬──────────────────────────────────┘   │
+    └─────────────────────┼──────────────────────────────────────┘
+                          │
+                          │ MCP Protocol
+                          │ http://localhost:5000
+                          ▼
+              ┌─────────────────────────┐
+              │    MCP TOOLBOX          │
+              │    (Executable)         │
+              │                         │
+              │  MCP Tools Available:   │
+              │  • get_all_patients     │
+              │  • get_critical_patients│
+              │  • get_patients_by_risk │
+              │  • get_patient_by_id    │
+              │  • query_by_diagnosis   │
+              │  • list_collections     │
+              └────────┬────────────────┘
+                       │
+                       │ Firestore SDK
+                       ▼
     ┌─────────────────────────────────────────────────────┐
     │                                                       │
     │           GOOGLE CLOUD FIRESTORE                     │
-    │          (Central Database - NoSQL)                  │
+    │       (Database: careflow-478811/careflow-db)        │
     │                                                       │
     │  Collections:                                        │
     │  • /patients                    [Main patient data] │
@@ -413,8 +453,8 @@ CareFlow Pulse is built on a **decoupled, cloud-native architecture** that separ
     │                                                       │
     └──────────────────┬────────────────────────────────────┘
                        │
-                       │ Real-time Sync
-                       │ (onSnapshot)
+                       │ Real-time Sync (onSnapshot)
+                       │
                        ▼
     ┌─────────────────────────────────────────────────────┐
     │                                                       │
@@ -428,7 +468,7 @@ CareFlow Pulse is built on a **decoupled, cloud-native architecture** that separ
     │  ┌──────────────────▼───────────────────────────┐   │
     │  │         Dashboard Pages (App Router)         │   │
     │  │                                              │   │
-    │  │  /dashboard     → Overview & Stats          │   │
+    │  │  /dashboard     → Overview & KPIs           │   │
     │  │  /patients      → Patient List              │   │
     │  │  /patient/{id}  → Patient Detail & History  │   │
     │  │  /alerts        → Critical Alert Management │   │
@@ -437,7 +477,6 @@ CareFlow Pulse is built on a **decoupled, cloud-native architecture** that separ
     │                                                       │
     └───────────────────────────────────────────────────────┘
                        ▲
-                       │
                        │
               ┌────────┴─────────┐
               │                  │
@@ -449,11 +488,13 @@ CareFlow Pulse is built on a **decoupled, cloud-native architecture** that separ
 
 **Key Architectural Principles:**
 
-1. **Separation of Concerns**: AI logic (Backend) is completely decoupled from UI (Frontend)
-2. **Event-Driven**: External triggers (Scheduler, Twilio) drive agent actions via webhooks
-3. **Real-Time Sync**: Firestore acts as the single source of truth with live updates to frontend
-4. **Stateless Agents**: ADK agents are stateless; all state is persisted in Firestore
-5. **Cloud-Native**: Leverages managed Google Cloud services for scalability and reliability
+1. **Dual-Agent Specialization**: Separate agents for voice interaction (Caller) and medical intelligence (Pulse)
+2. **MCP Protocol**: Standardized toolbox integration for Firestore database access
+3. **A2A Protocol**: Inter-agent communication using JSON-RPC + SSE streaming
+4. **Voice-First Interface**: Natural phone conversations via Twilio ConversationRelay + ElevenLabs
+5. **Real-Time Sync**: Firestore acts as the single source of truth with live updates to frontend
+6. **Containerized Deployment**: Both agents run as separate Cloud Run services
+7. **Cloud-Native**: Leverages managed Google Cloud services for scalability and reliability
 
 ---
 
@@ -477,16 +518,22 @@ CareFlow Pulse is built on a **decoupled, cloud-native architecture** that separ
 | **Date Handling** | date-fns | 3.6.0 | Date formatting and manipulation |
 | **Hosting** | Vercel | N/A | Edge-optimized hosting with zero-config deployment |
 
-#### **Backend (AI Agent System)**
+#### **Backend (Dual-Agent AI System)**
 
 | Component | Technology | Version | Purpose |
 | :--- | :--- | :--- | :--- |
-| **Framework** | Google ADK | 1.6.1+ | Agent Development Kit for multi-agent orchestration |
-| **Language** | Python | 3.10-3.12 | Backend logic and agent implementation |
-| **AI Model** | Gemini 2.5 Flash | Latest | Fast, intelligent LLM for medical triage |
-| **Deployment** | Vertex AI Agent Engine | N/A | Serverless agent hosting on Google Cloud |
+| **CareFlow Pulse Agent** | Google ADK | 1.6.1+ | Medical reasoning agent with MCP toolbox integration |
+| **CareFlow Caller Agent** | LangGraph | Latest | Voice interface agent with REACT architecture |
+| **Language** | Python | 3.10-3.12 | Backend logic for both agents |
+| **AI Model** | Gemini 2.5 Flash | Latest | Fast, intelligent LLM for medical triage and conversation |
+| **MCP Protocol** | toolbox-core | Latest | Model Context Protocol for Firestore database access |
+| **A2A Protocol** | a2a-sdk | Latest | Agent-to-Agent communication (JSON-RPC + SSE) |
+| **Voice Interface** | Twilio ConversationRelay | Latest | Real-time voice streaming with WebSocket |
+| **Text-to-Speech** | ElevenLabs | Latest | Natural-sounding voice synthesis (voice: UgBBYS2sOqTuMpoF3BR0) |
+| **LangChain Integration** | langchain-google-genai | 2.0.7+ | LangChain + Gemini for caller agent |
+| **Deployment** | Google Cloud Run | N/A | Containerized deployment (2 separate services) |
+| **Container Registry** | Artifact Registry | N/A | Docker image storage |
 | **Environment** | python-dotenv | Latest | Environment variable management |
-| **Package Manager** | uv | Latest | Fast Python package installer |
 
 #### **Database**
 
@@ -500,10 +547,12 @@ CareFlow Pulse is built on a **decoupled, cloud-native architecture** that separ
 
 | Service | Provider | Purpose |
 | :--- | :--- | :--- |
-| **Voice Calls** | Twilio Voice API | Initiate outbound calls to patients |
-| **SMS Messaging** | Twilio SMS API | Send/receive text messages |
-| **Voice AI** | Deepgram | Real-time speech-to-text, text-to-speech, conversation management |
-| **Scheduling** | Google Cloud Scheduler | Time-based triggers for automated follow-ups |
+| **Voice Streaming** | Twilio ConversationRelay | Real-time voice conversation management with WebSocket |
+| **Text-to-Speech** | ElevenLabs | Natural-sounding voice synthesis for patient interactions |
+| **SMS Messaging** | Twilio SMS API | Send/receive text messages for medication reminders |
+| **Database** | Google Cloud Firestore | NoSQL document database for patient data, interactions, alerts |
+| **Container Hosting** | Google Cloud Run | Serverless container hosting for both agents |
+| **Container Registry** | Google Cloud Artifact Registry | Docker image storage and management |
 | **Monitoring** | Google Cloud Logging | Centralized logging and tracing |
 
 #### **Development & DevOps**
