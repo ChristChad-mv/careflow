@@ -18,7 +18,7 @@ from langchain_core.messages import (
 from langchain_core.tools import tool # type: ignore[import]
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent # type: ignore[import]
-from .app_utils.llm import get_model, ModelConfig
+from .app_utils.config import get_model, ModelConfig
 from pydantic import BaseModel, Field
 from .app_utils.conversation_relay import SessionData
 from a2a.types import (
@@ -624,6 +624,11 @@ def read_config():
         logger.info(f"Reading config from: {config_path}")
         with open(config_path, 'r') as file:
             config = yaml.safe_load(file)
+        
+        # Override servers with environment variable if provided (for Cloud Run)
+        agent_url = os.environ.get("CAREFLOW_AGENT_URL", f"http://localhost:{config['servers'][0]['port']}")
+        config['servers'] = [{"name": "CareFlow Agent", "port": None, "url": agent_url}]
+        
         return config
     except Exception as error:
         logger.error(f'Error reading config.yaml: {error}')
@@ -633,7 +638,10 @@ def read_config():
 config = read_config()
 
 # Create agent instance
+# Use environment variable for A2A server URL or fall back to config
+a2a_server_urls = [s.get('url') or f"http://localhost:{s['port']}" for s in config['servers'] if s.get('url') or s.get('port')]
+
 agent = Agent(
     system_message=config['client']['system'],
-    a2a_servers=[f"http://localhost:{server['port']}" for server in config['servers']]
+    a2a_servers=a2a_server_urls
 )
