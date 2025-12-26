@@ -37,10 +37,13 @@ latency_by_tools = {
 }
 
 # --- Agent Card Definition ---
+# Get service URL from environment (Cloud Run deployment)
+service_url = os.environ.get("SERVICE_URL", "http://localhost:8080/")
+
 caller_agent_card = AgentCard(
     name="Caller Agent",
     description="Voice interface for CareFlow Pulse. Handles phone calls with patients and relays information to the Healthcare Agent.",
-    url="http://localhost:8080/",
+    url=service_url,
     provider=AgentProvider(
         organization="CareFlow Pulse",
         url="https://careflow-pulse.com",
@@ -101,6 +104,7 @@ class CallerAgentExecutor(AgentExecutor):
         logger.error(f"Cancelled task {context.task_id}")
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+        print(f"DEBUG: CallerAgentExecutor.execute called with context: {context}")
         logger.info("Executing Caller Agent via A2A")
         user_message: Optional[Message] = context.message
         currentTask = context.current_task
@@ -187,8 +191,10 @@ class CallerAgentExecutor(AgentExecutor):
             if p.root.kind == "text" and hasattr(p.root, "text"):
                 current_message_text += p.root.text + "\n"
         current_message_text = current_message_text.strip()
+        print(f"DEBUG: Extracted message text: '{current_message_text}'")
 
         if not current_message_text:
+            print("DEBUG: No text found in user message!")
             logger.warning("No text found in user message")
             # Handle failure...
             return
@@ -241,13 +247,16 @@ class CallerAgentExecutor(AgentExecutor):
                 config={
                     "configurable": {"thread_id": contextId},
                     "callbacks": [],
+                    "recursion_limit": 100
                 },
                 version="v2"
             )
 
             final_response = ""
+            print("DEBUG: Starting agent stream...")
             
             async for stream in streams:
+                print(f"DEBUG: Stream event: {stream.get('event')}")
                 if taskId in self.cancelled_tasks:
                     logger.info(f"Request cancelled for task: {taskId}")
                     # Send cancel event...
