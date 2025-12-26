@@ -5,7 +5,7 @@ Communication avec Twilio-Agent via A2A Protocol
 import json
 import httpx
 from typing import Optional, AsyncGenerator
-from google.adk.streaming import StreamingOptions
+from google.adk import StreamingOptions
 
 # Configuration Twilio-Agent
 TWILIO_AGENT_URL = "http://localhost:5001"  # URL du service Twilio-Agent
