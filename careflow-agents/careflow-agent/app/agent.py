@@ -5,26 +5,45 @@ This AI agent monitors recently discharged patients, analyzes their symptoms,
 and generates alerts for nurse coordinators.
 """
 
+import sys
+import os
 from datetime import datetime, timezone
+from dotenv import load_dotenv
 
-import google.genai.types as genai_types
+load_dotenv()
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
+
 from google.adk.agents import LlmAgent
+import google.genai.types as genai_types
 from google.adk.planners import BuiltInPlanner
 
+from toolbox_core import ToolboxSyncClient
+
+# Load MCP Toolbox tools
+print(f"📡 Connecting to MCP toolbox server at http://127.0.0.1:5000...")
+
+# Keep client open globally so tools can use it
+toolbox_client = None
+all_tools = []
+try:
+    # Don't use 'with' - we need to keep the session open
+    toolbox_client = ToolboxSyncClient("http://127.0.0.1:5000")
+    # Load our custom toolset
+    all_tools = toolbox_client.load_toolset("patient_tools")
+except Exception as e:
+    print(f"⚠️ Warning: Could not load MCP tools: {e}")
+    import traceback
+    traceback.print_exc()
+
+print(f"Total tools available: {len(all_tools)} MCP tools")
 
 AGENT_NAME = "careflow_pulse_agent"
 AGENT_MODEL = "gemini-2.5-flash"
 AGENT_DESCRIPTION = "An AI agent that monitors post-hospitalization patients, analyzes symptoms, and generates alerts for healthcare coordinators."
 
-# --- ROOT AGENT DEFINITION ---
-root_agent = LlmAgent(
-    name=AGENT_NAME,
-    model=AGENT_MODEL,
-    description=AGENT_DESCRIPTION,
-    planner=BuiltInPlanner(
-        thinking_config=genai_types.ThinkingConfig(include_thoughts=True)
-    ),
-    instruction=f"""
+AGENT_INSTRUCTION = f"""
     You are CareFlow Pulse, an AI-powered post-hospitalization patient monitoring agent.
     Your primary mission is to help nurse coordinators monitor recently discharged patients
     and prevent readmissions through proactive care and early intervention.
@@ -125,6 +144,16 @@ root_agent = LlmAgent(
 
     Remember: Your goal is to prevent readmissions through early detection and proactive intervention.
     Every alert you generate could save a life or prevent unnecessary suffering.
-    """,
+    """
+
+root_agent = LlmAgent(
+    name=AGENT_NAME,
+    model=AGENT_MODEL,
+    description=AGENT_DESCRIPTION,
+    planner=BuiltInPlanner(
+        thinking_config=genai_types.ThinkingConfig(include_thoughts=True)
+    ),
+    instruction=AGENT_INSTRUCTION,
+    tools=all_tools,
     output_key="patient_monitoring",
 )
