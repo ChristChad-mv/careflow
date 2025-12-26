@@ -2,8 +2,8 @@
 
 | | |
 | :--- | :--- |
-| **Document Version:** | 3.0 |
-| **Date:** | 2025-12-03 |
+| **Document Version:** | 3.1 |
+| **Date:** | 2025-12-25 |
 | **Status:** | **Current** |
 | **Author:** | Christ |
 
@@ -12,9 +12,10 @@
 ## **Revision History**
 | Version | Date | Author | Changes |
 | :--- | :--- | :--- | :--- |
-| 1.0 | 2025-11-15 | Christ | Initial Draft - Basic architecture overview |
-| 2.0 | 2025-11-15 | Christ | Complete rewrite with comprehensive database structure, API endpoints, and implementation details |
-| 3.0 | 2025-12-03 | Christ | Major architecture update: Dual-agent system (CareFlow Pulse + Caller), MCP protocol integration, A2A inter-agent communication, Twilio ConversationRelay, Cloud Run deployment |
+| 1.0 | 2025-12-20 | Christ | Initial Draft - Basic architecture overview |
+| 2.0 | 2025-12-23 | Christ | Complete rewrite with comprehensive database structure, API endpoints, and implementation details |
+| 3.0 | 2025-12-26 | Christ | Major architecture update: Dual-agent system (CareFlow Pulse + Caller), MCP protocol integration, A2A inter-agent communication, Twilio ConversationRelay, Cloud Run deployment |
+| 3.1 | 2025-12-26 | Christ | Major architecture update: Dual-agent system (CareFlow Pulse + Caller), MCP protocol integration, A2A inter-agent communication, Twilio ConversationRelay, Cloud Run deployment (v2) |
 
 ---
 
@@ -130,7 +131,20 @@
    - 10.4. Google Cloud Configuration
 
 ### **11. Deployment Guide**
-   - 11.1. Backend Deployment (Google Cloud Run - 2 Services)
+   -### **11.1. Backend Deployment (The Fleet)**
+
+We do NOT deploy a single monolithic agent. We deploy a **Fleet of Agents**, one per hospital.
+
+1.  **Containerize**: Build `careflow-pulse-agent` Docker image.
+2.  **Deploy loop**: For each hospital in `hospitals.json`:
+    -   Deploy Cloud Run Service: `careflow-agent-[HOSPITAL_ID]`
+    -   Set Env Var: `HOSPITAL_ID=[HOSPITAL_ID]`
+3.  **Result**: N Isolated Services.
+
+#### **Dispatcher Deployment**
+-   Deploy a single "Dispatcher" (Cloud Function or Script).
+-   Cloud Scheduler triggers Dispatcher daily.
+-   Dispatcher fires async requests to all N Agent Services.
    - 11.2. Frontend Deployment (Vercel)
    - 11.3. Database Setup (Firestore)
    - 11.4. MCP Toolbox Setup
@@ -342,16 +356,15 @@ The following external resources are referenced throughout this document:
 - Google Cloud Firestore (Database)
 - Google Cloud Artifact Registry (Container images)
 
-#### **Conventions Used in This Document**
+#### **Development & DevOps**
 
-Throughout this technical specification, the following conventions are used:
-
-- **`Code blocks`** represent actual code, configuration, or terminal commands
-- **Field names** in database schemas are shown in `monospace font`
-- **[Hyperlinks]** point to related sections, external documentation, or code repositories
-- **⚠️ Warning boxes** highlight critical security or performance considerations
-- **💡 Pro Tips** provide implementation best practices
-- **🔧 TODO markers** indicate areas requiring additional configuration or future enhancement
+| Tool | Purpose |
+| :--- | :--- |
+| **Makefile** | Development workflow orchestration (install, dev, deploy) |
+| **Git** | Version control (GitHub repository) |
+| **npm/bun** | Frontend package management |
+| **uv** | Backend package management |
+| **Environment Files** | `.env` for configuration management |
 
 ---
 
@@ -365,6 +378,7 @@ CareFlow Pulse is built on a **modern dual-agent architecture** using cutting-ed
 ┌────────────────────────────────────────────────────────────────────────────┐
 │                         CAREFLOW PULSE ARCHITECTURE v3.0                    │
 │                  Dual-Agent System with MCP & A2A Protocols                 │
+│                     MULTI-TENANT FLEET (1 Agent / Hospital)                │
 └────────────────────────────────────────────────────────────────────────────┘
 
                               ┌──────────────┐
@@ -380,7 +394,6 @@ CareFlow Pulse is built on a **modern dual-agent architecture** using cutting-ed
               │  Calls   │    │ Messages │    │ Dashboard│
               └────┬─────┘    └────┬─────┘    └──────────┘
                    │               │
-                   │               │
            ┌───────▼───────────────▼────────┐
            │                                 │
            │  TWILIO CONVERSATIONRELAY       │
@@ -392,49 +405,35 @@ CareFlow Pulse is built on a **modern dual-agent architecture** using cutting-ed
                       │ Webhooks (/twiml)
                       ▼
     ┌─────────────────────────────────────────────────────────────┐
-    │                  GOOGLE CLOUD RUN (us-central1)              │
-    │                                                               │
-    │  ┌─────────────────────────────────────────────────────┐   │
-    │  │   CareFlow Caller Agent (Port 8080)                 │   │
-    │  │   LangGraph REACT Architecture                      │   │
-    │  │                                                       │   │
-    │  │  • Voice conversation management                    │   │
-    │  │  • Twilio ConversationRelay integration             │   │
-    │  │  • ElevenLabs TTS (voice: UgBBYS2sOqTuMpoF3BR0)    │   │
-    │  │  • A2A Client for medical agent delegation          │   │
-    │  │  • Conversation state tracking                      │   │
-    │  └──────────────────┬──────────────────────────────────┘   │
-    │                     │                                        │
-    │                     │ A2A Protocol (JSON-RPC + SSE)         │
-    │                     │ http://careflow-pulse-agent:8000      │
-    │                     ▼                                        │
-    │  ┌─────────────────────────────────────────────────────┐   │
-    │  │   CareFlow Pulse Agent (Port 8000)                  │   │
-    │  │   Google ADK Implementation                         │   │
-    │  │                                                       │   │
-    │  │  • Medical reasoning & triage                       │   │
-    │  │  • MCP Toolbox integration (6 Firestore tools)      │   │
-    │  │  • Clinical decision support                        │   │
-    │  │  • Risk assessment (GREEN/ORANGE/RED)               │   │
-    │  │  • A2A Server for caller agent requests             │   │
-    │  │  • AgentCard: /.well-known/agent.json              │   │
-    │  └──────────────────┬──────────────────────────────────┘   │
-    └─────────────────────┼──────────────────────────────────────┘
+    │                  GOOGLE CLOUD RUN (The Fleet)               │
+    │         (One Service per Hospital for Isolation)            │
+    │                                                             │
+    │  ┌─────────────────────────────────────────────────────┐    │
+    │  │   CareFlow Caller Agent (Port 8080)                 │    │
+    │  │   (Shared Service or Dedicated)                     │    │
+    │  └──────────────────┬──────────────────────────────────┘    │
+    │                     │                                         │
+    │                     │ A2A Protocol (JSON-RPC + SSE)          │
+    │                     ▼                                         │
+    │  ┌─────────────────────────────────────────────────────┐    │
+    │  │   AGENT FLEET (Medical Intelligence)                │    │
+    │  │                                                     │    │
+    │  │   [Service: careflow-agent-hosp001]                 │    │
+    │  │   • Env: HOSPITAL_ID=HOSP01                         │    │
+    │  │                                                     │    │
+    │  │   [Service: careflow-agent-hosp002]                 │    │
+    │  │   • Env: HOSPITAL_ID=HOSP02                         │    │
+    │  │                                                     │    │
+    │  │   ... (Scales Horizontally)                         │    │
+    │  └──────────────────┬──────────────────────────────────┘    │
+    │                     │                                         │
+    └─────────────────────┼───────────────────────────────────────┘
                           │
-                          │ MCP Protocol
-                          │ http://localhost:5000
+                          │ MCP Protocol (Restricted by HOSPITAL_ID)
                           ▼
               ┌─────────────────────────┐
               │    MCP TOOLBOX          │
               │    (Executable)         │
-              │                         │
-              │  MCP Tools Available:   │
-              │  • get_all_patients     │
-              │  • get_critical_patients│
-              │  • get_patients_by_risk │
-              │  • get_patient_by_id    │
-              │  • query_by_diagnosis   │
-              │  • list_collections     │
               └────────┬────────────────┘
                        │
                        │ Firestore SDK
@@ -444,46 +443,22 @@ CareFlow Pulse is built on a **modern dual-agent architecture** using cutting-ed
     │           GOOGLE CLOUD FIRESTORE                     │
     │       (Database: careflow-478811/careflow-db)        │
     │                                                       │
-    │  Collections:                                        │
-    │  • /patients                    [Main patient data] │
-    │    └─ /interactions             [Call logs]         │
-    │    └─ /medicationLog            [Med tracking]      │
-    │  • /alerts                      [Active alerts]     │
-    │  • /users                       [Healthcare staff]  │
+    │  Collections (Logical Isolation via hospitalId):     │
+    │  • /patients                    [where hospitalId=X]│
+    │  • /alerts                      [where hospitalId=X]│
+    │  • /users                       [where hospitalId=X]│
     │                                                       │
     └──────────────────┬────────────────────────────────────┘
                        │
                        │ Real-time Sync (onSnapshot)
-                       │
                        ▼
     ┌─────────────────────────────────────────────────────┐
-    │                                                       │
     │           NEXT.JS FRONTEND (Vercel)                  │
-    │                                                       │
-    │  ┌──────────────────────────────────────────────┐   │
-    │  │           NextAuth Authentication            │   │
-    │  │     (Role-based: Nurse/Coordinator/Admin)    │   │
-    │  └──────────────────┬───────────────────────────┘   │
-    │                     │                                │
-    │  ┌──────────────────▼───────────────────────────┐   │
-    │  │         Dashboard Pages (App Router)         │   │
-    │  │                                              │   │
-    │  │  /dashboard     → Overview & KPIs           │   │
-    │  │  /patients      → Patient List              │   │
-    │  │  /patient/{id}  → Patient Detail & History  │   │
-    │  │  /alerts        → Critical Alert Management │   │
-    │  │  /config        → System Configuration      │   │
-    │  └──────────────────────────────────────────────┘   │
-    │                                                       │
-    └───────────────────────────────────────────────────────┘
-                       ▲
-                       │
-              ┌────────┴─────────┐
-              │                  │
-         ┌────▼────┐       ┌─────▼─────┐
-         │  NURSE  │       │COORDINATOR│
-         │  Sarah  │       │  Michael  │
-         └─────────┘       └───────────┘
+    │     (Multi-Tenant Dashboard via Auth Context)        │
+    └─────────────────────────────────────────────────────┘
+
+ORCHESTRATION (The Dispatcher):
+Cloud Scheduler (Daily) --> [Dispatcher Function] --> Loops Active Hospitals --> Triggers Specific Agent URL
 ```
 
 **Key Architectural Principles:**
@@ -567,7 +542,7 @@ CareFlow Pulse is built on a **modern dual-agent architecture** using cutting-ed
 
 ---
 
-### **2.3. Component Interaction Flow**
+## **2.3. Component Interaction Flow**
 
 This section describes the typical request flow through the system for key scenarios.
 
@@ -576,13 +551,15 @@ This section describes the typical request flow through the system for key scena
 ```
 1. Cloud Scheduler (8:15 AM)
    │
-   ├─→ POST /api/careflow/trigger-scheduled-calls
-   │   Body: { "timeSlot": "morning", "hour": 8 }
+   ├─→ POST [Dispatcher Function] (Loops active hospitals)
+   │   │
+   │   └─→ POST https://careflow-agent-hospXXX.run.app/start
+   │       Body: { "timeSlot": "morning", "hour": 8 }
    │
-2. CareFlow-Main Agent (Vertex AI)
+2. CareFlow-Main Agent (HOSPXXX Context)
    │
    ├─→ Query Firestore: Get patients with medications at 8am
-   │   WHERE dischargePlan.medications[].scheduleHour == 8
+   │   WHERE hospitalId == "HOSPXXX" AND dischargePlan.medications[].scheduleHour == 8
    │
 3. For each patient:
    │
@@ -786,7 +763,9 @@ CareFlow Pulse uses **Google Cloud Firestore** as its primary database. Firestor
 3. **Denormalization for Performance**: Active alerts are duplicated in a separate `/alerts` collection for fast dashboard queries
 4. **Timestamp Everything**: All documents include `createdAt` and `updatedAt` timestamps for audit trails
 5. **Indexed Fields**: Fields used in queries (e.g., `riskLevel`, `status`, `scheduleHour`) are indexed for performance
-6. **UUID Primary Keys**: Patients use UUIDs for universal uniqueness (future: may support hospital MRN)
+7. **Multi-Tenancy (Logical Isolation)**: Every top-level document (`/patients`, `/alerts`, `/users`) MUST ideally contain a `hospitalId` field. Queries are strictly scoped by this field to ensure data isolation.
+   - **Agent Enforcement**: Agents are deployed with `HOSPITAL_ID` env var and refuse to query data without this filter.
+   - **Frontend Enforcement**: UI components filter data based on the logged-in user's `hospitalId`.
 
 #### **Database Structure Overview**
 
@@ -815,6 +794,7 @@ Firestore Root
 | Field | Type | Required | Description | Example | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `patientId` | `string` | ✅ | Unique identifier (matches document ID) | `"550e8400-e29b-41d4-a716-446655440000"` | UUID v4 format |
+| `hospitalId` | `string` | ✅ | Tenant Identifier for Logical Isolation | `"HOSP001"` | **Indexed** for Multi-Tenancy |
 | `name` | `string` | ✅ | Patient's full name | `"Sarah Mitchell"` | PHI - encrypted at rest |
 | `dateOfBirth` | `Timestamp` | ✅ | Date of birth for age calculation | `Timestamp(1978-03-15)` | PHI |
 | `contact` | `Map` | ✅ | Contact information object | See below | PHI |
@@ -1161,6 +1141,7 @@ type MedicationStatus =
 | Field | Type | Required | Description | Example | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `alertId` | `string` | ✅ | Unique alert identifier (matches doc ID) | `"alert_abc123"` | Auto-generated |
+| `hospitalId` | `string` | ✅ | Tenant Identifier | `"HOSP001"` | **Indexed** |
 | `patientId` | `string` | ✅ | Reference to patient | `"550e8400-e29b-41d4-a716-446655440000"` | **Indexed** |
 | `patientName` | `string` | ✅ | Patient name (denormalized for speed) | `"Sarah Mitchell"` | Displayed in alert list |
 | `riskLevel` | `string` | ✅ | Alert severity | `"RED"` | Enum: `ORANGE`, `RED` - **Indexed** |
@@ -1484,30 +1465,29 @@ Rather than using a single monolithic AI agent, CareFlow Pulse employs a **speci
     └──────────────┘ └──────────────┘ └─────────────────┘
 ```
 
-#### **Deployment Platform: Vertex AI Agent Engine**
+#### **Deployment Platform: Google Cloud Run (The Fleet)**
 
-All agents are packaged together and deployed as a single **ADK App** to Vertex AI Agent Engine:
+All agents are packaged and deployed as **Stateless Services** on Google Cloud Run. To strictly enforce Multi-Tenancy:
 
-- **Serverless**: No infrastructure management required
-- **Auto-scaling**: Automatically scales from 0 to N instances based on traffic
-- **Built-in Monitoring**: Integrated with Cloud Logging and Cloud Trace
-- **API Endpoints**: Exposes REST endpoints for external triggers
-- **Authentication**: Uses Google Cloud IAM for secure access
+-   **Replication**: We deploy **One Agent Service per Hospital**.
+-   **Isolation**: Each service has a specific `HOSPITAL_ID` environment variable (e.g., `HOSP001`).
+-   **Logic**: The agent reads this variable at startup and strictly filters all Firestore queries by this ID.
+-   **Discovery**: The "Dispatcher" knows the URL of each hospital's agent service.
 
 **Deployment Command:**
 ```bash
-cd app/
-make deploy
-# Or manually:
-uv run python -m app.agent_engine_app deploy
+# Deploy for Hospital 1
+gcloud run deploy careflow-agent-hosp001 \
+  --image gcr.io/project/agent \
+  --set-env-vars HOSPITAL_ID=HOSP001,FIREBASE_PROJECT_ID=...
+
+# Deploy for Hospital 2
+gcloud run deploy careflow-agent-hosp002 \
+  --image gcr.io/project/agent \
+  --set-env-vars HOSPITAL_ID=HOSP002,FIREBASE_PROJECT_ID=...
 ```
 
-This command:
-1. Packages all agent code and dependencies
-2. Uploads to Google Cloud Storage (staging bucket)
-3. Deploys to Vertex AI Agent Engine in `us-central1`
-4. Creates/updates the Agent Engine endpoint
-5. Returns the publicly accessible API URL
+This strategy ensures that `HOSP001` agent **physically cannot** access `HOSP002` data due to logic and potential future IAM bindings.
 
 ---
 
@@ -1521,7 +1501,7 @@ This command:
 
 | Responsibility | Description | Tools Used |
 | :--- | :--- | :--- |
-| **Webhook Handling** | Receives POST requests from Twilio, Deepgram, and Cloud Scheduler | N/A (HTTP endpoint) |
+| **Webhook Handling** | Receives POST requests from Twilio, and Cloud Scheduler | N/A (HTTP endpoint) |
 | **Request Routing** | Determines which specialized agent should handle the request | ADK planner |
 | **Firestore Sync** | All database reads/writes go through this agent | `firestore_tool` |
 | **Workflow Coordination** | Manages multi-step processes (e.g., call → analyze → update → alert nurse) | ADK session management |
@@ -1542,8 +1522,12 @@ root_agent = LlmAgent(
     planner=BuiltInPlanner(
         thinking_config=genai_types.ThinkingConfig(include_thoughts=True)
     ),
-    instruction="""
-    You are CareFlow Pulse, an AI-powered patient monitoring orchestrator.
+    instruction=f"""
+    You are CareFlow Pulse, the medical intelligence agent for post-hospitalization patient monitoring.
+    
+    1. **Scope**: You serve **ONLY** Hospital `{os.environ.get("HOSPITAL_ID")}`.
+       - You must NEVER access or process data for any other hospital.
+       - All your Firestore queries matches `hospitalId='{os.environ.get("HOSPITAL_ID")}'`.
     
     Your job is to:
     1. Receive triggers from external systems (scheduler, Twilio webhooks)
@@ -2361,4 +2345,72 @@ Content-Security-Policy: default-src 'self'
 - Alert if authentication failures spike (potential attack)
 
 ---
+
+
+## **10. Configuration & Environment Variables**
+
+### **10.1. Backend Environment Variables (The Fleet)**
+
+Each Agent Service in the fleet requires specific configuration.
+
+| Variable | Required | Description | Example |
+| :--- | :--- | :--- | :--- |
+| `HOSPITAL_ID` | ✅ | **[CRITICAL]** Tenant Context for this Agent Instance | `"HOSP001"` |
+| `FIREBASE_PROJECT_ID` | ✅ | Firebase Project ID | `"careflow-478811"` |
+| `GOOGLE_CLOUD_PROJECT` | ✅ | GCP Project ID | `"careflow-478811"` |
+| `TWILIO_ACCOUNT_SID` | ✅ | Twilio Account SID | `"AC..."` |
+| `TWILIO_AUTH_TOKEN` | ✅ | Twilio Auth Token | `"..."` |
+| `DEEPGRAM_API_KEY` | ✅ | Deepgram API Key | `"..."` |
+
+---
+
+## **11. Deployment Guide**
+
+### **11.1. Backend Deployment (The Fleet Strategy)**
+
+We utilize a **Multi-Tenant Fleet** strategy where each hospital gets its own isolated Cloud Run service.
+
+#### **Step 1: Build the Generic Agent Image**
+Build a single Docker image that can serve *any* hospital.
+```bash
+gcloud builds submit --tag gcr.io/careflow-478811/careflow-agent:latest .
+```
+
+#### **Step 2: Deploy Service for Each Hospital**
+Iterate through your hospital list and deploy an instance for each, injecting the `HOSPITAL_ID` environment variable.
+
+**Hospital 1 (Central Hospital):**
+```bash
+gcloud run deploy careflow-agent-hosp001 \
+  --image gcr.io/careflow-478811/careflow-agent:latest \
+  --set-env-vars HOSPITAL_ID=HOSP001 \
+  --region us-central1 \
+  --allow-unauthenticated
+```
+
+**Hospital 2 (St. Mary's Clinic):**
+```bash
+gcloud run deploy careflow-agent-hosp002 \
+  --image gcr.io/careflow-478811/careflow-agent:latest \
+  --set-env-vars HOSPITAL_ID=HOSP002 \
+  --region us-central1 \
+  --allow-unauthenticated
+```
+
+#### **Step 3: Deploy the Dispatcher**
+Deploy a Cloud Function or Scheduler Job that triggers these services.
+- **Job:** `daily-rounds`
+- **Target:** Calls the Dispatcher Function
+- **Dispatcher Logic:**
+  - READ `hospitals.json` or queries Active Hospitals from DB.
+  - POST to `https://careflow-agent-hosp001.../start`
+  - POST to `https://careflow-agent-hosp002.../start`
+
+### **11.2. Frontend Deployment (Vercel)**
+The Next.js frontend is deployed as a single application.
+- **Environment:**
+  - `NEXT_PUBLIC_FIREBASE_PROJECT_ID=careflow-478811`
+- **Multi-Tenancy:**
+  - The frontend uses the logged-in user's `hospitalId` (from Auth session) to filter data views.
+  - No separate deployment is needed for the frontend.
 
