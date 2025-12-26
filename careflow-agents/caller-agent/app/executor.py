@@ -25,7 +25,7 @@ from a2a.types import (
 from langchain_core.messages import AIMessage, HumanMessage, BaseMessage, AIMessageChunk
 
 from agent import Agent
-from utils.conversation_relay import SessionData
+from .app_utils.conversation_relay import SessionData
 
 logger = logging.getLogger(__name__)
 
@@ -205,7 +205,7 @@ class CallerAgentExecutor(AgentExecutor):
         
         # Construct SessionData from langchain_messages
         # Wait, SessionData expects ConversationMessage objects
-        from utils.conversation_relay import ConversationMessage
+        from .app_utils.conversation_relay import ConversationMessage
         
         conversation_history = []
         for msg in langchain_messages:
