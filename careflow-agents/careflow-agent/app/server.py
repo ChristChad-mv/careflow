@@ -219,10 +219,13 @@ class CareFlowAgentExecutor(AgentExecutor):
 
 def create_app():
     # Define the Agent Card
+    # Get the service URL from environment (Cloud Run provides this as SERVICE_URL)
+    service_url = os.environ.get("SERVICE_URL", "http://localhost:8000/")
+    
     careflow_card = AgentCard(
         name="CareFlow Pulse Agent",
         description="Post-hospitalization patient monitoring agent. Can access patient data and generate alerts.",
-        url="http://localhost:8000/",
+        url=service_url,
         provider=AgentProvider(
             organization="CareFlow",
             url="https://careflow.example.com",
