@@ -53,6 +53,20 @@ tools:
         description: "Risk level to filter by (RED, YELLOW, or GREEN)"
         required: true
   
+  # Get patients for specific medication schedule (morning/noon/evening)
+  get_patients_for_schedule:
+    kind: firestore-query
+    source: careflow-firestore
+    description: "Retrieve all active patients (filter by scheduleHour client-side since Firestore doesn't store this field yet)"
+    collectionPath: "patients"
+    filters: |
+      {
+        "field": "status",
+        "op": "==",
+        "value": {"stringValue": "active"}
+      }
+    limit: 100
+  
   # Get specific patient by ID using query
   get_patient_by_id:
     kind: firestore-query
@@ -89,6 +103,24 @@ tools:
         description: "The diagnosis to search for"
         required: true
 
+  # Query patient by phone number (for inbound calls)
+  get_patient_by_phone:
+    kind: firestore-query
+    source: careflow-firestore
+    description: "Find a patient by their phone number (for inbound call identification)"
+    collectionPath: "patients"
+    filters: |
+      {
+        "field": "contact.phone",
+        "op": "==",
+        "value": {"stringValue": "{{.phoneNumber}}"}
+      }
+    parameters:
+      - name: phoneNumber
+        type: string
+        description: "Patient's phone number in E.164 format (e.g., +15551234567)"
+        required: true
+
   # List all available collections
   list_collections:
     kind: firestore-list-collections
@@ -100,6 +132,8 @@ toolsets:
     - get_all_patients
     - get_critical_patients
     - get_patients_by_risk_level
+    - get_patients_for_schedule
     - get_patient_by_id
+    - get_patient_by_phone
     - query_patients_by_diagnosis
     - list_collections
