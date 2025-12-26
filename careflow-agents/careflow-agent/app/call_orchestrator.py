@@ -8,7 +8,7 @@ from datetime import datetime
 from google.cloud import firestore
 
 from app.agent import root_agent
-from app.utils.a2a_tools import (
+from .app_utils.a2a_tools import (
     initiate_call,
     send_instruction_to_patient,
     end_call
