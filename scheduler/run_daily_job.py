@@ -1,25 +1,21 @@
 import asyncio
 import aiohttp
 import uuid
-import json
 import logging
+import sys
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Target the CareFlow Agent (Orchestrator)
 CAREFLOW_AGENT_URL = "http://localhost:8000"
 
-async def trigger_daily_job(schedule_hour: int = 8):
+async def trigger_and_disconnect(schedule_hour: int = 8):
     """
-    Simulates a Cloud Scheduler job triggering the CareFlow Agent.
-    Sends a message to start the daily rounds for a specific medication schedule hour.
-    
-    Args:
-        schedule_hour: The medication schedule hour (8 for morning, 12 for noon, 20 for evening)
+    Triggers the job, waits 10 seconds, then disconnects.
     """
-    logger.info(f"⏰ Starting Daily Patient Rounds Job for {schedule_hour}:00...")
+    logger.info(f"🧪 TESTING DISCONNECT RESILIENCE")
+    logger.info(f"⏰ Triggering Daily Patient Rounds...")
     
     request_id = int(uuid.uuid1().int >> 64)
     message_text = f"start daily rounds for {schedule_hour}:00"
@@ -39,40 +35,36 @@ async def trigger_daily_job(schedule_hour: int = 8):
     }
     
     try:
-        async with aiohttp.ClientSession() as session:
-            logger.info(f"🚀 Sending trigger to CareFlow Agent at {CAREFLOW_AGENT_URL}...")
-            async with session.post(
-                CAREFLOW_AGENT_URL,
-                headers={"Content-Type": "application/json", "Accept": "text/event-stream"},
-                json=rpc_request
-            ) as response:
-                if not response.ok:
-                    logger.error(f"❌ Failed to trigger job: {response.status} {await response.text()}")
-                    return
-
-                logger.info("✅ Job triggered successfully! Listening for orchestrator status...")
-                
-                async for line in response.content:
-                    line = line.decode('utf-8').strip()
-                    if line.startswith("data:"):
-                        try:
-                            data = json.loads(line[5:].strip())
-                            if data.get("result"):
-                                # Just log activity to show it's working
-                                res = data["result"]
-                                if isinstance(res, dict) and res.get("status", {}).get("state") == "working":
-                                    logger.info("Orchestrator is working...")
-                                if data.get("result", {}).get("final"):
-                                    logger.info("Daily rounds completed.")
-                                    break
-                        except:
-                            pass
+        # We set a very short timeout or just cancel manually
+        timeout = aiohttp.ClientTimeout(total=10) # 10 seconds lifespan
+        
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            logger.info(f"🚀 Sending trigger...")
+            try:
+                async with session.post(
+                    CAREFLOW_AGENT_URL,
+                    headers={"Content-Type": "application/json", "Accept": "text/event-stream"},
+                    json=rpc_request
+                ) as response:
+                    logger.info("✅ Trigger sent! Receiving stream for 10 seconds...")
+                    
+                    start_time = asyncio.get_event_loop().time()
+                    async for line in response.content:
+                        logger.info(f"📩 Server replied: {line.decode('utf-8').strip()[:50]}...")
+                        # Just consume a bit
+                        if asyncio.get_event_loop().time() - start_time > 10:
+                            logger.info("⏱️ 10 seconds reached. Cutting connection!")
+                            break
                             
+            except asyncio.TimeoutError:
+                logger.info("⏰ Timeout reached (Intentional). Connection closed.")
+            except Exception as e:
+                 logger.info(f"💥 Disconnect Event: {e}")
+                 
     except Exception as e:
-        logger.error(f"❌ Error triggering job: {str(e)}")
+        logger.error(f"❌ Error: {str(e)}")
+
+    logger.info("👋 Script exiting. Check AGENT SERVER logs to see if calls continue!")
 
 if __name__ == "__main__":
-    import sys
-    # Allow specifying schedule hour from command line: python run_daily_job.py 8
-    schedule_hour = int(sys.argv[1]) if len(sys.argv) > 1 else 8
-    asyncio.run(trigger_daily_job(schedule_hour))
+    asyncio.run(trigger_and_disconnect())
