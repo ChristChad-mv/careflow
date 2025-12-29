@@ -45,7 +45,7 @@ def get_model(model_config: Optional[ModelConfig] = None) -> BaseChatModel:
     if GEMINI_API_KEY:
         logger.info('Using Gemini')
         return ChatGoogleGenerativeAI(
-            model=model_name or 'gemini-2.5-flash',
+            model=model_name or 'gemini-2.0-flash',
             api_key=GEMINI_API_KEY,
             temperature=config.get('temperature', 0.7),
             streaming=config.get('streaming', False)
