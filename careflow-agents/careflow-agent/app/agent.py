@@ -26,7 +26,7 @@ from google.adk.planners import BuiltInPlanner
 from toolbox_core import ToolboxSyncClient
 
 # Load MCP Toolbox tools
-print(f"📡 Connecting to MCP toolbox server at http://127.0.0.1:5000...")
+# print(f"📡 Connecting to MCP toolbox server at http://127.0.0.1:5000...")
 
 # Keep client open globally so tools can use it
 toolbox_client = None
@@ -41,7 +41,7 @@ def init_tools():
         all_tools = toolbox_client.load_toolset("patient_tools")
         print(f"Total tools available: {len(all_tools)} MCP tools")
     except Exception as e:
-        print(f"⚠️ Warning: Could not load MCP tools: {e}")
+        logger.error(f"⚠️ Warning: Could not load MCP tools: {e}")
         # import traceback
         # traceback.print_exc()
 
