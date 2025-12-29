@@ -8,64 +8,40 @@ sources:
     database: "careflow-db"  # Firestore database ID
 
 tools:
-  # Get all patients from the database
-  get_all_patients:
-    kind: firestore-query
-    source: careflow-firestore
-    description: "Retrieve all patients from the database with their complete information"
-    collectionPath: "patients"
-    orderBy:
-      field: "id"
-      direction: "ASCENDING"
-    limit: 100
-  
-  # Get patients with critical risk level
-  get_critical_patients:
-    kind: firestore-query
-    source: careflow-firestore
-    description: "Retrieve all patients with critical (RED) risk level requiring urgent attention"
-    collectionPath: "patients"
-    filters: |
-      {
-        "field": "riskLevel",
-        "op": "==",
-        "value": {"stringValue": "RED"}
-      }
-    orderBy:
-      field: "id"
-      direction: "ASCENDING"
-  
-  # Get patients by risk level (parameterized)
-  get_patients_by_risk_level:
-    kind: firestore-query
-    source: careflow-firestore
-    description: "Retrieve patients filtered by their risk level (RED, YELLOW, GREEN)"
-    collectionPath: "patients"
-    filters: |
-      {
-        "field": "riskLevel",
-        "op": "==",
-        "value": {"stringValue": "{{.riskLevel}}"}
-      }
-    parameters:
-      - name: riskLevel
-        type: string
-        description: "Risk level to filter by (RED, YELLOW, or GREEN)"
-        required: true
-  
-  # Get patients for specific medication schedule (morning/noon/evening)
+  # Get patients for specific medication schedule
   get_patients_for_schedule:
     kind: firestore-query
     source: careflow-firestore
-    description: "Retrieve all active patients (filter by scheduleHour client-side since Firestore doesn't store this field yet)"
+    description: "Retrieve all active patients for the hospital"
     collectionPath: "patients"
     filters: |
       {
-        "field": "status",
-        "op": "==",
-        "value": {"stringValue": "active"}
+        "compositeFilter": {
+          "op": "AND",
+          "filters": [
+            {
+              "fieldFilter": {
+                "field": "hospitalId",
+                "op": "==",
+                "value": {"stringValue": "{{.hospitalId}}"}
+              }
+            },
+            {
+              "fieldFilter": {
+                "field": "status",
+                "op": "==",
+                "value": {"stringValue": "active"}
+              }
+            }
+          ]
+        }
       }
     limit: 100
+    parameters:
+      - name: hospitalId
+        type: string
+        description: "The Hospital ID to filter by"
+        required: true
   
   # Get specific patient by ID using query
   get_patient_by_id:
@@ -75,57 +51,73 @@ tools:
     collectionPath: "patients"
     filters: |
       {
-        "field": "id",
-        "op": "==",
-        "value": {"stringValue": "{{.patientId}}"}
+        "compositeFilter": {
+          "op": "AND",
+          "filters": [
+            {
+              "fieldFilter": {
+                "field": "hospitalId",
+                "op": "==",
+                "value": {"stringValue": "{{.hospitalId}}"}
+              }
+            },
+            {
+              "fieldFilter": {
+                "field": "id",
+                "op": "==",
+                "value": {"stringValue": "{{.patientId}}"}
+              }
+            }
+          ]
+        }
       }
     parameters:
+      - name: hospitalId
+        type: string
+        description: "The Hospital ID to filter by"
+        required: true
       - name: patientId
         type: string
-        description: "The unique identifier of the patient (the id field value)"
+        description: "The unique identifier of the patient"
         required: true
   
-  # Query patients by diagnosis
-  query_patients_by_diagnosis:
-    kind: firestore-query
-    source: careflow-firestore
-    description: "Find all patients with a specific diagnosis"
-    collectionPath: "patients"
-    filters: |
-      {
-        "field": "diagnosis",
-        "op": "==",
-        "value": {"stringValue": "{{.diagnosis}}"}
-      }
-    parameters:
-      - name: diagnosis
-        type: string
-        description: "The diagnosis to search for"
-        required: true
-
-  # Query patient by phone number (for inbound calls)
+  # Query patient by phone number
   get_patient_by_phone:
     kind: firestore-query
     source: careflow-firestore
-    description: "Find a patient by their phone number (for inbound call identification)"
+    description: "Find a patient by their phone number for the hospital"
     collectionPath: "patients"
     filters: |
       {
-        "field": "contact.phone",
-        "op": "==",
-        "value": {"stringValue": "{{.phoneNumber}}"}
+        "compositeFilter": {
+          "op": "AND",
+          "filters": [
+            {
+              "fieldFilter": {
+                "field": "hospitalId",
+                "op": "==",
+                "value": {"stringValue": "{{.hospitalId}}"}
+              }
+            },
+            {
+              "fieldFilter": {
+                "field": "contact.phone",
+                "op": "==",
+                "value": {"stringValue": "{{.phoneNumber}}"}
+              }
+            }
+          ]
+        }
       }
     parameters:
+      - name: hospitalId
+        type: string
+        description: "The Hospital ID to filter by"
+        required: true
       - name: phoneNumber
         type: string
-        description: "Patient's phone number in E.164 format (e.g., +15551234567)"
+        description: "Patient's phone number"
         required: true
-
-  # List all available collections
-  list_collections:
-    kind: firestore-list-collections
-    source: careflow-firestore
-    description: "List all available collections in the Firestore database"
 
   # Create a new critical alert
   create_alert:
@@ -135,43 +127,31 @@ tools:
       Create a new critical alert. 
       REQUIRED: 
       1. collectionPath: "alerts"
-      2. documentData: A JSON object where keys are fields (patientId, priority, etc.) and values are Firestore-typed (e.g., {"stringValue": "RED"}).
-      Example documentData:
+      2. documentData: Must include hospitalId.
+      Example:
       {
+        "hospitalId": {"stringValue": "HOSP001"},
         "patientId": {"stringValue": "ID_HERE"},
-        "priority": {"stringValue": "critical"},
-        "trigger": {"stringValue": "Pain 8/10"},
-        "status": {"stringValue": "active"},
-        "createdAt": {"stringValue": "2023-10-10T10:00:00Z"}
+        "priority": {"stringValue": "critical"}
       }
 
   # Update patient risk level
   update_patient_risk:
     kind: firestore-update-document
     source: careflow-firestore
-    description: >
-      Update a patient's risk level.
-      REQUIRED:
-      1. documentPath: "patients/{patientId}"
-      2. documentData: Firestore-typed fields to update.
-      3. updateMask: List of fields to update (e.g. ["riskLevel", "lastAssessment"])
+    description: "Update a patient's risk level. Requires full document path."
 
   # Log interaction
   log_patient_interaction:
     kind: firestore-add-documents
     source: careflow-firestore
-    description: "Log a call interaction. collectionPath='patients/{id}/interactions'. documentData must include content, type, sender, timestamp."
+    description: "Log a call interaction. collectionPath='patients/{id}/interactions'."
 
 toolsets:
   patient_tools:
-    - get_all_patients
-    - get_critical_patients
-    - get_patients_by_risk_level
     - get_patients_for_schedule
     - get_patient_by_id
     - get_patient_by_phone
-    - query_patients_by_diagnosis
-    - list_collections
     - create_alert
     - update_patient_risk
     - log_patient_interaction
