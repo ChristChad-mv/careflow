@@ -119,6 +119,44 @@ tools:
         description: "Patient's phone number"
         required: true
 
+  # Query patient by name (for inbound calls)
+  get_patient_by_name:
+    kind: firestore-query
+    source: careflow-firestore
+    description: "Find a patient by their name for the hospital (used for inbound calls when patient identifies themselves)"
+    collectionPath: "patients"
+    filters: |
+      {
+        "compositeFilter": {
+          "op": "AND",
+          "filters": [
+            {
+              "fieldFilter": {
+                "field": "hospitalId",
+                "op": "==",
+                "value": {"stringValue": "{{.hospitalId}}"}
+              }
+            },
+            {
+              "fieldFilter": {
+                "field": "name",
+                "op": "==",
+                "value": {"stringValue": "{{.patientName}}"}
+              }
+            }
+          ]
+        }
+      }
+    parameters:
+      - name: hospitalId
+        type: string
+        description: "The Hospital ID to filter by"
+        required: true
+      - name: patientName
+        type: string
+        description: "Patient's full name as stored in the database"
+        required: true
+
   # Create a new critical alert
   create_alert:
     kind: firestore-add-documents
@@ -152,6 +190,7 @@ toolsets:
     - get_patients_for_schedule
     - get_patient_by_id
     - get_patient_by_phone
+    - get_patient_by_name
     - create_alert
     - update_patient_risk
     - log_patient_interaction
