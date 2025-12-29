@@ -104,7 +104,7 @@ class CallerAgentExecutor(AgentExecutor):
         logger.error(f"Cancelled task {context.task_id}")
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        print(f"DEBUG: CallerAgentExecutor.execute called with context: {context}")
+        logger.debug(f"CallerAgentExecutor.execute called with context: {context}")
         logger.info("Executing Caller Agent via A2A")
         user_message: Optional[Message] = context.message
         currentTask = context.current_task
@@ -191,10 +191,10 @@ class CallerAgentExecutor(AgentExecutor):
             if p.root.kind == "text" and hasattr(p.root, "text"):
                 current_message_text += p.root.text + "\n"
         current_message_text = current_message_text.strip()
-        print(f"DEBUG: Extracted message text: '{current_message_text}'")
+        logger.debug(f"Extracted message text: '{current_message_text}'")
 
         if not current_message_text:
-            print("DEBUG: No text found in user message!")
+            logger.warning("DEBUG: No text found in user message!")
             logger.warning("No text found in user message")
             # Handle failure...
             return
@@ -253,10 +253,10 @@ class CallerAgentExecutor(AgentExecutor):
             )
 
             final_response = ""
-            print("DEBUG: Starting agent stream...")
+            # logger.debug("Starting agent stream...")
             
             async for stream in streams:
-                print(f"DEBUG: Stream event: {stream.get('event')}")
+                # logger.debug(f"Stream event: {stream.get('event')}")
                 if taskId in self.cancelled_tasks:
                     logger.info(f"Request cancelled for task: {taskId}")
                     # Send cancel event...
