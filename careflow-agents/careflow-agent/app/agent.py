@@ -52,6 +52,9 @@ AGENT_NAME = "careflow_pulse_agent"
 AGENT_MODEL = "gemini-2.5-flash"
 AGENT_DESCRIPTION = "An AI agent that monitors post-hospitalization patients, analyzes symptoms, and generates alerts for healthcare coordinators."
 
+# Get Hospital ID from environment or default to HOSP001
+HOSPITAL_ID = os.environ.get("HOSPITAL_ID", "HOSP001")
+
 AGENT_INSTRUCTION = f"""
 You are CareFlow Pulse, the medical intelligence agent for post-hospitalization patient monitoring.
 
@@ -60,10 +63,41 @@ You are CareFlow Pulse, the medical intelligence agent for post-hospitalization 
 **Core Workflow:**
 
 When you receive "start daily rounds for [TIME]" (e.g., "start daily rounds for 8:00"):
-1. Extract the schedule hour from the message (8, 12, or 20)
-2. Query patients using `get_patients_for_schedule` with scheduleHour parameter
-   - This gets ALL active patients with medications at that time (morning/noon/evening)
-3. **BATCHING REQUIREMENT:** You must process patients in **batches of 2**.
+1. **Scope:** You serve **ONLY** Hospital `{HOSPITAL_ID}`.
+2. Extract the schedule hour from the message (8, 12, or 20).
+3. Query patients using `get_patients_for_schedule` with scheduleHour AND `hospitalId='{HOSPITAL_ID}'`.
+   - **CRITICAL:** You MUST pass `hospitalId='{HOSPITAL_ID}'` to filters. Do not query without it.
+
+**Patient Data Structure (Example):**
+When you get patients, they will look like this. Use this schema to extract data:
+```json
+{{
+    "id": "p_h1_001",
+    "hospitalId": "HOSP001",
+    "name": "James Wilson (HOSP1)",
+    "email": "james.wilson@email.com",
+    "dateOfBirth": "1955-03-15",
+    "contact": {{ "phone": "+1555123001", "preferredMethod": "phone" }},
+    "assignedNurse": {{ "name": "Sarah Johnson, RN", "email": "sarah@hosp1.com", "phone": "+15559876543" }},
+    "dischargePlan": {{
+        "diagnosis": "Post-CABG",
+        "dischargeDate": "Timestamp.now()",
+        "hospitalId": "HOSP001",
+        "dischargingPhysician": "Dr. A. Carter",
+        "medications": [
+            {{ "name": "Metoprolol", "dosage": "50mg", "frequency": "Twice daily", "instructions": "Take with food", "scheduleHour": 8, "startDate": "Timestamp.now()" }}
+        ],
+        "criticalSymptoms": ["Chest pain > 5/10", "Shortness of breath at rest"],
+        "warningSymptoms": ["Leg swelling", "Fatigue"]
+    }},
+    "nextAppointment": {{ "date": "2025-12-10T09:00:00Z", "type": "Follow-up", "location": "Cardiology Center" }},
+    "riskLevel": "safe",
+    "aiBrief": "Patient stable. Incision clean.",
+    "status": "active"
+}}
+```
+
+4. **BATCHING REQUIREMENT:** You must process patients in **batches of 2**.
    - Select the first 2 patients.
    - Delegate valid interviews for them via `send_remote_agent_task`.
    - **WAIT** for their reports to be returned and processed.
@@ -71,7 +105,17 @@ When you receive "start daily rounds for [TIME]" (e.g., "start daily rounds for 
    - Do not fire all calls at once.
 4. For EACH patient in the current batch:
    - Send: Patient Name and ID (keep risk level and diagnosis internal for analysis)
-4. When Caller returns summary, analyze it immediately
+   - **INSTRUCTION TO CALLER:** You MUST explicitly instruct the Caller to verify the patient's identity by stating "This is CareFlow calling for [Name], checking on ID [ID]" at the very beginning of the call.
+4. When Caller returns summary, analyze it immediately:
+   - **ZERO HALLUCINATION POLICY (CRITICAL):**
+     - If the tool returns ANY string starting with "ERROR" (e.g., "Connection Failed", "Patient Unreachable"), OR if the response is empty.
+     - **SCENARIOS:** Server offline, Caller crashed, Twilio logic failed, or Patient did not pick up.
+     - **ABSOLUTE RULE:** You MUST NOT invent a summary. You MUST NOT say "Patient reports X" if you couldn't reach them.
+   - **REQUIRED ACTION:**
+     1. **Status:** Update patient to **RED** (Critical).
+     2. **Alert:** Create a critical alert (`priority="critical"`).
+     3. **AI Brief:** "Patient Unreachable during rounds (Connection/Voice Failure). Manual check required immediately."
+     4. **Log:** Log the failure reasoning in `add_interaction_log`.
 5. Update database and generate alerts as needed
 6. Save comprehensive report via `save_patient_report`
 
@@ -143,9 +187,17 @@ Example: "Patient reports chest pressure (6/10) radiating to left arm. Given rec
 
 **Current Date:** {datetime.now(timezone.utc).strftime("%Y-%m-%d")}
 
-**Key Principle:** You have database write access - USE IT. Every patient round must update Firestore so nurses see real-time status changes.
+**Key Principle:** You have database write access - USE IT. Every patient round must update Firestore so nurses see real-time status changes. 
 """
 
+# ... existing imports ...
+import uuid
+import json
+import aiohttp
+from a2a.types import AgentCard
+from pydantic import BaseModel, Field
+
+# ... existing code ...
 
 # A2A Tools Implementation
 async def list_remote_agents() -> str:
@@ -153,8 +205,9 @@ async def list_remote_agents() -> str:
     List all remote agents available for A2A communication, returning their AgentCard
     metadata including capabilities, authentication, and provider information.
     """
-    # Hardcoded list of servers for now, or load from config
-    a2a_servers = ["http://localhost:8080"] 
+    # Get A2A server URLs from environment variable (for Cloud Run deployment)
+    caller_agent_url = os.environ.get("CAREFLOW_CALLER_URL", "http://localhost:8080")
+    a2a_servers = [caller_agent_url] 
     
     agent_cards = []
     async with aiohttp.ClientSession() as session:
@@ -176,6 +229,7 @@ async def list_remote_agents() -> str:
         formatted_cards.append(f"{i+1}. {card.name} ({card.url}) - {card.description}")
     
     return "Available remote agents:\n" + "\n".join(formatted_cards)
+
 
 async def save_patient_report(patient_id: str, report_data: str) -> str:
     """
@@ -211,14 +265,16 @@ async def save_patient_report(patient_id: str, report_data: str) -> str:
     except Exception as e:
         return f"Failed to save report for {patient_id}: {str(e)}"
 
-
-async def send_remote_agent_task(server_url: str, task: str) -> str:
+async def send_remote_agent_task(task: str, server_url: str = None) -> str:
     """
     Send a task to a specified remote agent for processing using SSE streaming.
     The tool waits for the complete response and only returns the final result.
-    Requires server_url and task parameters.
+    If server_url is not provided, it defaults to the CAREFLOW_CALLER_URL environment variable.
     """
     try:
+        if not server_url:
+            server_url = os.environ.get("CAREFLOW_CALLER_URL", "http://localhost:8080")
+
         # Generate IDs
         request_id = int(uuid.uuid1().int >> 64)
         task_id = f"task_{int(uuid.uuid1().int >> 64)}_{uuid.uuid4().hex[:9]}"
@@ -248,6 +304,9 @@ async def send_remote_agent_task(server_url: str, task: str) -> str:
 
                 # Simple SSE processing to get final text
                 final_text = ""
+                
+                print(f"\n[CAREFLOW -> CALLER]: Task sent: {task}")
+                
                 async for line in response.content:
                     line = line.decode('utf-8').strip()
                     if line.startswith("data:"):
@@ -255,24 +314,42 @@ async def send_remote_agent_task(server_url: str, task: str) -> str:
                         try:
                             data = json.loads(data_str)
                             if data.get("result"):
-                                # Extract text from result
                                 res = data["result"]
+                                
+                                # Check for final status update with message parts
                                 if isinstance(res, dict):
-                                    if res.get("message", {}).get("text"):
-                                        final_text = res["message"]["text"]
+                                    # Case 1: Standard ADK status update
+                                    if res.get("status", {}).get("message", {}).get("parts"):
+                                        parts = res["status"]["message"]["parts"]
+                                        if parts and parts[0].get("text"):
+                                            final_text = parts[0]["text"]
+                                    # Case 2: Direct text field
                                     elif res.get("text"):
                                         final_text = res["text"]
+                                    # Case 3: Message object
+                                    elif res.get("message", {}).get("text"):
+                                        final_text = res["message"]["text"]
+                                        
                                 elif isinstance(res, str):
                                     final_text = res
                         except:
                             pass
                 
-                return final_text or "Task completed but no text response received."
+                    if final_text:
+                        print(f"[CALLER -> CAREFLOW]: Response: {final_text}\n")
+                        return final_text
+                    
+                    # Explicit error if no text content found
+                    print(f"[CALLER -> CAREFLOW]: No text response received.\n")
+                    return "ERROR: Patient Unreachable - No response text received from Caller Agent."
+                
+                return final_text
 
     except Exception as e:
-        return f"Error sending task: {str(e)}"
+        # Return explicit ERROR string so agent triggers RED ALERT
+        return f"ERROR: Connection Failed - {str(e)}"
 
-a2a_tools = [list_remote_agents, send_remote_agent_task]
+a2a_tools = [list_remote_agents, send_remote_agent_task, save_patient_report]
 
 class CareFlowAgent(BaseAgent):
     """
