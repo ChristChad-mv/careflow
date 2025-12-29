@@ -438,8 +438,13 @@ class Agent:
             Sends the message to the patient's phone (simulated server) and returns their reply.
             """
             import aiohttp
-            
-            phone_server_url = "http://localhost:9000/incoming_call"
+
+            # Routing logic for demonstration (Load balancing between 9000 and 9001)
+            # Simple hash: if patient_id last char is even/odd (assuming hex or numeric)
+            # Let's use hash of string
+            port = 9000 if hash(patient_id) % 2 == 0 else 9001
+            phone_server_url = f"http://localhost:{port}/incoming_call"
+            print(f"[Caller] Routing {patient_name} ({patient_id}) to PORT {port}")
             
             try:
                 async with aiohttp.ClientSession() as session:
