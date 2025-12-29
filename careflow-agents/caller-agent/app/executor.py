@@ -1,49 +1,66 @@
+"""
+CareFlow Pulse - Caller Agent A2A Executor
+
+This module implements the A2A (Agent-to-Agent) protocol executor for the
+Caller Agent. It handles incoming A2A requests and translates them to
+LangGraph agent invocations.
+
+Architecture:
+    - Implements AgentExecutor interface from a2a.server
+    - Manages task lifecycle (submitted -> working -> completed)
+    - Converts between A2A Message format and LangChain BaseMessage
+    - Streams responses back via EventQueue
+
+Author: CareFlow Pulse Team
+Version: 1.0.0
+"""
+
 import logging
-import uuid
 import os
+import uuid
 from datetime import datetime
-from typing import Optional, List, Dict, Set, Any
+from typing import Any, Dict, List, Optional, Set
+
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.types import (
-    Role,
+    AgentCapabilities,
     AgentCard,
-    TaskState,
-    TaskStatus,
     AgentProvider,
     AgentSkill,
-    AgentCapabilities,
-    AgentExtension,
     Message,
-    Task,
-    TaskStatusUpdateEvent,
     Part,
+    Role,
+    Task,
+    TaskState,
+    TaskStatus,
+    TaskStatusUpdateEvent,
     TextPart,
-    DataPart,
 )
-from langchain_core.messages import AIMessage, HumanMessage, BaseMessage, AIMessageChunk
 
-from agent import Agent
-from .app_utils.conversation_relay import SessionData
+from agent import CallerAgent
+from .app_utils.conversation_relay import ConversationMessage, SessionData
+
 
 logger = logging.getLogger(__name__)
 
-# --- Latency Configuration ---
-# Estimated latency for tools (in milliseconds)
-latency_by_tools = {
-    "call_patient": 2000,
-    "send_remote_agent_task": 1000
-}
 
-# --- Agent Card Definition ---
-# Get service URL from environment (Cloud Run deployment)
-service_url = os.environ.get("SERVICE_URL", "http://localhost:8080/")
+# =============================================================================
+# AGENT CARD DEFINITION
+# =============================================================================
+
+# Service URL from environment (for Cloud Run deployment)
+SERVICE_URL = os.environ.get("SERVICE_URL", "http://localhost:8080/")
 
 caller_agent_card = AgentCard(
-    name="Caller Agent",
-    description="Voice interface for CareFlow Pulse. Handles phone calls with patients and relays information to the Healthcare Agent.",
-    url=service_url,
+    name="CareFlow Caller Agent",
+    description=(
+        "Voice interface for CareFlow Pulse. Handles phone calls with patients "
+        "and relays information to the Healthcare Agent via A2A protocol."
+    ),
+    url=SERVICE_URL,
     provider=AgentProvider(
         organization="CareFlow Pulse",
         url="https://careflow-pulse.com",
@@ -53,17 +70,6 @@ caller_agent_card = AgentCard(
         streaming=True,
         pushNotifications=False,
         stateTransitionHistory=True,
-        extensions=[
-            AgentExtension(
-                uri="https://github.com/twilio-labs/a2a-latency-extension",
-                description="Provides latency updates for tasks. The server will send DataPart messages with latency information for each tool call.",
-                required=True,
-                params={
-                    "skillLatency": latency_by_tools,
-                    "supportsLatencyTaskUpdates": True
-                }
-            )
-        ],
     ),
     securitySchemes=None,
     security=None,
@@ -73,12 +79,16 @@ caller_agent_card = AgentCard(
         AgentSkill(
             id="voice_call_handling",
             name="Voice Call Handling",
-            description="Handle voice calls with patients in French, relay information to Healthcare Agent",
-            tags=["voice", "twilio", "healthcare", "french"],
+            description=(
+                "Handle voice calls with patients, conduct wellness interviews, "
+                "and relay information to Healthcare Agent"
+            ),
+            tags=["voice", "healthcare", "patient-communication"],
             examples=[
                 "Call patient about medication",
                 "Follow up on patient symptoms",
                 "Conduct wellness check",
+                "follow-up calls"
             ],
             inputModes=["text"],
             outputModes=["text", "task-status"],
@@ -87,260 +97,364 @@ caller_agent_card = AgentCard(
     supportsAuthenticatedExtendedCard=False,
 )
 
-# Simple store for contexts (In-memory for now, could be replaced by Redis or similar)
+
+# =============================================================================
+# MESSAGE HISTORY CACHE
+# =============================================================================
+
+# Simple in-memory cache for conversation context
+# Key: contextId, Value: List of Messages
 MESSAGE_HISTORY_CACHE: Dict[str, List[Message]] = {}
 
+
+# =============================================================================
+# A2A EXECUTOR
+# =============================================================================
+
 class CallerAgentExecutor(AgentExecutor):
-    def __init__(self, agent: Agent):
+    """
+    A2A Protocol executor for the Caller Agent.
+    
+    Translates A2A requests into LangGraph agent invocations and
+    streams responses back through the A2A event queue.
+    
+    Attributes:
+        agent: The underlying CallerAgent instance
+        cancelled_tasks: Set of task IDs that have been cancelled
+    """
+    
+    def __init__(self, agent: CallerAgent):
+        """
+        Initialize the executor.
+        
+        Args:
+            agent: CallerAgent instance to delegate execution to
+        """
         self.agent = agent
         self.cancelled_tasks: Set[str] = set()
-
+    
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        """Cancel a task by ID."""
-        if context.task_id in self.cancelled_tasks:
-            return
-        if context.task_id:
+        """
+        Cancel a running task.
+        
+        Args:
+            context: Request context containing task ID
+            event_queue: Event queue (unused for cancellation)
+        """
+        if context.task_id and context.task_id not in self.cancelled_tasks:
             self.cancelled_tasks.add(context.task_id)
-        logger.error(f"Cancelled task {context.task_id}")
-
+            logger.info(f"Cancelled task: {context.task_id}")
+    
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        logger.debug(f"CallerAgentExecutor.execute called with context: {context}")
-        logger.info("Executing Caller Agent via A2A")
-        user_message: Optional[Message] = context.message
-        currentTask = context.current_task
-
+        """
+        Execute an A2A request.
+        
+        Processes the incoming message through the LangGraph agent
+        and streams status updates and responses via the event queue.
+        
+        Args:
+            context: Request context with message and task info
+            event_queue: Queue for publishing A2A events
+        """
+        user_message = context.message
+        current_task = context.current_task
+        
         if not user_message:
-            logger.error("No user message provided")
+            logger.error("No user message provided in context")
             return
-
-        # Determine IDs
-        taskId = (getattr(currentTask, 'id', None) if currentTask else getattr(context, 'task_id', None)) or str(uuid.uuid4())
         
-        msg_context_id = getattr(user_message, 'contextId', None) or getattr(user_message, 'context_id', None)
-        task_context_id = getattr(currentTask, 'contextId', None) or getattr(currentTask, 'context_id', None) if currentTask else None
-        ctx_context_id = getattr(context, 'context_id', None)
+        # Determine task and context IDs
+        task_id = self._get_task_id(context, current_task)
+        context_id = self._get_context_id(context, user_message, current_task)
+        message_id = getattr(user_message, 'messageId', None) or getattr(user_message, 'message_id', None)
         
-        contextId = msg_context_id or task_context_id or ctx_context_id or str(uuid.uuid4())
+        logger.info(f"[{context_id}] Processing message {message_id} for task {task_id}")
         
-        messageId = getattr(user_message, 'messageId', None) or getattr(user_message, 'message_id', None)
-
-        logger.info(f"[{contextId}] Processing message {messageId} for task {taskId}")
-
-        # 1. Publish initial Task event if it's a new task
-        if not currentTask:
-            initial_task = Task(
-                kind="task",
-                id=taskId,
-                contextId=contextId,
-                status=TaskStatus(
-                    state=TaskState.submitted,
-                    timestamp=datetime.now().isoformat(),
-                ),
-                history=[user_message],
-                metadata=user_message.metadata if user_message.metadata else {},
+        # Publish initial task if new
+        if not current_task:
+            await self._publish_initial_task(
+                event_queue, task_id, context_id, user_message
             )
-            await event_queue.enqueue_event(initial_task)
-
-        # 2. Publish "working" status update
-        working_status_update = TaskStatusUpdateEvent(
+        
+        # Publish working status
+        await self._publish_working_status(event_queue, task_id, context_id)
+        
+        # Extract message text
+        message_text = self._extract_message_text(user_message)
+        if not message_text:
+            logger.warning("No text content found in message")
+            return
+        
+        # Build conversation history
+        session_data = self._build_session_data(context_id, user_message)
+        langchain_messages = self._build_langchain_messages(context_id)
+        
+        try:
+            # Execute agent
+            final_response = await self._execute_agent(
+                task_id, context_id, message_text, langchain_messages
+            )
+            
+            # Publish completion
+            await self._publish_completion(
+                event_queue, task_id, context_id, final_response
+            )
+            
+        except Exception as e:
+            logger.error(f"Error executing agent: {e}", exc_info=True)
+            await self._publish_error(event_queue, task_id, context_id, str(e))
+    
+    # -------------------------------------------------------------------------
+    # Helper Methods
+    # -------------------------------------------------------------------------
+    
+    def _get_task_id(self, context: RequestContext, current_task: Optional[Task]) -> str:
+        """Extract or generate task ID."""
+        if current_task and hasattr(current_task, 'id'):
+            return current_task.id
+        if context.task_id:
+            return context.task_id
+        return str(uuid.uuid4())
+    
+    def _get_context_id(
+        self,
+        context: RequestContext,
+        message: Message,
+        current_task: Optional[Task]
+    ) -> str:
+        """Extract or generate context ID."""
+        # Try message context ID
+        msg_ctx = getattr(message, 'contextId', None) or getattr(message, 'context_id', None)
+        if msg_ctx:
+            return msg_ctx
+        
+        # Try task context ID
+        if current_task:
+            task_ctx = getattr(current_task, 'contextId', None) or getattr(current_task, 'context_id', None)
+            if task_ctx:
+                return task_ctx
+        
+        # Try request context
+        req_ctx = getattr(context, 'context_id', None)
+        if req_ctx:
+            return req_ctx
+        
+        return str(uuid.uuid4())
+    
+    def _extract_message_text(self, message: Message) -> str:
+        """Extract text content from A2A message."""
+        text_parts = []
+        for part in message.parts:
+            if part.root.kind == "text" and hasattr(part.root, "text"):
+                text_parts.append(part.root.text)
+        return "\n".join(text_parts).strip()
+    
+    def _build_session_data(self, context_id: str, message: Message) -> SessionData:
+        """Build SessionData from message history."""
+        # Update message history cache
+        history = MESSAGE_HISTORY_CACHE.get(context_id, [])
+        message_id = getattr(message, 'messageId', None) or getattr(message, 'message_id', None)
+        
+        if not any(
+            (getattr(m, 'messageId', None) or getattr(m, 'message_id', None)) == message_id
+            for m in history
+        ):
+            history.append(message)
+        MESSAGE_HISTORY_CACHE[context_id] = history
+        
+        # Convert to ConversationMessage format
+        conversation_history = []
+        for msg in history[:-1]:  # Exclude current message
+            text = self._extract_message_text(msg)
+            if text:
+                role = 'assistant' if msg.role == Role.agent else 'user'
+                conversation_history.append(ConversationMessage(
+                    role=role,
+                    content=text,
+                    timestamp=datetime.now().isoformat()
+                ))
+        
+        return SessionData(
+            connected_at=datetime.now().isoformat(),
+            call_sid=context_id,
+            conversation=conversation_history
+        )
+    
+    def _build_langchain_messages(self, context_id: str) -> List[BaseMessage]:
+        """Build LangChain message list from history."""
+        history = MESSAGE_HISTORY_CACHE.get(context_id, [])
+        messages: List[BaseMessage] = []
+        
+        for msg in history[:-1]:  # Exclude current message
+            text = self._extract_message_text(msg)
+            if text:
+                if msg.role == Role.agent:
+                    messages.append(AIMessage(content=text))
+                else:
+                    messages.append(HumanMessage(content=text))
+        
+        return messages
+    
+    async def _execute_agent(
+        self,
+        task_id: str,
+        context_id: str,
+        message_text: str,
+        history: List[BaseMessage]
+    ) -> str:
+        """Execute the LangGraph agent and collect response."""
+        messages = [self.agent.system_message] + history + [HumanMessage(content=message_text)]
+        
+        streams = self.agent.agent.astream_events(
+            {"messages": messages},
+            config={
+                "configurable": {"thread_id": context_id},
+                "callbacks": [],
+                "recursion_limit": 100
+            },
+            version="v2"
+        )
+        
+        final_response = ""
+        
+        async for stream in streams:
+            # Check for cancellation
+            if task_id in self.cancelled_tasks:
+                logger.info(f"Task cancelled: {task_id}")
+                return "Task cancelled"
+            
+            event_type = stream.get("event")
+            if event_type in ('on_chat_model_stream', 'on_llm_stream'):
+                data = stream.get('data')
+                if isinstance(data, dict):
+                    chunk = data.get('chunk')
+                    if isinstance(chunk, AIMessageChunk) and chunk.content:
+                        if isinstance(chunk.content, str):
+                            final_response += chunk.content
+        
+        logger.info(f"Agent response: {final_response[:200]}...")
+        return final_response
+    
+    # -------------------------------------------------------------------------
+    # Event Publishing
+    # -------------------------------------------------------------------------
+    
+    async def _publish_initial_task(
+        self,
+        event_queue: EventQueue,
+        task_id: str,
+        context_id: str,
+        message: Message
+    ) -> None:
+        """Publish initial task event."""
+        task = Task(
+            kind="task",
+            id=task_id,
+            contextId=context_id,
+            status=TaskStatus(
+                state=TaskState.submitted,
+                timestamp=datetime.now().isoformat(),
+            ),
+            history=[message],
+            metadata=message.metadata if message.metadata else {},
+        )
+        await event_queue.enqueue_event(task)
+    
+    async def _publish_working_status(
+        self,
+        event_queue: EventQueue,
+        task_id: str,
+        context_id: str
+    ) -> None:
+        """Publish working status update."""
+        status_update = TaskStatusUpdateEvent(
             kind="status-update",
-            taskId=taskId,
-            contextId=contextId,
+            taskId=task_id,
+            contextId=context_id,
             status=TaskStatus(
                 state=TaskState.working,
                 message=Message(
                     kind="message",
                     role=Role.agent,
                     messageId=str(uuid.uuid4()),
-                    parts=[
-                        Part(root=TextPart(kind="text", text="Processing your request..."))
-                    ],
-                    taskId=taskId,
-                    contextId=contextId,
+                    parts=[Part(root=TextPart(kind="text", text="Processing your request..."))],
+                    taskId=task_id,
+                    contextId=context_id,
                 ),
                 timestamp=datetime.now().isoformat(),
             ),
             final=False,
         )
-        await event_queue.enqueue_event(working_status_update)
-
-        # 3. Prepare messages for LangGraph agent
-        # We maintain a separate history cache for A2A context mapping
-        history_for_agent = MESSAGE_HISTORY_CACHE.get(contextId, [])
-        if not any(m.messageId == messageId for m in history_for_agent):
-            history_for_agent.append(user_message)
-        MESSAGE_HISTORY_CACHE[contextId] = history_for_agent
-
-        # Convert A2A messages to LangChain BaseMessage format
-        langchain_messages: List[BaseMessage] = []
-        for m in history_for_agent[:-1]: # All except current
-            text_content = ""
-            for p in m.parts:
-                if p.root.kind == "text" and hasattr(p.root, "text"):
-                    text_content += p.root.text + "\n"
-            
-            if text_content.strip():
-                if m.role == Role.agent:
-                    langchain_messages.append(AIMessage(content=text_content))
-                else:
-                    langchain_messages.append(HumanMessage(content=text_content))
-
-        # Extract current user message text
-        current_message_text = ""
-        for p in user_message.parts:
-            if p.root.kind == "text" and hasattr(p.root, "text"):
-                current_message_text += p.root.text + "\n"
-        current_message_text = current_message_text.strip()
-        logger.debug(f"Extracted message text: '{current_message_text}'")
-
-        if not current_message_text:
-            logger.warning("DEBUG: No text found in user message!")
-            logger.warning("No text found in user message")
-            # Handle failure...
-            return
-
-        # Add current message to LangChain messages
-        # Note: The Agent.stream_message method usually takes just the user message and session data
-        # But here we want to use the underlying agent directly or pass history via session data.
-        # The Agent class uses `session_data.conversation` to build history.
-        # We can construct a dummy SessionData with the history we have.
-        
-        # However, `Agent.stream_message` does:
-        # messages = [system_message] + history + [HumanMessage(user_message)]
-        # So we can just pass the history via SessionData.
-        
-        # Construct SessionData from langchain_messages
-        # Wait, SessionData expects ConversationMessage objects
-        from .app_utils.conversation_relay import ConversationMessage
-        
-        conversation_history = []
-        for msg in langchain_messages:
-            role = 'assistant' if isinstance(msg, AIMessage) else 'user'
-            conversation_history.append(ConversationMessage(
-                role=role,
-                content=str(msg.content),
-                timestamp=datetime.now().isoformat()
-            ))
-            
-        session_data = SessionData(
-            connected_at=datetime.now().isoformat(),
-            call_sid=contextId, # Use contextId as session ID
-            conversation=conversation_history
+        await event_queue.enqueue_event(status_update)
+    
+    async def _publish_completion(
+        self,
+        event_queue: EventQueue,
+        task_id: str,
+        context_id: str,
+        response: str
+    ) -> None:
+        """Publish task completion event."""
+        agent_message = Message(
+            kind="message",
+            role=Role.agent,
+            messageId=str(uuid.uuid4()),
+            parts=[Part(root=TextPart(kind="text", text=response or "Task processed."))],
+            taskId=task_id,
+            contextId=context_id,
         )
+        
+        # Update history cache
+        history = MESSAGE_HISTORY_CACHE.get(context_id, [])
+        history.append(agent_message)
+        MESSAGE_HISTORY_CACHE[context_id] = history
+        
+        final_update = TaskStatusUpdateEvent(
+            kind="status-update",
+            taskId=task_id,
+            contextId=context_id,
+            status=TaskStatus(
+                state=TaskState.completed,
+                message=agent_message,
+                timestamp=datetime.now().isoformat(),
+            ),
+            final=True,
+        )
+        await event_queue.enqueue_event(final_update)
+    
+    async def _publish_error(
+        self,
+        event_queue: EventQueue,
+        task_id: str,
+        context_id: str,
+        error: str
+    ) -> None:
+        """Publish task error event."""
+        error_message = Message(
+            kind="message",
+            role=Role.agent,
+            messageId=str(uuid.uuid4()),
+            parts=[Part(root=TextPart(kind="text", text=f"Error: {error}"))],
+            taskId=task_id,
+            contextId=context_id,
+        )
+        
+        error_update = TaskStatusUpdateEvent(
+            kind="status-update",
+            taskId=task_id,
+            contextId=context_id,
+            status=TaskStatus(
+                state=TaskState.failed,
+                message=error_message,
+                timestamp=datetime.now().isoformat(),
+            ),
+            final=True,
+        )
+        await event_queue.enqueue_event(error_update)
 
-        try:
-            # 4. Run the agent streaming
-            # We use self.agent.stream_message which yields strings
-            # But we might want more granular control (events) like in MovieAgentExecutor
-            # Agent.stream_message uses self.agent.agent.astream_events internally but only yields content chunks.
-            # To support latency updates (tool calls), we need to access the raw events.
-            
-            # Let's call self.agent.agent.astream_events directly here, similar to how Agent.stream_message does it.
-            
-            # Prepare input for LangGraph agent
-            messages = [self.agent.system_message] + langchain_messages + [HumanMessage(content=current_message_text)]
-            
-            streams = self.agent.agent.astream_events(
-                {
-                    "messages": messages,
-                },
-                config={
-                    "configurable": {"thread_id": contextId},
-                    "callbacks": [],
-                    "recursion_limit": 100
-                },
-                version="v2"
-            )
 
-            final_response = ""
-            # logger.debug("Starting agent stream...")
-            
-            async for stream in streams:
-                # logger.debug(f"Stream event: {stream.get('event')}")
-                if taskId in self.cancelled_tasks:
-                    logger.info(f"Request cancelled for task: {taskId}")
-                    # Send cancel event...
-                    return
+# =============================================================================
+# EXPORTS
+# =============================================================================
 
-                event_type = stream.get("event")
-                
-                # Handle Tool Calls (Latency Updates)
-                if event_type == "on_tool_start":
-                    data = stream.get("data", {})
-                    tool_name = stream.get("name")
-                    if tool_name:
-                        # Send latency update
-                        tool_update_event = TaskStatusUpdateEvent(
-                            kind="status-update",
-                            taskId=taskId,
-                            contextId=contextId,
-                            status=TaskStatus(
-                                state=TaskState.working,
-                                message=Message(
-                                    kind="message",
-                                    role=Role.agent,
-                                    messageId=str(uuid.uuid4()),
-                                    parts=[Part(root=DataPart(
-                                        kind="data",
-                                        data={
-                                            "latency": latency_by_tools.get(tool_name, 0)
-                                        }
-                                    ))],
-                                    taskId=taskId,
-                                    contextId=contextId,
-                                    metadata={"toolName": tool_name}
-                                ),
-                                timestamp=datetime.now().isoformat(),
-                            ),
-                            final=False,
-                        )
-                        await event_queue.enqueue_event(tool_update_event)
-
-                # Handle Streaming Content
-                elif event_type in ('on_chat_model_stream', 'on_llm_stream'):
-                    data = stream.get('data')
-                    if not isinstance(data, dict): continue
-                    chunk = data.get('chunk')
-                    if not isinstance(chunk, AIMessageChunk): continue
-                    content = chunk.content
-                    if content and isinstance(content, str):
-                        final_response += content
-                        # We could stream partial text updates if A2A supports it (it does via multiple messages or parts)
-                        # But typically we wait for final or send chunks. 
-                        # For now let's just accumulate for the final response to match the MovieAgent example structure
-                        # which sends one final message. 
-                        # OR we could send intermediate updates? 
-                        # The MovieAgent example seems to only send final response text.
-
-            logger.info(f"Agent response: {final_response}")
-
-            # 5. Publish final task status update
-            agent_message = Message(
-                kind="message",
-                role=Role.agent,
-                messageId=str(uuid.uuid4()),
-                parts=[Part(root=TextPart(kind="text", text=final_response or "Completed."))],
-                taskId=taskId,
-                contextId=contextId,
-            )
-            
-            # Update history
-            history_for_agent.append(agent_message)
-            MESSAGE_HISTORY_CACHE[contextId] = history_for_agent
-
-            final_update = TaskStatusUpdateEvent(
-                kind="status-update",
-                taskId=taskId,
-                contextId=contextId,
-                status=TaskStatus(
-                    state=TaskState.completed,
-                    message=agent_message,
-                    timestamp=datetime.now().isoformat(),
-                ),
-                final=True,
-            )
-            await event_queue.enqueue_event(final_update)
-
-        except Exception as error:
-            logger.error(f"Error executing agent: {error}", exc_info=True)
-            # Send error event
+__all__ = ['CallerAgentExecutor', 'caller_agent_card']
