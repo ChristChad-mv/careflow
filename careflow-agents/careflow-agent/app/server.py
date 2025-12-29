@@ -30,6 +30,14 @@ from a2a.types import (
 from google.adk.agents import LlmAgent
 from google.genai import types as genai_types
 
+# OpenTelemetry Imports
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.starlette import StarletteInstrumentor
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
 # Import the existing agent configuration
 from agent import root_agent, CareFlowAgent
 
@@ -281,12 +289,47 @@ def create_app():
         http_handler=request_handler
     )
     
-    return app.build()
+    starlette_app = app.build()
+
+    # --- Telemetry Configuration ---
+    logger.info("Configuring Telemetry (OpenTelemetry + Jaeger)")
+    resource = Resource(attributes={
+        "service.name": "careflow-pulse-agent",
+        "service.version": "1.0.0",
+        "deployment.environment": os.environ.get("DEPLOYMENT_ENV", "development")
+    })
+    
+    # Create and register TracerProvider
+    tracer_provider = TracerProvider(resource=resource)
+    trace.set_tracer_provider(tracer_provider)
+    
+    # Configure Jaeger Exporter (OTLP gRPC)
+    # Default to localhost:4317, or use OTLP_ENDPOINT env var
+    otlp_endpoint = os.environ.get("OTLP_ENDPOINT", "http://localhost:4317")
+    try:
+        otlp_exporter = OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
+        tracer_provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
+        logger.info(f"Telemetry enabled. Exporting to {otlp_endpoint}")
+    except Exception as e:
+        logger.error(f"Failed to initialize OTLP exporter: {e}")
+
+    # Instrument the Starlette app
+    StarletteInstrumentor().instrument_app(starlette_app)
+
+    return starlette_app
 
 app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 8000))
+    import argparse
+
+    parser = argparse.ArgumentParser(description='CareFlow Pulse Agent Server')
+    parser.add_argument('--port', type=int, help='Port to run the server on')
+    args = parser.parse_args()
+
+    # Priority: Command Line > Environment Variable > Default 8000
+    port = args.port or int(os.environ.get("PORT", 8000))
+    
     logger.info(f"Starting CareFlow A2A Server on port {port}")
     uvicorn.run("server:app", host="0.0.0.0", port=port, reload=True)
