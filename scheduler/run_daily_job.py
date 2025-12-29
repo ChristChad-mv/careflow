@@ -8,7 +8,7 @@ import sys
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-CAREFLOW_AGENT_URL = "http://localhost:8000"
+CAREFLOW_AGENT_URL = "http://localhost:8001"
 
 async def trigger_and_disconnect(schedule_hour: int = 8):
     """
