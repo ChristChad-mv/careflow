@@ -4,13 +4,13 @@
 
 **AI-Powered Post-Hospitalization Patient Monitoring System**
 
-A healthcare application designed for nurse coordinators to monitor recently discharged patients in real-time using AI-powered monitoring and voice interactions. Built with Next.js frontend and dual-agent AI architecture.
+A production-ready healthcare application for nurse coordinators to monitor recently discharged patients using **Gemini 3** AI agents, voice interactions, and real-time dashboard. Built with Next.js frontend and dual-agent architecture.
 
 *Preventing readmissions through intelligent, proactive care*
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.0-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![Python](https://img.shields.io/badge/Python-3.10+-blue?style=flat-square&logo=python)](https://www.python.org/)
-[![Google ADK](https://img.shields.io/badge/Google-ADK-4285F4?style=flat-square&logo=google-cloud)](https://cloud.google.com/vertex-ai)
+[![Gemini 3](https://img.shields.io/badge/Gemini-3.0-4285F4?style=flat-square&logo=google)](https://deepmind.google/technologies/gemini/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 
 </div>
@@ -33,10 +33,11 @@ A healthcare application designed for nurse coordinators to monitor recently dis
 
 ## 🏥 Overview
 
-**CareFlow Pulse** is an enterprise-grade healthcare monitoring platform designed for nurse coordinators to track recently discharged patients in real-time. Powered by a **dual-agent AI architecture**, the system combines:
+**CareFlow Pulse** is an enterprise-grade healthcare monitoring platform designed for nurse coordinators to track recently discharged patients in real-time. Powered by **Google Gemini 3** and a **dual-agent AI architecture**, the system combines:
 
-- **CareFlow Pulse Agent**: Medical reasoning agent with direct Firestore database access via MCP (Model Context Protocol)
-- **CareFlow Caller Agent**: Voice interface agent enabling natural phone conversations with patients via Twilio
+- **CareFlow Pulse Agent**: Medical reasoning agent powered by Gemini 3 Pro with direct Firestore database access via MCP (Model Context Protocol)
+- **CareFlow Caller Agent**: Voice interface agent powered by Gemini 2.0 Flash enabling natural phone conversations with patients via Twilio
+- **Next.js Dashboard**: Real-time web interface for nurse coordinators with patient monitoring, alerts, and AI insights
 
 The agents communicate using the **A2A (Agent-to-Agent) protocol**, enabling seamless delegation between voice interactions and medical data analysis.
 
@@ -125,10 +126,11 @@ CareFlow Pulse bridges the gap between hospital discharge and full recovery by:
   - Maintains conversation context
 
 ### Coming Soon
-- 🤖 Predictive readmission risk scoring
+- 🤖 Predictive readmission risk scoring with Gemini 3's advanced reasoning
 - 📊 Advanced analytics and trend detection
-- 📱 Mobile app for nurse coordinators
+- 📱 Mobile app for nurse coordinators (React Native)
 - 🔍 EHR integration (HL7 FHIR)
+- 🖼️ Multimodal support: Photo analysis (wounds, medication compliance) via Gemini 3 Vision
 
 ---
 
@@ -138,22 +140,30 @@ CareFlow Pulse bridges the gap between hospital discharge and full recovery by:
 ```
 careflow/
 ├── careflow-agents/
-│   ├── caller-agent/         # Voice agent (Python, Twilio, ElevenLabs, LangGraph)
+│   ├── caller-agent/         # Voice agent (Gemini 2.0 Flash, Twilio, LangGraph)
 │   │   ├── app/              # Core logic, agent, server, utils
-│   │   ├── deployment/       # Terraform, cloud configs
+│   │   ├── deployment/       # Terraform (26 .tf files), cloud configs
 │   │   ├── notebooks/        # Evaluation notebooks
 │   │   ├── tests/            # Integration, load, unit tests
-│   │   └── tools/            # Inspector tools (backend/frontend/scripts)
-│   └── careflow-agent/       # Medical reasoning agent (Python, ADK, MCP)
+│   │   └── tools/            # A2A Inspector (backend/frontend/scripts)
+│   └── careflow-agent/       # Medical reasoning agent (Gemini 3 Pro, ADK, MCP)
 │       ├── app/              # Core logic, agent, server, utils
-│       ├── deployment/       # Terraform, cloud configs
+│       ├── deployment/       # Terraform (26 .tf files), cloud configs
 │       ├── notebooks/        # Evaluation notebooks
 │       ├── tests/            # Integration, load, unit tests
-├── docs/                     # Functional & technical specifications
-├── mcp/                      # MCP toolbox config
-├── nextjs/                   # Frontend (Next.js)
-├── refs/                     # Extensions, samples (JS/Python)
-├── scheduler/                # Scheduling logic (if present)
+├── docs/                     # Functional & technical specs (2662 lines)
+├── mcp/                      # MCP toolbox config (Firestore integration)
+├── nextjs/                   # Frontend UI (Next.js 16, React 19, shadcn/ui)
+│   ├── src/
+│   │   ├── app/              # App Router pages (layout, page components)
+│   │   └── components/       # Reusable UI components (shadcn/ui)
+│   └── public/               # Static assets
+├── refs/                     # A2A latency extension, samples (JS/Python)
+├── scheduler/                # Cloud Scheduler orchestrator (Terraform)
+│   ├── terraform/            # Terraform config for daily jobs (4 .tf files)
+│   ├── run_daily_job.py      # Test script for resilience testing
+│   ├── Makefile              # Scheduler management commands
+│   └── README.md             # Scheduler documentation
 └── README.md                 # Central documentation
 ```
 
@@ -162,21 +172,23 @@ careflow/
 ```
 ┌─────────────────┐         ┌──────────────────┐         ┌─────────────────┐
 │                 │         │                  │         │                 │
-│  Nurse Portal   │ ◄─SSE── │  Next.js API     │ ◄─HTTP─►│ CareFlow Pulse  │
-│  (React UI)     │         │  (API Routes)    │         │ Agent (ADK)     │
+│  Nurse Portal   │ ◄─SSE── │  Next.js 16 API  │ ◄─HTTP─►│ CareFlow Pulse  │
+│  (shadcn/ui)    │         │  (API Routes)    │         │ Agent (Gemini 3)│
 │                 │         │                  │         │                 │
 └─────────────────┘         └──────────────────┘         └────────┬────────┘
                                                                    │
                                                               A2A  │
+                                                          (JSON-RPC)
                                                                    │
-┌─────────────────┐         ┌──────────────────┐         ┌────────▼────────┐
-│                 │         │                  │         │                 │
-│  Patient Phone  │ ◄─Call─►│ Twilio Relay     │ ◄─WS──► │ CareFlow Caller │
-│                 │         │ + ElevenLabs TTS │         │ Agent (Graph)   │
-│                 │         │                  │         │                 │
-└─────────────────┘         └──────────────────┘         └─────────────────┘
+┌─────────────────┐         ┌──────────────────┐         ┌────────▼──────────┐
+│                 │         │                  │         │                   │
+│  Patient Phone  │ ◄─Call─►│ Twilio Relay     │ ◄─WS──► │ CareFlow Caller   │
+│                 │         │ + ElevenLabs TTS │         │ Agent (Gemini 2.0)│
+│                 │         │                  │         │                   │
+└─────────────────┘         └──────────────────┘         └───────────────────┘
                                                                    │
                                                               MCP  │
+                                                          (Toolbox)│
                                                                    │
                                                           ┌────────▼────────┐
                                                           │                 │
@@ -236,10 +248,12 @@ careflow/
 | Technology | Version | Purpose |
 |------------|---------|---------|
 | **Python** | 3.10-3.12 | Backend language |
-| **Google ADK** | 1.6.1+ | Agent Development Kit (CareFlow Pulse Agent) |
-| **LangGraph** | Latest | REACT agent framework (CareFlow Caller Agent) |
+| **Gemini 3 Pro** | Preview | Main orchestrator agent with advanced reasoning |
+| **Gemini 2.0** | Preview | Voice agent with ultra-low latency |
+| **Google ADK** | 1.16.1+ | Agent Development Kit framework |
+| **LangGraph** | 1.0.3+ | REACT agent framework (CareFlow Caller Agent) |
 | **MCP (Model Context Protocol)** | Latest | Firestore database access via toolbox |
-| **A2A SDK** | Latest | Agent-to-Agent communication protocol |
+| **A2A SDK** | 0.3.9 | Agent-to-Agent communication protocol |
 | **Twilio ConversationRelay** | Latest | Real-time voice streaming |
 | **ElevenLabs** | Latest | Text-to-speech synthesis |
 | **google-genai** | 1.52.0 | Gemini model integration |
@@ -624,7 +638,7 @@ Before you begin, ensure you have the following installed:
    
    # Agent Configuration
    AGENT_NAME=careflow-pulse-agent
-   MODEL=gemini-2.5-flash
+   MODEL=gemini-3-flash-preview
    
    # Vertex AI Configuration
    GOOGLE_GENAI_USE_VERTEXAI=True
