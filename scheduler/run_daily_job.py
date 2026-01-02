@@ -1,18 +1,61 @@
+"""CareFlow Pulse - Disconnect Resilience Test Script
+
+⚠️ THIS IS A TESTING SCRIPT - NOT FOR PRODUCTION USE ⚠️
+
+Purpose:
+    Tests the CareFlow Pulse Agent's ability to handle network disconnections
+    during ongoing patient calls. Simulates a Cloud Scheduler job that 
+    disconnects after 10 seconds.
+
+Usage:
+    # Start CareFlow Pulse Agent locally on port 8001
+    python run_daily_job.py
+    
+    # With custom schedule hour
+    python run_daily_job.py --hour 12
+
+Production Scheduler:
+    For production deployment, use Cloud Scheduler (see terraform/ directory)
+    which provides:
+    - OIDC authentication
+    - Retry mechanisms
+    - Multi-environment support (staging/prod)
+    - Proper monitoring and alerting
+
+Author: CareFlow Team
+Last Updated: January 2026
+"""
+
 import asyncio
 import aiohttp
 import uuid
 import logging
 import sys
+import argparse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-CAREFLOW_AGENT_URL = "http://localhost:8001"
+CAREFLOW_AGENT_URL = "http://localhost:8001"  # Local development only
 
 async def trigger_and_disconnect(schedule_hour: int = 8):
     """
-    Triggers the job, waits 10 seconds, then disconnects.
+    Triggers a daily rounds job and intentionally disconnects after 10 seconds
+    to test the agent's resilience to network failures.
+    
+    Args:
+        schedule_hour: Hour of the day to simulate (8, 12, or 20)
+    
+    Flow:
+        1. Sends A2A JSON-RPC request to local agent
+        2. Begins consuming SSE stream
+        3. After 10 seconds, forcefully closes connection
+        4. Agent should continue processing calls despite disconnect
+    
+    Expected Behavior:
+        The agent should detect the disconnect, log it, but continue
+        making patient calls that were already queued.
     """
     logger.info(f"🧪 TESTING DISCONNECT RESILIENCE")
     logger.info(f"⏰ Triggering Daily Patient Rounds...")
@@ -67,4 +110,32 @@ async def trigger_and_disconnect(schedule_hour: int = 8):
     logger.info("👋 Script exiting. Check AGENT SERVER logs to see if calls continue!")
 
 if __name__ == "__main__":
-    asyncio.run(trigger_and_disconnect())
+    parser = argparse.ArgumentParser(
+        description='Test CareFlow Agent disconnect resilience',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Test morning rounds (8 AM)
+  python run_daily_job.py --hour 8
+  
+  # Test noon rounds (12 PM)
+  python run_daily_job.py --hour 12
+  
+  # Test evening rounds (8 PM)
+  python run_daily_job.py --hour 20
+
+Note: This script only works with a locally running agent on port 8001.
+      For production, use Cloud Scheduler (see terraform/ directory).
+        """
+    )
+    parser.add_argument(
+        '--hour',
+        type=int,
+        default=8,
+        choices=[8, 12, 20],
+        help='Schedule hour to test (8=morning, 12=noon, 20=evening)'
+    )
+    args = parser.parse_args()
+    
+    logger.info(f"🧪 Testing disconnect resilience for {args.hour}:00 rounds")
+    asyncio.run(trigger_and_disconnect(args.hour))
