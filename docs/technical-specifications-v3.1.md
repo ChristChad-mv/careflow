@@ -1,9 +1,9 @@
-# **CareFlow Pulse: Technical Specifications (v2.0)**
+# **CareFlow Pulse: Technical Specifications (v3.2)**
 
 | | |
 | :--- | :--- |
-| **Document Version:** | 3.1 |
-| **Date:** | 2025-12-25 |
+| **Document Version:** | 3.2 |
+| **Date:** | 2026-01-02 |
 | **Status:** | **Current** |
 | **Author:** | Christ |
 
@@ -16,6 +16,7 @@
 | 2.0 | 2025-12-23 | Christ | Complete rewrite with comprehensive database structure, API endpoints, and implementation details |
 | 3.0 | 2025-12-26 | Christ | Major architecture update: Dual-agent system (CareFlow Pulse + Caller), MCP protocol integration, A2A inter-agent communication, Twilio ConversationRelay, Cloud Run deployment |
 | 3.1 | 2025-12-26 | Christ | Major architecture update: Dual-agent system (CareFlow Pulse + Caller), MCP protocol integration, A2A inter-agent communication, Twilio ConversationRelay, Cloud Run deployment (v2) |
+| 3.2 | 2026-01-02 | Christ | Cloud Scheduler Infrastructure as Code: Terraform configuration with multi-environment deployment (staging/prod), OIDC authentication, automated retry logic, comprehensive monitoring setup |
 
 ---
 
@@ -131,25 +132,18 @@
    - 10.4. Google Cloud Configuration
 
 ### **11. Deployment Guide**
-   -### **11.1. Backend Deployment (The Fleet)**
-
-We do NOT deploy a single monolithic agent. We deploy a **Fleet of Agents**, one per hospital.
-
-1.  **Containerize**: Build `careflow-pulse-agent` Docker image.
-2.  **Deploy loop**: For each hospital in `hospitals.json`:
-    -   Deploy Cloud Run Service: `careflow-agent-[HOSPITAL_ID]`
-    -   Set Env Var: `HOSPITAL_ID=[HOSPITAL_ID]`
-3.  **Result**: N Isolated Services.
-
-#### **Dispatcher Deployment**
--   Deploy a single "Dispatcher" (Cloud Function or Script).
--   Cloud Scheduler triggers Dispatcher daily.
--   Dispatcher fires async requests to all N Agent Services.
-   - 11.2. Frontend Deployment (Vercel)
-   - 11.3. Database Setup (Firestore)
-   - 11.4. MCP Toolbox Setup
-   - 11.5. CI/CD Pipeline
-   - 11.6. Monitoring & Logging
+   - **11.1. Backend Deployment (Dual-Agent System)**
+     - CareFlow Pulse Agent (Orchestrator)
+     - CareFlow Caller Agent (Voice Interface)
+   - **11.2. Cloud Scheduler Deployment (Terraform)**
+     - Infrastructure as Code
+     - Multi-Environment Strategy (Staging + Prod)
+     - OIDC Authentication & IAM
+   - **11.3. Frontend Deployment (Vercel)**
+   - **11.4. Database Setup (Firestore)**
+   - **11.5. MCP Toolbox Setup**
+   - **11.6. CI/CD Pipeline**
+   - **11.7. Monitoring & Logging**
 
 ### **12. Testing Strategy**
    - 12.1. Unit Testing
@@ -500,7 +494,7 @@ Cloud Scheduler (Daily) --> [Dispatcher Function] --> Loops Active Hospitals -->
 | **CareFlow Pulse Agent** | Google ADK | 1.6.1+ | Medical reasoning agent with MCP toolbox integration |
 | **CareFlow Caller Agent** | LangGraph | Latest | Voice interface agent with REACT architecture |
 | **Language** | Python | 3.10-3.12 | Backend logic for both agents |
-| **AI Model** | Gemini 2.5 Flash | Latest | Fast, intelligent LLM for medical triage and conversation |
+| **AI Model** | Gemini 3 Flash (Preview) | Latest | Fast, intelligent LLM for medical triage and conversation |
 | **MCP Protocol** | toolbox-core | Latest | Model Context Protocol for Firestore database access |
 | **A2A Protocol** | a2a-sdk | Latest | Agent-to-Agent communication (JSON-RPC + SSE) |
 | **Voice Interface** | Twilio ConversationRelay | Latest | Real-time voice streaming with WebSocket |
@@ -679,7 +673,7 @@ CareFlow Pulse is deployed across multiple Google Cloud and Vercel environments.
     │  │        Vertex AI Agent Engine                    │   │
     │  │  • ADK Multi-Agent System (Python)               │   │
     │  │  • Auto-scaling (0 to N instances)               │   │
-    │  │  • Model: Gemini 2.5 Flash                       │   │
+    │  │  • Model: Gemini 3 Flash (Preview)              │   │
     │  │  • Endpoints:                                    │   │
     │  │    - /api/careflow/trigger-scheduled-calls       │   │
     │  │    - /api/careflow/twilio-sms                    │   │
@@ -1517,7 +1511,7 @@ from app.config import config
 
 root_agent = LlmAgent(
     name=config.internal_agent_name,  # "careflow_pulse_agent"
-    model=config.model,                 # "gemini-2.5-flash"
+    model=config.model,                 # "gemini-3-flash-preview"
     description="AI agent that monitors post-hospitalization patients",
     planner=BuiltInPlanner(
         thinking_config=genai_types.ThinkingConfig(include_thoughts=True)
@@ -2366,47 +2360,299 @@ Each Agent Service in the fleet requires specific configuration.
 
 ## **11. Deployment Guide**
 
-### **11.1. Backend Deployment (The Fleet Strategy)**
+### **11.1. Backend Deployment (Dual-Agent System)**
 
-We utilize a **Multi-Tenant Fleet** strategy where each hospital gets its own isolated Cloud Run service.
+CareFlow Pulse uses a **dual-agent architecture** deployed as serverless Cloud Run services:
 
-#### **Step 1: Build the Generic Agent Image**
-Build a single Docker image that can serve *any* hospital.
+#### **Agent 1: CareFlow Pulse Agent (Medical Intelligence & Orchestration)**
+
+**Purpose**: Orchestrates patient rounds, manages medical logic, queries Firestore, delegates voice calls via A2A protocol.
+
+**Deployment**:
 ```bash
-gcloud builds submit --tag gcr.io/careflow-478811/careflow-agent:latest .
-```
+cd careflow-agents/careflow-agent
 
-#### **Step 2: Deploy Service for Each Hospital**
-Iterate through your hospital list and deploy an instance for each, injecting the `HOSPITAL_ID` environment variable.
+# Build and deploy to Cloud Run
+make deploy
 
-**Hospital 1 (Central Hospital):**
-```bash
-gcloud run deploy careflow-agent-hosp001 \
+# Or manually:
+gcloud builds submit --tag gcr.io/careflow-478811/careflow-agent:latest
+gcloud run deploy careflow-agent \
   --image gcr.io/careflow-478811/careflow-agent:latest \
-  --set-env-vars HOSPITAL_ID=HOSP001 \
   --region us-central1 \
-  --allow-unauthenticated
+  --platform managed \
+  --allow-unauthenticated \
+  --set-env-vars GOOGLE_CLOUD_PROJECT=careflow-478811,FIRESTORE_DATABASE=careflow-db
 ```
 
-**Hospital 2 (St. Mary's Clinic):**
+**Environment Variables**:
 ```bash
-gcloud run deploy careflow-agent-hosp002 \
-  --image gcr.io/careflow-478811/careflow-agent:latest \
-  --set-env-vars HOSPITAL_ID=HOSP002 \
-  --region us-central1 \
-  --allow-unauthenticated
+GOOGLE_CLOUD_PROJECT=careflow-478811
+FIRESTORE_DATABASE=careflow-db
+GOOGLE_GENAI_USE_VERTEXAI=true
+LOG_LEVEL=INFO
 ```
 
-#### **Step 3: Deploy the Dispatcher**
-Deploy a Cloud Function or Scheduler Job that triggers these services.
-- **Job:** `daily-rounds`
-- **Target:** Calls the Dispatcher Function
-- **Dispatcher Logic:**
-  - READ `hospitals.json` or queries Active Hospitals from DB.
-  - POST to `https://careflow-agent-hosp001.../start`
-  - POST to `https://careflow-agent-hosp002.../start`
+**Exposed Endpoint**:
+- `POST /api/careflow/trigger-scheduled-calls` - Receives Cloud Scheduler triggers
 
-### **11.2. Frontend Deployment (Vercel)**
+---
+
+#### **Agent 2: CareFlow Caller Agent (Voice Interface)**
+
+**Purpose**: Handles voice interactions via Twilio ConversationRelay, streams audio with ElevenLabs, receives A2A messages from Pulse Agent.
+
+**Deployment**:
+```bash
+cd careflow-agents/caller-agent
+
+# Build and deploy to Cloud Run
+make deploy
+
+# Or manually:
+gcloud builds submit --tag gcr.io/careflow-478811/caller-agent:latest
+gcloud run deploy caller-agent \
+  --image gcr.io/careflow-478811/caller-agent:latest \
+  --region us-central1 \
+  --platform managed \
+  --allow-unauthenticated \
+  --set-env-vars TWILIO_ACCOUNT_SID=ACxxx,TWILIO_AUTH_TOKEN=xxx,ELEVENLABS_API_KEY=xxx
+```
+
+**Environment Variables**:
+```bash
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxx
+ELEVENLABS_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
+ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM  # Rachel voice
+GOOGLE_CLOUD_PROJECT=careflow-478811
+```
+
+**Exposed Endpoints**:
+- `POST /` - A2A protocol endpoint (receives messages from Pulse Agent)
+- `POST /twilio-webhook` - Twilio voice status callbacks
+
+---
+
+### **11.2. Cloud Scheduler Deployment (Terraform)**
+
+The **Cloud Scheduler** orchestrates automated daily patient rounds by triggering the CareFlow Pulse Agent at predetermined times.
+
+#### **Architecture**
+
+```
+Cloud Scheduler (Morning/Noon/Evening)
+    ↓ HTTPS POST with OIDC Auth
+CareFlow Pulse Agent
+    ↓ A2A Protocol
+CareFlow Caller Agent
+    ↓ Twilio API
+Patient Phone Calls
+```
+
+#### **Infrastructure as Code**
+
+All scheduler resources are managed via **Terraform** in `scheduler/terraform/`:
+
+**File Structure**:
+```
+scheduler/terraform/
+├── main.tf          # Scheduler jobs (3 times × 2 environments = 6 jobs)
+├── variables.tf     # prod_project_id, staging_project_id, pulse_agent_urls
+├── outputs.tf       # Service account emails, job names
+├── providers.tf     # Google Cloud provider with staging/prod aliases
+└── vars/
+    └── env.tfvars   # Configuration values
+```
+
+#### **Multi-Environment Strategy**
+
+Uses `for_each` loops to deploy to **staging and production simultaneously**:
+
+```terraform
+locals {
+  deploy_project_ids = {
+    prod    = var.prod_project_id
+    staging = var.staging_project_id
+  }
+}
+
+resource "google_cloud_scheduler_job" "morning_rounds" {
+  for_each = local.deploy_project_ids  # Creates 2 jobs
+
+  name    = "${var.project_name}-morning-rounds"
+  project = each.value
+  schedule = "15 8 * * *"  # 8:15 AM EST
+  time_zone = "America/New_York"
+  
+  http_target {
+    http_method = "POST"
+    uri = var.pulse_agent_urls[each.key]
+    
+    body = base64encode(jsonencode({
+      scheduleHour = 8
+      timezone     = "America/New_York"
+      triggerType  = "scheduled"
+      source       = "cloud-scheduler"
+      environment  = each.key
+    }))
+    
+    oidc_token {
+      service_account_email = google_service_account.scheduler_sa[each.key].email
+      audience = var.pulse_agent_urls[each.key]
+    }
+  }
+}
+```
+
+#### **Schedule Configuration**
+
+| Job | Time (EST) | Cron | Purpose |
+|-----|------------|------|---------|
+| `careflow-morning-rounds` | 8:15 AM | `15 8 * * *` | Post-breakfast medication adherence |
+| `careflow-noon-rounds` | 12:15 PM | `15 12 * * *` | Mid-day symptom check |
+| `careflow-evening-rounds` | 8:15 PM | `15 20 * * *` | Evening medication review |
+
+**Total Resources Deployed**: 16
+- 6 Cloud Scheduler Jobs (3 × staging + 3 × prod)
+- 2 Service Accounts (`careflow-scheduler`)
+- 2 IAM Bindings (`roles/run.invoker`)
+- 6 API Enablements (`cloudscheduler.googleapis.com`, etc.)
+
+#### **Deployment Steps**
+
+**Step 1: Configure Variables**
+```bash
+cd scheduler/terraform
+nano vars/env.tfvars
+```
+
+```terraform
+# Project IDs
+prod_project_id    = "careflow-478811"
+staging_project_id = "careflow-staging-12345"
+project_name       = "careflow"
+
+# Region
+region = "us-central1"
+
+# Pulse Agent URLs (from Cloud Run deployment)
+pulse_agent_urls = {
+  prod    = "https://careflow-agent-abc123-uc.a.run.app"
+  staging = "https://careflow-agent-xyz789-uc.a.run.app"
+}
+
+pulse_agent_service_name = "careflow-agent"
+```
+
+**Step 2: Initialize Terraform**
+```bash
+terraform init
+```
+
+**Step 3: Preview & Deploy**
+```bash
+terraform plan -var-file=vars/env.tfvars
+terraform apply -var-file=vars/env.tfvars
+```
+
+**Step 4: Verify Deployment**
+```bash
+# List scheduler jobs
+gcloud scheduler jobs list --project=careflow-478811 --location=us-central1
+
+# Manually trigger test
+gcloud scheduler jobs run careflow-morning-rounds \
+  --project=careflow-478811 \
+  --location=us-central1
+```
+
+#### **Security: OIDC Authentication**
+
+Cloud Scheduler authenticates to Cloud Run using **OIDC tokens** (no API keys):
+
+1. **Service Account**: `careflow-scheduler@{project}.iam.gserviceaccount.com`
+2. **IAM Role**: `roles/run.invoker` on CareFlow Pulse Agent
+3. **Token Generation**: Automatically signed by scheduler SA
+4. **Validation**: Cloud Run verifies audience and issuer
+
+**IAM Binding** (managed by Terraform):
+```terraform
+resource "google_cloud_run_v2_service_iam_member" "pulse_agent_invoker" {
+  for_each = local.deploy_project_ids
+
+  project  = each.value
+  location = var.region
+  name     = var.pulse_agent_service_name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.scheduler_sa[each.key].email}"
+}
+```
+
+#### **Retry Configuration**
+
+Each job has automatic retry logic:
+```terraform
+retry_config {
+  retry_count          = 3       # Max 3 attempts
+  max_retry_duration   = "0s"
+  min_backoff_duration = "60s"   # 1 minute wait
+  max_backoff_duration = "300s"  # 5 minutes max
+}
+```
+
+**Retry Scenarios**:
+- Cloud Run cold start delays
+- Temporary network failures
+- Downstream service rate limiting
+
+#### **Operations**
+
+**Pause Jobs** (Maintenance):
+```bash
+for job in morning-rounds noon-rounds evening-rounds; do
+  gcloud scheduler jobs pause careflow-$job \
+    --project=careflow-478811 --location=us-central1
+done
+```
+
+**Resume Jobs**:
+```bash
+for job in morning-rounds noon-rounds evening-rounds; do
+  gcloud scheduler jobs resume careflow-$job \
+    --project=careflow-478811 --location=us-central1
+done
+```
+
+**Update Schedule**:
+Edit `main.tf`, change `schedule` parameter, then:
+```bash
+terraform apply -var-file=vars/env.tfvars
+```
+
+#### **Monitoring**
+
+**Key Metrics**:
+1. Job success rate: `cloudscheduler.googleapis.com/job/attempt_count`
+2. Execution duration: `cloudscheduler.googleapis.com/job/execution_duration`
+3. Agent response latency: `run.googleapis.com/request_latencies`
+
+**Alert Policy** (3 consecutive failures):
+```bash
+gcloud alpha monitoring policies create \
+  --display-name="CareFlow Scheduler Failures" \
+  --condition-threshold-value=3 \
+  --condition-filter='resource.type="cloud_scheduler_job"'
+```
+
+**Cost**: ~$4/year for 6 jobs (3 free, 3 × $0.10/month)
+
+For complete documentation, see: [`scheduler/README.md`](../scheduler/README.md)
+
+---
+
+### **11.3. Frontend Deployment (Vercel)**
+
 The Next.js frontend is deployed as a single application.
 - **Environment:**
   - `NEXT_PUBLIC_FIREBASE_PROJECT_ID=careflow-478811`
