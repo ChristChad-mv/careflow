@@ -49,7 +49,7 @@ def init_tools():
 init_tools()
 
 AGENT_NAME = "careflow_pulse_agent"
-AGENT_MODEL = "gemini-2.5-flash"
+AGENT_MODEL = "gemini-3-pro-preview"
 AGENT_DESCRIPTION = "An AI agent that monitors post-hospitalization patients, analyzes symptoms, and generates alerts for healthcare coordinators."
 
 # Get Hospital ID from environment or default to HOSP001
