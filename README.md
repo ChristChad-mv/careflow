@@ -25,9 +25,6 @@ A production-ready healthcare application for nurse coordinators to monitor rece
 - [Tech Stack](#-tech-stack)
 - [Getting Started](#-getting-started)
 - [Development](#-development)
-- [Deployment](#-deployment)
-- [Project Structure](#-project-structure)
-- [Contributing](#-contributing)
 
 ---
 
@@ -134,8 +131,9 @@ CareFlow Pulse bridges the gap between hospital discharge and full recovery by:
 
 ---
 
+## 🏗️ Architecture
 
-## 🗂️ Project Structure
+CareFlow Pulse follows a modern, scalable architecture with clear separation of concerns:
 
 ```
 careflow/
@@ -223,6 +221,7 @@ careflow/
 - **Database**: Firestore (careflow-478811/careflow-db)
 - **Voice**: Twilio + ElevenLabs
 - **Monitoring**: Cloud Logging, OpenTelemetry tracing
+- **Infrastructure**: Terraform (automated provisioning in `deployment/` folders)
 
 ---
 
@@ -276,9 +275,11 @@ careflow/
 Before you begin, ensure you have the following installed:
 
 - **Python 3.10-3.12** - [Download Python](https://www.python.org/downloads/)
+- **uv** (Fast Python package manager) - [Install uv](https://docs.astral.sh/uv/)
 - **Node.js 18+** and **npm** - [Install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 - **Google Cloud Account** - [Sign up](https://cloud.google.com/) (free tier available)
 - **Twilio Account** - [Sign up](https://www.twilio.com/) (for voice features)
+- **ElevenLabs Account** - [Sign up](https://elevenlabs.io/) (for text-to-speech)
 
 ### Installation
 
@@ -288,12 +289,24 @@ Before you begin, ensure you have the following installed:
    cd careflow-pulse
    ```
 
-2. **Install Python dependencies**
+2. **Install Python dependencies with uv**
    ```bash
-   cd careflow-pulse
-   python -m venv .venv
+   # Install uv if not already installed
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   
+   # CareFlow Pulse Agent (Medical Reasoning)
+   cd careflow-agents/careflow-agent
+   uv venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   pip install -r careflow-agent/requirements.txt
+   uv pip install -r requirements.txt
+   cd ../..
+   
+   # CareFlow Caller Agent (Voice Interface)
+   cd careflow-agents/caller-agent
+   uv venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   uv pip install -r requirements.txt
+   cd ../..
    ```
 
 3. **Install Node.js dependencies**
@@ -313,32 +326,97 @@ Before you begin, ensure you have the following installed:
 
 5. **Configure environment variables**
 
-   **CareFlow Pulse Agent** (`careflow-agent/careflow_pulse_agent/.env`):
+   **Next.js Frontend** (create `nextjs/.env.local`):
+   ```bash
+   cd nextjs
+   cp .env.example .env.local
+   # Edit .env.local with your Firebase and API credentials
+   ```
+   
+   Required variables in `nextjs/.env.local`:
    ```env
+   # Firebase Configuration
+   NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=careflow-478811.firebaseapp.com
+   NEXT_PUBLIC_FIREBASE_PROJECT_ID=careflow-478811
+   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=careflow-478811.appspot.com
+   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+   NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+   
+   # NextAuth Configuration
+   NEXTAUTH_SECRET=your_random_secret  # Generate with: openssl rand -base64 32
+   NEXTAUTH_URL=http://localhost:3000
+   
+   # Firebase Admin (Server-side)
+   FIREBASE_PROJECT_ID=careflow-478811
+   FIREBASE_CLIENT_EMAIL=your_service_account@careflow-478811.iam.gserviceaccount.com
+   FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+   
+   # Upstash Redis (Rate Limiting)
+   UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
+   UPSTASH_REDIS_REST_TOKEN=your_token
+   
+   # Agent URLs (for API integration)
+   CAREFLOW_AGENT_URL=http://localhost:8000
+   CAREFLOW_CALLER_URL=http://localhost:8080
+   ```
+
+   **CareFlow Pulse Agent** (create `careflow-agents/careflow-agent/.env`):
+   ```bash
+   cd careflow-agents/careflow-agent
+   cat > .env << EOF
+   # Agent Configuration
    CAREFLOW_CALLER_URL=http://localhost:8080
    MCP_TOOLBOX_URL=http://localhost:5000
    PORT=8000
+   
+   # Google Cloud Configuration
    GOOGLE_CLOUD_PROJECT=careflow-478811
+   GOOGLE_CLOUD_LOCATION=us-central1
+   
+   # Gemini Configuration
+   GOOGLE_GENAI_USE_VERTEXAI=True
+   MODEL=gemini-3-flash-preview
+   
+   # Firestore Configuration
+   FIRESTORE_DATABASE=careflow-db
+   EOF
    ```
 
-   **CareFlow Caller Agent** (`careflow-agent/careflow_pulse_caller/.env`):
-   ```env
+   **CareFlow Caller Agent** (create `careflow-agents/caller-agent/.env`):
+   ```bash
+   cd careflow-agents/caller-agent
+   cat > .env << EOF
+   # Agent URLs
    CAREFLOW_AGENT_URL=http://localhost:8000
    PORT=8080
+   
+   # Twilio Configuration (Voice Interface)
    TWILIO_ACCOUNT_SID=your_account_sid
    TWILIO_AUTH_TOKEN=your_auth_token
-   TWILIO_PHONE_NUMBER=your_phone_number
+   TWILIO_PHONE_NUMBER=+1234567890
+   
+   # ElevenLabs Configuration (Text-to-Speech)
    ELEVENLABS_API_KEY=your_api_key
+   ELEVENLABS_VOICE_ID=your_voice_id  # Optional, uses default if not set
+   
+   # Google Cloud Configuration
+   GOOGLE_CLOUD_PROJECT=careflow-478811
+   GOOGLE_CLOUD_LOCATION=us-central1
+   
+   # Gemini Configuration
+   MODEL=gemini-2.0-flash-preview
+   GOOGLE_GENAI_USE_VERTEXAI=True
+   EOF
    ```
 
-   **Next.js** (create `.env.local` in `nextjs/`):
-   ```env
-   NEXT_PUBLIC_AGENT_URL=http://localhost:8000
+6. **Authenticate with Google Cloud**
+   ```bash
+   gcloud auth application-default login
+   gcloud config set project careflow-478811
    ```
 
-
-
-### Our Solution### Development
+---### Development
 
 
 
@@ -654,124 +732,78 @@ Before you begin, ensure you have the following installed:
 
 ## 💻 Development
 
-### Running the Application
+### Running the Application Locally
 
-#### Option 1: Run Both Services Concurrently (Recommended)
+Start all services in separate terminals:
 
+#### Terminal 1: MCP Toolbox (Firestore Access)
 ```bash
-make dev
+# Run from project root
+./toolbox serve mcp/tools.yaml
+# Runs at http://localhost:5000
 ```
 
-This starts:
-- **AI Agent Backend** at `http://localhost:8000`
-- **Next.js Frontend** at `http://localhost:3000`
-
-#### Option 2: Run Services Separately
-
+#### Terminal 2: CareFlow Pulse Agent (Medical Reasoning)
 ```bash
-# Terminal 1: Start AI Agent Backend
-make dev-backend
-
-# Terminal 2: Start Next.js Frontend
-make dev-frontend
+cd careflow-agents/careflow-agent
+source .venv/bin/activate
+python app/server.py
+# Runs at http://localhost:8000
 ```
 
-### Testing the AI Agent
-
-Launch the ADK web interface to test agent interactions:
-
+#### Terminal 3: CareFlow Caller Agent (Voice Interface)
 ```bash
-make adk-web
+cd careflow-agents/caller-agent
+source .venv/bin/activate
+python app/server.py
+# Runs at http://localhost:8080
 ```
 
-Opens at `http://localhost:8501` - allows direct chat with the AI agent.
+#### Terminal 4: Next.js Frontend
+```bash
+cd nextjs
+npm run dev
+# Runs at http://localhost:3000
+```
+
+### Development with Make Commands
+
+Both agents include Makefiles for streamlined development:
+
+**CareFlow Pulse Agent:**
+```bash
+cd careflow-agents/careflow-agent
+make install        # Install dependencies with uv
+make dev            # Run development server
+make lint           # Lint code (ruff + mypy)
+make test           # Run tests
+```
+
+**CareFlow Caller Agent:**
+```bash
+cd careflow-agents/caller-agent
+make install        # Install dependencies with uv
+make dev            # Run development server
+make lint           # Lint code (ruff + mypy)
+make test           # Run tests
+```
 
 ### Code Quality
 
 ```bash
-# Lint everything
-make lint
+# Python linting (from agent directories)
+ruff format .       # Format code
+ruff check . --fix  # Lint and auto-fix
+mypy app/           # Type checking
 
-# Lint Python code only
-make lint-backend
-
-# Lint Next.js code only
-make lint-frontend
+# Next.js linting
+cd nextjs
+npm run lint
 ```
-
-### Available Make Commands
-
-| Command | Description |
-|---------|-------------|
-| `make install` | Install all dependencies (Python + Node.js) |
-| `make dev` | Run both backend and frontend concurrently |
-| `make dev-backend` | Run Python AI Agent only |
-| `make dev-frontend` | Run Next.js frontend only |
-| `make adk-web` | Launch ADK web interface for testing |
-| `make lint` | Lint both backend and frontend |
-| `make lint-backend` | Lint Python code (ruff + mypy) |
-| `make lint-frontend` | Lint Next.js code (ESLint) |
-| `make deploy-agent` | Deploy AI agent to Vertex AI Agent Engine |
-| `make deploy-frontend` | Deploy Next.js to Vercel |
-| `make clean` | Remove build artifacts and dependencies |
 
 ---
 
-## 🚢 Deployment
-
-### Prerequisites for Deployment
-
-#### 1. Google Cloud Setup (for AI Agent)
-
-Follow the comprehensive [ADK Deployment Guide](./ADK_DEPLOYMENT_GUIDE.md) which covers:
-- Google Cloud project creation
-- Required API enablement (5 APIs)
-- IAM permissions configuration
-- Storage bucket creation
-- Service account setup
-
-#### 2. Vercel Setup (for Frontend)
-
-Follow the [Next.js Vercel Deployment Guide](./NEXTJS_VERCEL_DEPLOYMENT_GUIDE.md) which covers:
-- Vercel account configuration
-- Environment variable setup
-- Service account key generation
-- Production deployment steps
-
-### Quick Deployment
-
-Once prerequisites are complete:
-
-```bash
-# Deploy AI agent to Vertex AI Agent Engine
-make deploy-agent
-
-# Deploy frontend to Vercel (requires Vercel CLI)
-make deploy-frontend
-```
-
-### Production Environment Variables
-
-Ensure these are configured in your production environments:
-
-**Vercel (Frontend):**
-- `GOOGLE_CLOUD_PROJECT`
-- `REASONING_ENGINE_ID`
-- `GOOGLE_SERVICE_ACCOUNT_KEY_BASE64`
-- `AGENT_ENGINE_ENDPOINT`
-- `GOOGLE_CLOUD_LOCATION`
-- `ADK_APP_NAME`
-
-**Agent Engine (Backend):**
-- `GOOGLE_CLOUD_PROJECT`
-- `GOOGLE_CLOUD_LOCATION`
-- `GOOGLE_GENAI_USE_VERTEXAI`
-- `MODEL`
-- `AGENT_NAME`
-
----
-
-## 📁 Project Structure
+##  Project Structure
 
 ### Frontend (`nextjs/`)
 
@@ -877,67 +909,6 @@ CareFlow Pulse uses a **medical-grade dark theme** optimized for healthcare envi
 - Accessibility (WCAG AA compliance)
 - Responsive layouts
 - Dark mode optimized
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! Please follow these guidelines:
-
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
-3. **Commit your changes**: `git commit -m 'Add amazing feature'`
-4. **Push to the branch**: `git push origin feature/amazing-feature`
-5. **Open a Pull Request**
-
-### Development Guidelines
-
-- Follow existing code style (ESLint + Ruff configs)
-- Write meaningful commit messages
-- Add tests for new features
-- Update documentation as needed
-- Ensure all tests pass before submitting PR
-
----
-
-## 🗺️ Roadmap
-
-### Phase 1: Core Platform (Current)
-- ✅ Next.js frontend with dashboard
-- ✅ Dual-agent AI architecture (CareFlow Pulse + Caller agents)
-- ✅ MCP protocol integration for Firestore database access
-- ✅ A2A protocol for inter-agent communication
-- ✅ Dockerfiles and Cloud Run deployment configuration
-- 🔄 Twilio ConversationRelay + ElevenLabs TTS integration
-- 🔄 Production deployment to Cloud Run
-
-### Phase 2: AI Integration
-- ⏳ Real-time patient symptom analysis via voice calls
-- ⏳ Risk scoring algorithm based on medical guidelines
-- ⏳ Automated alert generation for nurse coordinators
-- ⏳ Voice-to-dashboard integration (SSE streaming)
-- ⏳ EHR system integration (HL7 FHIR) via MCP extensions
-
-### Phase 3: Clinical Features
-- ⏳ Advanced medication interaction detection
-- ⏳ Vital signs monitoring from wearable devices
-- ⏳ Multi-language support (French, English, Arabic)
-- ⏳ Nurse coordinator mobile app
-- ⏳ Patient education content generation
-
-### Phase 4: Enterprise Features
-- ⏳ Multi-tenant architecture for multiple hospitals
-- ⏳ Role-based access control (RBAC)
-- ⏳ HIPAA compliance certification
-- ⏳ Advanced analytics and reporting dashboards
-- ⏳ Integration with French hospital systems
-
-### Phase 5: Market Expansion
-- ⏳ Demo pilot with French hospitals
-- ⏳ Patient mobile app (React Native)
-- ⏳ Telehealth video integration
-- ⏳ AI-powered care plan recommendations
-- ⏳ International healthcare system support
 
 ---
 
