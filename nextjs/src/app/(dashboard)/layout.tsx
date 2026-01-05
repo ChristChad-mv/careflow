@@ -3,13 +3,15 @@
 import { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
-import { SignOutButton } from "@/components/auth/signOutButton";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 
 import { getAlerts } from "@/lib/db";
 
+export const dynamic = 'force-dynamic';
+
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const alerts = await getAlerts();
-  const criticalCount = alerts.filter(a => a.riskLevel === 'critical').length;
+  const criticalCount = alerts.filter(a => ['critical', 'warning'].includes(a.priority)).length;
 
   return (
     <SidebarProvider>
