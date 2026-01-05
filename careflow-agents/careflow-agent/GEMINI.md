@@ -153,7 +153,7 @@ ADK allows you to define agents, tools, and even multi-agent workflows using a s
     ```yaml
     # yaml-language-server: $schema=https://raw.githubusercontent.com/google/adk-python/refs/heads/main/src/google/adk/agents/config_schemas/AgentConfig.json
     name: assistant_agent
-    model: gemini-2.5-flash
+    model: gemini-3-flash-preview
     description: A helper agent that can answer users' various questions.
     instruction: You are an agent to help answer users' various questions.
     ```
@@ -171,7 +171,7 @@ ADK allows you to define agents, tools, and even multi-agent workflows using a s
 *   **Agent with Custom Tools**:
     ```yaml
     agent_class: LlmAgent
-    model: gemini-2.5-flash
+    model: gemini-3-flash-preview
     name: prime_agent
     description: Handles checking if numbers are prime.
     instruction: |
@@ -185,7 +185,7 @@ ADK allows you to define agents, tools, and even multi-agent workflows using a s
 *   **Multi-Agent System with Sub-Agents**:
     ```yaml
     agent_class: LlmAgent
-    model: gemini-2.5-flash
+    model: gemini-3-flash-preview
     name: root_agent
     description: Learning assistant that provides tutoring in code and math.
     instruction: |
@@ -1405,7 +1405,7 @@ Multi-layered defense against harmful content, misalignment, and unsafe actions.
         ```python
         def safety_checker_callback(context: CallbackContext, llm_request: LlmRequest) -> Optional[LlmResponse]:
             # Use a separate, small LLM to classify safety
-            safety_llm_agent = Agent(name="SafetyChecker", model="gemini-2.5-flash-001", instruction="Classify input as 'safe' or 'unsafe'. Output ONLY the word.")
+            safety_llm_agent = Agent(name="SafetyChecker", model="gemini-3-flash-preview", instruction="Classify input as 'safe' or 'unsafe'. Output ONLY the word.")
             # Run the safety agent (might need a new runner instance or direct model call)
             # For simplicity, a mock:
             user_input = llm_request.contents[-1].parts[0].text
@@ -1533,7 +1533,7 @@ async def start_streaming_session(runner, session, user_id):
 
 *   **Advanced I/O Modalities**: ADK (especially with Gemini Live API models) supports richer interactions.
     *   **Audio**: Input via `Blob(mime_type="audio/pcm", data=bytes)`, Output via `genai_types.SpeechConfig` in `RunConfig`.
-    *   **Vision (Images/Video)**: Input via `Blob(mime_type="image/jpeg", data=bytes)` or `Blob(mime_type="video/mp4", data=bytes)`. Models like `gemini-2.5-flash-exp` can process these.
+    *   **Vision (Images/Video)**: Input via `Blob(mime_type="image/jpeg", data=bytes)` or `Blob(mime_type="video/mp4", data=bytes)`. Models like `gemini-3-flash-preview` can process these.
     *   **Multimodal Input in `Content`**:
         ```python
         multimodal_content = genai_types.Content(
@@ -1548,7 +1548,7 @@ async def start_streaming_session(runner, session, user_id):
 
 ## 16. Performance Optimization
 
-*   **Model Selection**: Choose the smallest model that meets requirements (e.g., `gemini-2.5-flash` for simple tasks).
+*   **Model Selection**: Choose the smallest model that meets requirements (e.g., `gemini-3-flash-preview` for simple tasks).
 *   **Instruction Prompt Engineering**: Concise, clear instructions reduce tokens and improve accuracy.
 *   **Tool Use Optimization**:
     *   Design efficient tools (fast API calls, optimize database queries).
@@ -1980,7 +1980,7 @@ Before finalizing any `new_string` for a `replace` operation, meticulously verif
     *   **Avoid `make playground`** unless specifically instructed; it is designed for human interaction. Focus on programmatic testing.
 
 *   **Model Selection:**
-    *   **When using Gemini, prefer modern model families** for optimal performance and capabilities: "gemini-2.5-pro", "gemini-2.5-flash", and "gemini-3-flash-preview"
+    *   **When using Gemini, prefer modern model families** for optimal performance and capabilities: "gemini-3-pro-preview", "gemini-3-flash-preview" (latest generation)
 
 *   **Running Python Commands:**
     *   Always use `uv` to execute Python commands within this repository (e.g., `uv run run_agent.py`).

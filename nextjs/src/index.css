@@ -1,0 +1,177 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light Mode - Clean Medical White/Teal */
+    --background: 210 40% 98%;
+    /* #f8fafc Off White */
+    --foreground: 222 47% 11%;
+    /* #0f172a Deep Slate */
+
+    --card: 0 0% 100%;
+    /* Pure White */
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 174 96% 39%;
+    /* #03c9a9 Vibrant Teal */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    /* Slate 100 */
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 174 96% 39%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 84% 60%;
+    /* Red 500 */
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 71% 45%;
+    /* Green 500 */
+    --success-foreground: 210 40% 98%;
+
+    --warning: 38 92% 50%;
+    /* Amber 500 */
+    --warning-foreground: 210 40% 98%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 174 96% 39%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar Light */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 174 96% 39%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 40% 96.1%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 174 96% 39%;
+
+    --critical-pulse: 0 84% 60%;
+  }
+
+  .dark {
+    /* Modern Medical Dark Theme - Deep Slate & Vibrant Teal */
+    --background: 222 47% 11%;
+    /* #0f172a Deep Slate */
+    --foreground: 210 40% 98%;
+    /* #f8fafc Off White */
+
+    --card: 222 47% 11%;
+    /* Same as bg for glass effect */
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 174 96% 39%;
+    /* #03c9a9 Vibrant Teal */
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 217 33% 17%;
+    /* #1e293b Slate 800 */
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 174 96% 39%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 84% 60%;
+    /* #ef4444 Red 500 */
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 71% 45%;
+    /* #22c55e Green 500 */
+    --success-foreground: 210 40% 98%;
+
+    --warning: 38 92% 50%;
+    /* #f59e0b Amber 500 */
+    --warning-foreground: 210 40% 98%;
+
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 174 96% 39%;
+
+    /* Sidebar Dark */
+    --sidebar-background: 222 47% 10%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 174 96% 39%;
+    --sidebar-primary-foreground: 222 47% 11%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 174 96% 39%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased selection:bg-primary/20 selection:text-primary;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-background/60 backdrop-blur-xl border border-white/5 shadow-xl;
+  }
+
+  .glass-card {
+    @apply bg-card/40 backdrop-blur-md border border-white/5 shadow-lg hover:bg-card/50 transition-all duration-300;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-teal-400;
+  }
+}
+
+/* Animations */
+@keyframes criticalPulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--critical-pulse) / 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 0 12px hsl(var(--critical-pulse) / 0);
+  }
+}
+
+.animate-critical-pulse {
+  animation: criticalPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Status Badges */
+.status-badge {
+  @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm;
+}
+
+.status-critical {
+  @apply bg-destructive/10 text-destructive border border-destructive/20;
+}
+
+.status-warning {
+  @apply bg-warning/10 text-warning border border-warning/20;
+}
+
+.status-safe {
+  @apply bg-success/10 text-success border border-success/20;
+}
