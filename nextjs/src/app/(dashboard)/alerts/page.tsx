@@ -1,17 +1,13 @@
-"use client";
-
-import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, Clock } from "lucide-react";
-import { mockAlerts } from "@/data/mockData";
-import { useRouter } from "next/navigation";
+import { getAlerts } from "@/lib/db";
+import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 
-export default function CriticalAlerts() {
-  const router = useRouter();
-  const [alerts] = useState(mockAlerts);
+export default async function CriticalAlerts() {
+  const alerts = await getAlerts();
 
   const getRiskBadgeClass = (risk: string) => {
     switch (risk) {
@@ -22,10 +18,6 @@ export default function CriticalAlerts() {
       default:
         return 'status-safe';
     }
-  };
-
-  const handleTakeOwnership = (patientId: string) => {
-    router.push(`/patient/${patientId}`);
   };
 
   return (
@@ -54,13 +46,12 @@ export default function CriticalAlerts() {
       ) : (
         <div className="space-y-4">
           {alerts.map((alert) => (
-            <Card 
+            <Card
               key={alert.id}
-              className={`border-2 ${
-                alert.riskLevel === 'critical' 
-                  ? 'border-destructive bg-destructive/5' 
+              className={`border-2 ${alert.riskLevel === 'critical'
+                  ? 'border-destructive bg-destructive/5'
                   : 'border-warning bg-warning/5'
-              }`}
+                }`}
             >
               <CardContent className="p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
@@ -96,12 +87,11 @@ export default function CriticalAlerts() {
 
                   {/* Action Button */}
                   <div className="lg:col-span-2 flex justify-end">
-                    <Button
-                      onClick={() => handleTakeOwnership(alert.patientId)}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
-                    >
-                      View Brief & Take Ownership
-                    </Button>
+                    <Link href={`/patient/${alert.patientId}`}>
+                      <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold">
+                        View Brief & Take Ownership
+                      </Button>
+                    </Link>
                   </div>
                 </div>
               </CardContent>
