@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, Suspense } from "react";
+import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { HeartPulse, AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -50,13 +51,12 @@ function LoginPageContent() {
         router.push(callbackUrl);
         router.refresh();
       }
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error("Login error:", error);
       // Handle Firebase specific errors
-      const firebaseError = error as { code?: string };
-      if (firebaseError.code === 'auth/invalid-credential' || firebaseError.code === 'auth/user-not-found' || firebaseError.code === 'auth/wrong-password') {
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
         setError("Invalid email or password. Please try again.");
-      } else if (firebaseError.code === 'auth/too-many-requests') {
+      } else if (error.code === 'auth/too-many-requests') {
         setError("Too many failed attempts. Please try again later.");
       } else {
         setError("An unexpected error occurred. Please try again.");
@@ -69,13 +69,16 @@ function LoginPageContent() {
     <div className="min-h-screen flex items-center justify-center p-6 bg-linear-to-br from-background via-background to-primary/5">
       <div className="w-full max-w-md space-y-6">
         {/* Logo/Branding */}
-        <div className="text-center space-y-2">
-          <div className="flex justify-center">
-            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <HeartPulse className="h-8 w-8 text-primary" />
-            </div>
+        <div className="text-center space-y-4 flex flex-col items-center">
+          <div className="relative w-64 h-20">
+            <Image
+              src="/logo.png"
+              alt="CareFlow Pulse"
+              fill
+              className="object-contain"
+              priority
+            />
           </div>
-          <h1 className="text-3xl font-bold">CareFlow Pulse</h1>
           <p className="text-muted-foreground">Post-Hospitalization Patient Monitoring</p>
         </div>
 
@@ -170,8 +173,8 @@ function LoginPageContent() {
         <p className="text-center text-xs text-muted-foreground">
           Protected by hospital-grade security protocols
         </p>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }
 

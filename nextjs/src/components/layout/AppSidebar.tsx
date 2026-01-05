@@ -15,6 +15,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
+import Image from "next/image";
+
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
   { title: "Critical Alerts", url: "/alerts", icon: AlertTriangle, badge: 3 },
@@ -22,6 +24,8 @@ const navItems = [
   { title: "Profile", url: "/profile", icon: User },
   { title: "Configuration", url: "/config", icon: Settings },
 ];
+
+
 
 export function AppSidebar({ alertCount = 0 }: { alertCount?: number }) {
   const { state } = useSidebar();
@@ -35,12 +39,27 @@ export function AppSidebar({ alertCount = 0 }: { alertCount?: number }) {
   return (
     <Sidebar className="border-r border-white/5 bg-sidebar/95 backdrop-blur-xl">
       <SidebarContent className="pt-6">
-        <div className="px-6 mb-8">
-          <h1 className={`font-bold text-sidebar-foreground transition-all ${isCollapsed ? 'text-lg' : 'text-2xl'}`}>
-            <span className="text-gradient">{isCollapsed ? 'CF' : 'CareFlow'}</span>
-          </h1>
-          {!isCollapsed && (
-            <p className="text-xs text-muted-foreground mt-1">Post-Hospitalization Monitor</p>
+        <div className="px-6 mb-8 flex justify-center">
+          {isCollapsed ? (
+            <div className="relative w-12 h-12">
+              <Image
+                src="/logo-2.png"
+                alt="CP"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
+          ) : (
+            <div className="relative w-40 h-12">
+              <Image
+                src="/logo.png"
+                alt="CareFlow Pulse"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
           )}
         </div>
 
