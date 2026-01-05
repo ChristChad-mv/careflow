@@ -99,8 +99,5 @@ export const config = {
 // Validate environment on module load
 if (typeof window === 'undefined') {
   // Server-side only - log configuration status
-  console.log('✅ Environment configuration validated successfully');
-  console.log(`📍 Environment: ${config.app.env}`);
-  console.log(`🌐 App URL: ${config.app.url}`);
-  console.log(`🤖 AI Agent: ${config.features.aiAgent ? 'Enabled' : 'Disabled'}`);
+
 }

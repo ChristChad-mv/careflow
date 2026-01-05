@@ -1,130 +1,213 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+@import "tailwindcss/preflight";
+@import "tailwindcss/utilities";
 
 @layer base {
   :root {
-    /* Medical-grade high-contrast dark theme */
-    --background: 212 25% 10%;  /* #1A1E24 Deep Charcoal */
-    --foreground: 0 0% 100%;    /* #FFFFFF Pure White */
+    /* Light Mode - Clean Medical White/Teal */
+    --background: 210 40% 98%;
+    /* #f8fafc Off White */
+    --foreground: 222 47% 11%;
+    /* #0f172a Deep Slate */
 
-    --card: 212 20% 14%;        /* Slightly lighter than background */
-    --card-foreground: 0 0% 100%;
+    --card: 0 0% 100%;
+    /* Pure White */
+    --card-foreground: 222 47% 11%;
 
-    --popover: 212 20% 14%;
-    --popover-foreground: 0 0% 100%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
 
-    /* Teal accent for primary actions */
-    --primary: 174 100% 37%;    /* #00BFA5 Professional Teal */
-    --primary-foreground: 0 0% 100%;
+    --primary: 174 96% 39%;
+    /* #03c9a9 Vibrant Teal */
+    --primary-foreground: 210 40% 98%;
 
-    --secondary: 212 15% 20%;   /* Subtle elevation */
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96.1%;
+    /* Slate 100 */
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 212 15% 20%;
-    --muted-foreground: 210 9% 67%; /* #A3A9B2 Light Gray */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 174 100% 37%;     /* Same as primary for consistency */
-    --accent-foreground: 0 0% 100%;
+    --accent: 174 96% 39%;
+    --accent-foreground: 210 40% 98%;
 
-    /* Medical risk color system */
-    --success: 122 39% 49%;     /* #4CAF50 Medical Green */
-    --success-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    /* Red 500 */
+    --destructive-foreground: 210 40% 98%;
 
-    --warning: 36 100% 50%;     /* #FF9800 Medical Orange */
-    --warning-foreground: 0 0% 100%;
+    --success: 142 71% 45%;
+    /* Green 500 */
+    --success-foreground: 210 40% 98%;
 
-    --destructive: 4 90% 58%;   /* #E53935 Critical Red */
-    --destructive-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    /* Amber 500 */
+    --warning-foreground: 210 40% 98%;
 
-    --border: 212 20% 25%;
-    --input: 212 20% 18%;
-    --ring: 174 100% 37%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 174 96% 39%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    /* Sidebar specific */
-    --sidebar-background: 212 30% 8%;   /* Even darker than main bg */
-    --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 174 100% 37%;
+    /* Sidebar Light */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 174 96% 39%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 212 20% 14%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 212 20% 15%;
-    --sidebar-ring: 174 100% 37%;
+    --sidebar-accent: 210 40% 96.1%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 174 96% 39%;
 
-    /* Medical-specific design tokens */
-    --critical-pulse: 4 90% 58%;        /* For pulsing critical alerts */
-    --status-safe: 122 39% 49%;
-    --status-warning: 36 100% 50%;
-    --status-critical: 4 90% 58%;
-    
-    /* Shadows for depth */
-    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.5);
+    --critical-pulse: 0 84% 60%;
+  }
+
+  .dark {
+    /* Modern Medical Dark Theme - Deep Slate & Vibrant Teal */
+    --background: 222 47% 11%;
+    /* #0f172a Deep Slate */
+    --foreground: 210 40% 98%;
+    /* #f8fafc Off White */
+
+    --card: 222 47% 11%;
+    /* Same as bg for glass effect */
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 174 96% 39%;
+    /* #03c9a9 Vibrant Teal */
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 217 33% 17%;
+    /* #1e293b Slate 800 */
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 174 96% 39%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 84% 60%;
+    /* #ef4444 Red 500 */
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 71% 45%;
+    /* #22c55e Green 500 */
+    --success-foreground: 210 40% 98%;
+
+    --warning: 38 92% 50%;
+    /* #f59e0b Amber 500 */
+    --warning-foreground: 210 40% 98%;
+
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 174 96% 39%;
+
+    /* Sidebar Dark */
+    --sidebar-background: 222 47% 10%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 174 96% 39%;
+    --sidebar-primary-foreground: 222 47% 11%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 174 96% 39%;
   }
 }
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
 
   body {
-    @apply bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-feature-settings: 'cv11' 1, 'ss01' 1;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-
-  /* Critical alert pulse animation */
-  @keyframes criticalPulse {
-    0%, 100% {
-      opacity: 1;
-      box-shadow: 0 0 0 0 hsl(var(--critical-pulse) / 0.7);
-    }
-    50% {
-      opacity: 0.9;
-      box-shadow: 0 0 0 8px hsl(var(--critical-pulse) / 0);
-    }
-  }
-
-  .animate-critical-pulse {
-    animation: criticalPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-
-  /* Status badge styles */
-  .status-badge {
-    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold;
-  }
-
-  .status-critical {
-    @apply bg-destructive/20 text-destructive border-2 border-destructive;
-  }
-
-  .status-warning {
-    background-color: hsl(var(--warning) / 0.2);
-    color: hsl(var(--warning));
-    border: 2px solid hsl(var(--warning));
-  }
-
-  .status-safe {
-    background-color: hsl(var(--success) / 0.2);
-    color: hsl(var(--success));
-    border: 2px solid hsl(var(--success));
+  
+  ::selection {
+    background-color: hsl(var(--primary) / 0.2);
+    color: hsl(var(--primary));
   }
 }
 
-@layer base {
-  * {
-    @apply border-border;
+@layer utilities {
+  .glass {
+    background-color: hsl(var(--background) / 0.6);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgb(255 255 255 / 0.05);
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
   }
 
-  body {
-    @apply bg-background text-foreground;
+  .glass-card {
+    background-color: hsl(var(--card) / 0.4);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgb(255 255 255 / 0.05);
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    transition: all 0.3s;
   }
+  
+  .glass-card:hover {
+    background-color: hsl(var(--card) / 0.5);
+  }
+
+  .text-gradient {
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    background-image: linear-gradient(to right, hsl(var(--primary)), rgb(45 212 191));
+  }
+}
+
+/* Animations */
+@keyframes criticalPulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--critical-pulse) / 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 0 12px hsl(var(--critical-pulse) / 0);
+  }
+}
+
+.animate-critical-pulse {
+  animation: criticalPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Status Badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+.status-critical {
+  background-color: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive));
+  border: 1px solid hsl(var(--destructive) / 0.2);
+}
+
+.status-warning {
+  background-color: hsl(var(--warning) / 0.1);
+  color: hsl(var(--warning));
+  border: 1px solid hsl(var(--warning) / 0.2);
+}
+
+.status-safe {
+  background-color: hsl(var(--success) / 0.1);
+  color: hsl(var(--success));
+  border: 1px solid hsl(var(--success) / 0.2);
 }
