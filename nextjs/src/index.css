@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Medical-grade high-contrast dark theme */
+    --background: 212 25% 10%;  /* #1A1E24 Deep Charcoal */
+    --foreground: 0 0% 100%;    /* #FFFFFF Pure White */
+
+    --card: 212 20% 14%;        /* Slightly lighter than background */
+    --card-foreground: 0 0% 100%;
+
+    --popover: 212 20% 14%;
+    --popover-foreground: 0 0% 100%;
+
+    /* Teal accent for primary actions */
+    --primary: 174 100% 37%;    /* #00BFA5 Professional Teal */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 212 15% 20%;   /* Subtle elevation */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 212 15% 20%;
+    --muted-foreground: 210 9% 67%; /* #A3A9B2 Light Gray */
+
+    --accent: 174 100% 37%;     /* Same as primary for consistency */
+    --accent-foreground: 0 0% 100%;
+
+    /* Medical risk color system */
+    --success: 122 39% 49%;     /* #4CAF50 Medical Green */
+    --success-foreground: 0 0% 100%;
+
+    --warning: 36 100% 50%;     /* #FF9800 Medical Orange */
+    --warning-foreground: 0 0% 100%;
+
+    --destructive: 4 90% 58%;   /* #E53935 Critical Red */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 212 20% 25%;
+    --input: 212 20% 18%;
+    --ring: 174 100% 37%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar specific */
+    --sidebar-background: 212 30% 8%;   /* Even darker than main bg */
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 174 100% 37%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 212 20% 14%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 212 20% 15%;
+    --sidebar-ring: 174 100% 37%;
+
+    /* Medical-specific design tokens */
+    --critical-pulse: 4 90% 58%;        /* For pulsing critical alerts */
+    --status-safe: 122 39% 49%;
+    --status-warning: 36 100% 50%;
+    --status-critical: 4 90% 58%;
+    
+    /* Shadows for depth */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.5);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-feature-settings: 'cv11' 1, 'ss01' 1;
+  }
+
+  /* Critical alert pulse animation */
+  @keyframes criticalPulse {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 0 0 hsl(var(--critical-pulse) / 0.7);
+    }
+    50% {
+      opacity: 0.9;
+      box-shadow: 0 0 0 8px hsl(var(--critical-pulse) / 0);
+    }
+  }
+
+  .animate-critical-pulse {
+    animation: criticalPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Status badge styles */
+  .status-badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold;
+  }
+
+  .status-critical {
+    @apply bg-destructive/20 text-destructive border-2 border-destructive;
+  }
+
+  .status-warning {
+    background-color: hsl(var(--warning) / 0.2);
+    color: hsl(var(--warning));
+    border: 2px solid hsl(var(--warning));
+  }
+
+  .status-safe {
+    background-color: hsl(var(--success) / 0.2);
+    color: hsl(var(--success));
+    border: 2px solid hsl(var(--success));
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

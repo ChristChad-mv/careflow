@@ -63,18 +63,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
           // Mock role assignment for demonstration until Firestore user record is created
           // You should set custom claims on the user in Firebase or read from Firestore
-          const role = (decodedToken.role as any) || "nurse";
-          const hospitalId = (decodedToken.hospitalId as any) || "HOSP001";
-          const department = (decodedToken.department as any) || "General";
+          const rawRole = (decodedToken.role as string | undefined) || "nurse";
+          const role: "nurse" | "coordinator" | "admin" = 
+            rawRole === "coordinator" || rawRole === "admin" ? rawRole : "nurse";
+          const hospitalId = (decodedToken.hospitalId as string | undefined) || "HOSP001";
+          const department = (decodedToken.department as string | undefined) || "General";
 
           return {
             id: uid,
             email: email || "",
             name: name || email?.split("@")[0] || "User",
             image: picture,
-            role: role,
-            department: department,
-            hospitalId: hospitalId,
+            role,
+            department,
+            hospitalId,
           };
         } catch (error) {
           console.error("Firebase Authentication error:", error);
