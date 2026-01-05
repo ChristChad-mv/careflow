@@ -46,6 +46,10 @@ from .app_utils.config import NGROK_URL
 from .app_utils.conversation_relay import SessionData
 from .app_utils.llm import ModelConfig, get_model
 from .app_utils.prompts.system_prompts import CALLER_SYSTEM_PROMPT
+from .core.security.model_armor import ModelArmorClient
+
+# Initialize Model Armor
+model_armor_client = ModelArmorClient()
 
 import logging
 
@@ -411,6 +415,14 @@ class CallerAgent:
             Returns:
                 Agent response
             """
+            # --- MODEL ARMOR INPUT SCAN ---
+            logger.info(f"Model Armor scanning A2A prompt to {server_url}")
+            input_scan = await model_armor_client.scan_prompt(message)
+            if input_scan.get("is_blocked"):
+                logger.warning(f"Model Armor BLOCKED A2A message to {server_url}")
+                return "Error: Security policy blocked this request."
+            # ------------------------------
+
             logger.info(f"Sending A2A message to {server_url}")
             
             if server_url not in self.a2a_servers:
@@ -468,6 +480,16 @@ class CallerAgent:
                         print(f"\n[CALLER -> CAREFLOW]: {message}")
                         print(f"[CAREFLOW -> CALLER]: {final_result}\n")
                         
+                        # --- MODEL ARMOR OUTPUT SCAN ---
+                        if final_result:
+                            logger.info(f"Model Armor scanning A2A response from {server_url}")
+                            output_scan = await model_armor_client.sanitize_response(final_result)
+                            if output_scan.get("is_blocked"):
+                                final_result = "[REDACTED] Clinical data blocked by security policy."
+                            else:
+                                final_result = output_scan.get("sanitized_text", final_result)
+                        # -------------------------------
+
                         result = f"Response: {final_result}"
                         if returned_task_id:
                             result += f"\nTaskId: {returned_task_id}"
@@ -644,6 +666,15 @@ class CallerAgent:
                 source=f"https://{NGROK_URL}/public/keyboard-typing.mp3"
             )
             
+            # --- MODEL ARMOR INPUT SCAN ---
+            logger.info(f"Model Armor scanning patient message: {user_message[:50]}...")
+            input_scan = await model_armor_client.scan_prompt(user_message)
+            if input_scan.get("is_blocked"):
+                logger.warning("Model Armor BLOCKED patient message")
+                yield "I'm sorry, I cannot process that request due to my safety guidelines. How else can I help you today?"
+                return
+            # ------------------------------
+
             messages.append(HumanMessage(content=user_message))
             
             # Stream from agent
@@ -674,8 +705,16 @@ class CallerAgent:
                     content = chunk.content
                     if content and isinstance(content, str):
                         full_response += content
+                        # Note: We stream chunks for voice, but we'll log the full response for final sanitization
+                        # Since we yield here, we can't easily sanitize the whole block AFTER it's spoken.
+                        # For the Hackathon, we will scan the FULL response at the end for audit/logging.
                         yield content
             
+            # --- MODEL ARMOR OUTPUT SCAN (Audit) ---
+            logger.info(f"Model Armor auditing caller response for PII/PHI")
+            await model_armor_client.sanitize_response(full_response)
+            # ---------------------------------------
+
             logger.info(f"Agent response for session {session_id}: {full_response[:100]}...")
             
         except Exception as e:
