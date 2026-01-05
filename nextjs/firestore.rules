@@ -1,0 +1,194 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================================================
+    // HELPER FUNCTIONS
+    // ============================================================================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Get authenticated user's ID
+    function getUserId() {
+      return request.auth.uid;
+    }
+    
+    // Get user's role from custom claims
+    function getUserRole() {
+      return request.auth.token.role;
+    }
+    
+    // Check if user is admin
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+    
+    // Check if user is coordinator
+    function isCoordinator() {
+      return isAuthenticated() && getUserRole() == 'coordinator';
+    }
+    
+    // Check if user is nurse
+    function isNurse() {
+      return isAuthenticated() && getUserRole() == 'nurse';
+    }
+    
+    // Check if user is staff (nurse, coordinator, or admin)
+    function isStaff() {
+      return isNurse() || isCoordinator() || isAdmin();
+    }
+    
+    // Check if user belongs to the same hospital
+    function isSameHospital(hospitalId) {
+      return isAuthenticated() && request.auth.token.hospitalId == hospitalId;
+    }
+    
+    // Validate incoming data has required fields
+    function hasRequiredUserFields() {
+      return request.resource.data.keys().hasAll(['email', 'name', 'role', 'hospitalId']);
+    }
+    
+    // ============================================================================
+    // USERS COLLECTION
+    // ============================================================================
+    
+    match /users/{userId} {
+      // Users can only read their own profile
+      allow read: if isAuthenticated() && getUserId() == userId;
+      
+      // Only admins can create new users
+      allow create: if isAdmin() && hasRequiredUserFields();
+      
+      // Users can update their own profile (limited fields)
+      // Admins can update any user
+      allow update: if (isAuthenticated() && getUserId() == userId && 
+                       !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'hospitalId', 'email']))
+                    || isAdmin();
+      
+      // Only admins can delete users
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================================================
+    // PATIENTS COLLECTION
+    // ============================================================================
+    
+    match /patients/{patientId} {
+      // Staff can read patients from their hospital only
+      allow read: if isStaff() && isSameHospital(resource.data.hospitalId);
+      
+      // Coordinators and admins can create patients
+      allow create: if (isCoordinator() || isAdmin()) 
+                    && isSameHospital(request.resource.data.hospitalId)
+                    && request.resource.data.keys().hasAll(['name', 'hospitalId', 'status']);
+      
+      // Coordinators and admins can update patients from their hospital
+      allow update: if (isCoordinator() || isAdmin()) 
+                    && isSameHospital(resource.data.hospitalId)
+                    && isSameHospital(request.resource.data.hospitalId);
+      
+      // Only admins can delete patients
+      allow delete: if isAdmin() && isSameHospital(resource.data.hospitalId);
+    }
+    
+    // ============================================================================
+    // ALERTS COLLECTION
+    // ============================================================================
+    
+    match /alerts/{alertId} {
+      // Staff can read alerts from their hospital
+      allow read: if isStaff() && isSameHospital(resource.data.hospitalId);
+      
+      // System (backend) can create alerts - validated by backend logic
+      // Staff can also create alerts
+      allow create: if isStaff() && isSameHospital(request.resource.data.hospitalId);
+      
+      // Staff can update alerts status (acknowledge, resolve)
+      allow update: if isStaff() 
+                    && isSameHospital(resource.data.hospitalId)
+                    && isSameHospital(request.resource.data.hospitalId);
+      
+      // Only admins can delete alerts
+      allow delete: if isAdmin() && isSameHospital(resource.data.hospitalId);
+    }
+    
+    // ============================================================================
+    // AUDIT LOGS COLLECTION
+    // ============================================================================
+    
+    match /auditLogs/{logId} {
+      // Only admins can read audit logs
+      allow read: if isAdmin();
+      
+      // System can write audit logs (append-only)
+      allow create: if isAuthenticated();
+      
+      // Nobody can update or delete audit logs (immutable)
+      allow update, delete: if false;
+    }
+    
+    // ============================================================================
+    // CALL HISTORY COLLECTION
+    // ============================================================================
+    
+    match /callHistory/{callId} {
+      // Staff can read call history from their hospital
+      allow read: if isStaff() && isSameHospital(resource.data.hospitalId);
+      
+      // System can create call records
+      allow create: if isAuthenticated() && isSameHospital(request.resource.data.hospitalId);
+      
+      // System can update call records (e.g., add transcript)
+      allow update: if isAuthenticated() && isSameHospital(resource.data.hospitalId);
+      
+      // Only admins can delete call history
+      allow delete: if isAdmin() && isSameHospital(resource.data.hospitalId);
+    }
+    
+    // ============================================================================
+    // NOTIFICATIONS COLLECTION
+    // ============================================================================
+    
+    match /notifications/{notificationId} {
+      // Users can only read their own notifications
+      allow read: if isAuthenticated() && getUserId() == resource.data.userId;
+      
+      // System can create notifications
+      allow create: if isAuthenticated();
+      
+      // Users can update their own notifications (e.g., mark as read)
+      allow update: if isAuthenticated() && getUserId() == resource.data.userId;
+      
+      // Users can delete their own notifications
+      allow delete: if isAuthenticated() && getUserId() == resource.data.userId;
+    }
+    
+    // ============================================================================
+    // HOSPITAL SETTINGS COLLECTION
+    // ============================================================================
+    
+    match /hospitalSettings/{hospitalId} {
+      // Staff can read settings from their hospital
+      allow read: if isStaff() && isSameHospital(hospitalId);
+      
+      // Only admins can create/update hospital settings
+      allow create, update: if isAdmin() && isSameHospital(hospitalId);
+      
+      // Nobody can delete hospital settings
+      allow delete: if false;
+    }
+    
+    // ============================================================================
+    // DEFAULT DENY ALL
+    // ============================================================================
+    
+    // Deny access to any other collections by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
