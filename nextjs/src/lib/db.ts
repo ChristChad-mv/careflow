@@ -100,33 +100,41 @@ import { auth } from "@/lib/auth";
 // Helper to get current user context
 async function getCurrentUser() {
     const session = await auth();
-    // For development/demo purposes without a real login, we fallback to the seeded nurse
-    if (!session?.user?.email) {
-        console.warn("⚠️ No active session found. Using MOCK nurse profile for development.");
+
+    // 1. If Real Session exists, return it (Production / Real Login)
+    if (session?.user) {
         return {
-            email: "nurse@careflow.com",
-            role: "nurse"
-        };
+            ...session.user,
+            hospitalId: (session.user as any).hospitalId || "HOSP001"
+        } as any;
     }
-    console.log(`✅ Session active for: ${session.user.email} (${session.user.role})`);
-    return session.user;
+
+    // 2. Dev Fallback (Only if no session)
+    console.warn("⚠️ No active session using MOCK [HOSP001] Sarah profile for DEV.");
+    return {
+        email: "sarah@hosp1.com",
+        name: "Sarah Johnson, RN",
+        role: "nurse",
+        hospitalId: "HOSP001"
+    };
 }
 
 export async function getPatients(): Promise<Patient[]> {
     const user = await getCurrentUser();
-    const db = await getAdminDb();
+    if (!user || !user.hospitalId) return [];
 
-    // Director/Admin sees everything
-    if (user.role === 'admin' || user.role === 'coordinator') {
-        const snapshot = await db.collection("patients").get();
-        return snapshot.docs.map(doc => convertPatient(doc));
+    const db = await getAdminDb();
+    const patientsRef = db.collection("patients");
+
+    // Base Query: ALWAYS filter by hospitalId first (Logical Isolation)
+    let query = patientsRef.where('hospitalId', '==', user.hospitalId);
+
+    // Nurse Role: Additional filter for assignment
+    if (user.role === 'nurse') {
+        query = query.where("assignedNurse.email", "==", user.email);
     }
 
-    // Nurses only see assigned patients
-    const snapshot = await db.collection("patients")
-        .where("assignedNurse.email", "==", user.email)
-        .get();
-
+    const snapshot = await query.get();
     return snapshot.docs.map(doc => convertPatient(doc));
 }
 
@@ -139,33 +147,39 @@ export async function getPatient(id: string): Promise<Patient | null> {
 
 export async function getAlerts(): Promise<Alert[]> {
     const user = await getCurrentUser();
+    if (!user || !user.hospitalId) return [];
+
     const db = await getAdminDb();
 
-    // Director/Admin sees all alerts
-    if (user.role === 'admin' || user.role === 'coordinator') {
-        const snapshot = await db.collection("alerts")
-            .orderBy("createdAt", "desc")
-            .get();
-        return snapshot.docs.map(doc => convertAlert(doc));
+    // Base Query: ALWAYS filter by hospitalId first
+    let query = db.collection("alerts").where('hospitalId', '==', user.hospitalId);
+
+    // Nurse Role: Filter by assigned patients only
+    if (user.role === 'nurse') {
+        const myPatients = await getPatients();
+        const patientIds = myPatients.map(p => p.id);
+
+        if (patientIds.length === 0) return [];
+
+        // Firestore 'in' limit is 10
+        if (patientIds.length <= 10) {
+            query = query.where('patientId', 'in', patientIds);
+        } else {
+            query = query.where('patientId', 'in', patientIds.slice(0, 10));
+        }
     }
 
-    // 1. Get patients assigned to this nurse
-    // We reuse getPatients() which already handles the filtering based on the same user context
-    const patients = await getPatients();
-    const patientIds = patients.map(p => p.id);
+    const snapshot = await query.orderBy("createdAt", "desc").get();
+    const alerts = snapshot.docs.map(doc => convertAlert(doc));
 
-    if (patientIds.length === 0) return [];
+    // Sort by priority on the server/app side
+    const priorityMap: Record<string, number> = { 'critical': 3, 'warning': 2, 'safe': 1 };
 
-    // 2. Query alerts for these patients
-    // Firestore 'in' query supports up to 10 items. For production, we'd batch or valid structure.
-    // For this prototype with <10 patients, it works fine.
-    const snapshot = await db
-        .collection("alerts")
-        .where("patientId", "in", patientIds.slice(0, 10)) // Limit to 10 for safety
-        .orderBy("createdAt", "desc")
-        .get();
-
-    return snapshot.docs.map(doc => convertAlert(doc));
+    return alerts.sort((a, b) => {
+        const pA = priorityMap[a.priority || 'safe'] || 0;
+        const pB = priorityMap[b.priority || 'safe'] || 0;
+        return pB - pA;
+    });
 }
 
 export async function getAlert(alertId: string): Promise<Alert | null> {
