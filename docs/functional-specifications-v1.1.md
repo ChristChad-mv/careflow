@@ -3,8 +3,8 @@
 | | |
 | :--- | :--- |
 | **Document Version:** | 2.0 |
-| **Date:** | 2025-12-24 |
-| **Status:** | **Approved** |
+| **Date:** | 2026-01-04 |
+| **Status:** | **Draft** |
 | **Author:** | Christ |
 
 ---
@@ -15,8 +15,7 @@
 | 1.0 | 2025-12-20 | Christ | Initial Draft |
 | 1.1 | 2025-12-22 | Christ | Incorporated feedback on handover protocol. |
 | 2.0 | 2025-12-24 | Christ | Comprehensive rewrite: Added Mission, Personas, and detailed User Stories. Expanded all sections for clarity. |
-
----
+| 3.0 | 2026-01-04 | AI Team | Updated Architecture (Agent-driven Alerts), Added 4 Detailed Clinical Scenarios (COPD, Knee, Heart Failure, AMI). |
 
 ## 1. Introduction: The Vision for Proactive Post-Hospitalization Care
 
@@ -43,11 +42,10 @@ graph TD
     %% System Components
     subgraph "CareFlow Pulse System"
         Scheduler[Cloud Scheduler]
-        Dispatcher[Dispatcher Service]
         
         subgraph "AI Agent Fleet"
-            PulseAgent[CareFlow Pulse Agent<br/>(Medical Intelligence)]
-            CallerAgent[Note: Voice Interface handled via Twilio<br/>(Caller Agent)]
+            PulseAgent[CareFlow Pulse Agent<br/>(Central Intelligence & Data)]
+            CallerAgent[CareFlow Caller Agent<br/>(Voice Interface)]
         end
         
         Database[(Firestore Database)]
@@ -55,13 +53,15 @@ graph TD
     end
 
     %% Flow
-    Scheduler -->|Trigger Daily Rounds| Dispatcher
-    Dispatcher -->|Start Job| PulseAgent
+    Scheduler -->|Trigger Daily Rounds| PulseAgent
     PulseAgent -->|Retrieve Plans| Database
-    PulseAgent -->|Initiate Call| CallerAgent
+    PulseAgent -->|Task: Call Patient| CallerAgent
     CallerAgent <-->|Voice Call| Patient
     
     CallerAgent -->|Transcript & Analysis| PulseAgent
+    
+    Note over PulseAgent: Analyzes Risk<br/>Creates Alerts
+    
     PulseAgent -->|Update Risk & Alerts| Database
     Database -->|Real-time Sync| Dashboard
     
@@ -72,154 +72,120 @@ graph TD
     style Patient fill:#e1f5fe,stroke:#01579b
     style Nurse fill:#e1f5fe,stroke:#01579b
     style PulseAgent fill:#f3e5f5,stroke:#4a148c
+    style CallerAgent fill:#f3e5f5,stroke:#4a148c
     style Dashboard fill:#e8f5e9,stroke:#1b5e20
     style Database fill:#fff3e0,stroke:#e65100
 ```
 
 ### 1.3. Scope of the System
 
-- **In Scope:** Automated, scheduled patient follow-ups via Voice and SMS; analysis of patient responses; risk classification; real-time dashboard for nurses; alert management and assignment.
-- **Out of Scope (for v1.0):** Direct integration with Electronic Health Record (EHR) systems; billing and insurance processing; patient-facing mobile application.
+- **In Scope:** Automated, scheduled patient follow-ups via Voice; analysis of patient responses; automated risk classification (Green/Yellow/Red); real-time dashboard for nurses; alert management.
+- **Out of Scope (for v1.0):** Direct integration with Electronic Health Record (EHR) systems; billing and insurance processing.
 
 ---
 
-## 2. User Personas & Stories
+## 2. User Personas
 
 ### 2.1. Persona: The Nurse Coordinator
-
 - **Name:** Sarah, RN
 - **Role:** Post-Discharge Care Coordinator
-- **Workload:** Manages a caseload of 80-100 recently discharged patients.
 - **Goals:** Prevent readmissions, ensure patients adhere to their care plans, and focus her limited time on the most critical cases.
-- **Frustrations:** "I spend most of my day making routine calls to patients who are doing fine. I'm constantly worried that while I'm on a routine call, a critical patient's condition is worsening. I need a way to filter out the noise and find the signal."
+- **Workflow:** primarily interacts with the **Dashboard**, responding to alerts created by the CareFlow Agent.
 
-### 2.2. Persona: The Patient
-
-- **Name:** Christine (Patient ID: 123899)
-- **Condition:** Recovering from minor knee surgery. Low-risk.
-- **Needs:** Gentle reminders and confirmation that she is on the right track with her simple recovery plan.
-
-- **Name:** Karl (Patient ID: 456789)
-- **Condition:** Recently discharged after an acute cardiac event. High-risk.
-- **Needs:** Close monitoring for specific critical symptoms and a clear, immediate path to his care team if issues arise.
+### 2.2. Patient Personas (See Scenarios below)
+Patients recently discharged with various conditions (COPD, Orthopedic Surgery, Heart Failure, AMI) requiring different levels of monitoring.
 
 ---
 
-## 3. Detailed User Stories & System Behavior
+## 3. Detailed Clinical Scenarios & System Behavior
 
-### 3.1. User Story 1: The "Green Path" - A Successful Follow-up with Christine
+This section outlines four specific scenarios demonstrating how CareFlow Pulse handles different risk levels and patient interactions. In all cases, the **CareFlow Agent** performs the interview, analyzes the result, and **automatically creates the alert** on the dashboard for Sarah to review.
 
-**As Nurse Sarah, I want the system to handle routine check-ins automatically, so I can be confident that stable patients like Christine are being monitored without taking up my time.**
+### 3.1. Scenario 1: The "Green Path" - Stable COPD Patient
+*Automated Success, No Disturbance for Nurse*
 
-**Scenario:**
-- **Patient:** Christine (ID: 123899)
-- **Discharge Date:** September 12, 2025
-- **Care Plan:** Take one dose of Paracetamol for pain management every evening at 8:00 PM.
-- **Scheduled Follow-up:** D+3, September 15, 2025, at 8:15 PM.
+**Patient:** **Robert (ID: 101)**
+- **Diagnosis:** Chronic Obstructive Pulmonary Disease (COPD)
+- **Status:** Stable
 
-**Execution Flow:**
-1.  **Trigger (8:15 PM):** The system's scheduler initiates a follow-up for Christine.
-2.  **Agent Action (Connect):** The `CareFlow-Connect` agent generates a dynamic prompt and initiates a voice call via Twilio.
-3.  **The Call:**
-    - **Agent:** "Hello Christine, this is your CareFlow assistant calling to check in on your recovery. The schedule notes it was time for your evening Paracetamol. Were you able to take it?"
-    - **Christine:** "Oh, hello! Yes, I took it about 15 minutes ago."
-    - **Agent:** "That's great to hear. And how are you feeling overall? Any unusual pain or swelling in your knee?"
-    - **Christine:** "No, it feels much better today, actually. Just a little stiff."
-    - **Agent:** "Excellent. I've noted that down. Remember to continue your gentle exercises. We'll check in again in a few days. Have a restful evening!"
-4.  **Agent Action (Analyze & Log):**
-    - The call ends. The `CareFlow-Analyze` agent receives the transcript.
-    - It determines there are no risk factors. It classifies the interaction as **`GREEN`**.
-    - It writes the call summary and transcript to Christine's `interactionLog` in Firestore.
-5.  **Nurse Interface:**
-    - On her dashboard, Nurse Sarah sees Christine's status update to `GREEN` with a timestamp. She doesn't receive an alert and can continue focusing on other patients, confident that Christine's check-in was successful.
+**Process:**
+1.  **Agent Call:** The CareFlow Caller Agent calls Robert.
+    - *Agent:* "Good morning Robert. How is your breathing today?"
+    - *Robert:* "It's good, about the same as yesterday. No trouble."
+    - *Agent:* "Are you using your inhalers as prescribed?"
+    - *Robert:* "Yes, I used the morning one."
+    - *Agent:* "Any coughing or changes in mucus?"
+    - *Robert:* "No changes."
+2.  **Analysis:** The Agent determines Robert is following his plan and symptoms are baseline.
+3.  **Result:**
+    - Risk Level set to **GREEN**.
+    - Interaction logged in Dashboard.
+    - **Nurse Action:** None required. Sarah sees the green checkmark on her list and knows Robert is fine.
 
-#### **Sequence Diagram: Automated Check-in (Green Path)**
+### 3.2. Scenario 2: The "Yellow Path" - Total Knee Replacement (Education Gap)
+*Warning - Requires Human Verification*
 
-```mermaid
-sequenceDiagram
-    participant S as Scheduler
-    participant A as CareFlow Agent
-    participant P as Patient (Christine)
-    participant DB as Database
-    participant D as Nurse Dashboard
+**Patient:** **Christine (ID: 102)**
+- **Diagnosis:** Total Knee Replacement
+- **Status:** Confused about medication and appointments.
 
-    S->>A: Trigger Scheduled Follow-up (8:15 PM)
-    A->>DB: Fetch Patient Data & Care Plan
-    DB-->>A: Returns: "Christine, Post-Op Knee, Paracetamol"
-    
-    Note over A: Generates Dynamic Prompt<br/>(Context: Knee Surgery, Medications)
-    
-    A->>P: Call: "Did you take your Paracetamol?"
-    P-->>A: Voice Response: "Yes, 15 mins ago."
-    
-    A->>A: Analyze Transcript
-    Note right of A: Risk Classification: GREEN<br/>(Adherence: Yes, Symptoms: None)
-    
-    A->>DB: Log Interaction & Set Risk = GREEN
-    DB->>D: Real-time Update (Green Indicator)
-```
+**Process:**
+1.  **Agent Call:**
+    - *Agent:* "Hello Christine. Are you managing your pain medication okay?"
+    - *Christine:* "I think so... was I supposed to take the white pill twice or three times? And I forgot when my physio appointment is."
+    - *Agent:* "According to your discharge plan, the white pill (Tramadol) is every 6 hours as needed. And your physio is scheduled for Thursday at 2 PM. Do you have a pen to write that down?"
+    - *Christine:* "Oh, thank you. Thursday at 2."
+2.  **Analysis:**
+    - The Agent successfully provided information, BUT detects a risk of non-adherence due to confusion.
+    - It decides this warrants a "human triple-check."
+3.  **Result:**
+    - Risk Level set to **YELLOW**.
+    - **Alert Created:** "Patient confusion regarding meds and appointment. Re-education provided, but verify understanding."
+    - **Nurse Action:** Sarah sees the **YELLOW** alert. She clicks "Take Ownership" and calls Christine personally to confirm she truly understands the plan. She listens to the Agent's call recording to hear exactly what confused Christine.
 
-### 3.2. User Story 2: The "Red Path" - A Critical Alert with Karl
+### 3.3. Scenario 3: The "Red Path" - Heart Failure Decompensation
+*Critical Alert - Urgent Medical Intervention*
 
-**As Nurse Sarah, I need the system to immediately notify me and provide clear context when a high-risk patient like Karl shows critical symptoms, so I can intervene before it's too late.**
+**Patient:** **Maria (ID: 103)**
+- **Diagnosis:** Congestive Heart Failure (CHF)
+- **Status:** Deteriorating (Fluid Overload)
 
-**Scenario:**
-- **Patient:** Karl (ID: 456789)
-- **Discharge Date:** November 10, 2025 (Cardiac Event)
-- **Care Plan:** Monitor for chest pain, shortness of breath, and dizziness.
-- **Scheduled Follow-up:** D+5, November 15, 2025, at 10:00 AM.
+**Process:**
+1.  **Agent Call:**
+    - *Agent:* "Hello Maria. Have you weighed yourself this morning?"
+    - *Maria:* "Yes... I've gained about 4 pounds since yesterday."
+    - *Agent:* "I see. And how is your breathing?"
+    - *Maria:* "I feel... a bit short of breath just walking to the kitchen."
+    - *Agent:* "Do you have any swelling in your ankles?"
+    - *Maria:* "Yes, they are very puffy."
+2.  **Analysis:**
+    - The Agent identifies specific "Red Flag" keywords for CHF: **Weight gain > 3lbs**, **Shortness of Breath**, **Edema**.
+    - Determines immediate risk of readmission.
+3.  **Result:**
+    - Risk Level set to **RED**.
+    - **Alert Created:** "CRITICAL: Signals of decompensation. Weight +4lbs, Dyspnea, Edema."
+    - **Nurse Action:** The Dashboard flashes red for Maria. Sarah immediately sees the alert. She calls Maria to instruct her to increase her diuretic dosage (per standing orders) or come to the clinic, preventing a full ER admission.
 
-**Execution Flow:**
-1.  **Trigger (10:00 AM):** The scheduler initiates a follow-up for Karl.
-2.  **Agent Action (Connect):** The agent initiates a voice call.
-3.  **The Call:**
-    - **Agent:** "Good morning Karl, this is your CareFlow assistant calling for your daily check-in. How are you feeling today?"
-    - **Karl:** "Not so good. I've been feeling quite dizzy this morning, and... and I have a slight pain in my chest."
-4.  **Agent Action (Immediate Analysis & Handover):**
-    - The agent's prompt has defined "dizzy" and "chest pain" as critical keywords for a cardiac patient.
-    - It immediately switches to the **Safe Handover Protocol**.
-    - **Agent:** "Thank you for telling me that, Karl. I've noted it down. For your safety, it's very important that you speak directly with your nurse about these symptoms. **I am connecting with Nurse Sarah right now to alert her.** She will call you back on this number very shortly. If you feel your condition is worsening, please hang up and dial 911."
-5.  **Agent Action (Alert Generation):**
-    - The agent ends the call with Karl.
-    - It immediately sets Karl's `riskLevel` in Firestore to **`RED`**.
-    - It populates the `alert` field with: `{ "isCritical": true, "reason": "Patient reports dizziness and chest pain.", "timestamp": "..." }`.
-    - The `CareFlow-Brief` agent generates a concise summary: *"Patient Karl reported dizziness and chest pain during scheduled check-in. Advised that his nurse would call him back."*
-6.  **Nurse Interface (Real-Time Update):**
-    - Nurse Sarah's dashboard instantly updates. Karl's entry shoots to the top of her list, highlighted in red. She sees the `aiBrief` and knows exactly what's wrong.
-7.  **Agent Action (Proactive Nurse Contact):**
-    - Simultaneously, the `CareFlow-Main` agent, having identified a `RED` alert, uses its `twilio_voice_call` tool to call Nurse Sarah's direct line.
-    - **Automated Call to Nurse:** "This is a critical alert from CareFlow Pulse. Patient Karl is reporting dizziness and chest pain. Please review his file in the dashboard and contact him immediately."
-8.  **Human Intervention:**
-    - Nurse Sarah, already looking at Karl's file, clicks "Take Ownership" on the alert and immediately calls Karl, armed with all the necessary context.
+### 3.4. Scenario 4: The "Red Path" - Acute Myocardial Infarction (AMI)
+*Emergency - Immediate Action*
 
-#### **Sequence Diagram: Critical Escalation (Red Path)**
+**Patient:** **Karl (ID: 104)**
+- **Diagnosis:** Post-AMI (Heart Attack)
+- **Status:** Emergency
 
-```mermaid
-sequenceDiagram
-    participant S as Scheduler
-    participant A as CareFlow Agent
-    participant P as Patient (Karl)
-    participant DB as Database
-    participant N as Nurse (Sarah)
-
-    S->>A: Trigger Scheduled Follow-up (10:00 AM)
-    A->>P: Call: "How are you feeling?"
-    P-->>A: "Dizzy and chest pain."
-    
-    Note over A: Detects Critical Keywords<br/>(Chest Pain, Dizziness)
-    
-    A->>P: "Stay calm. Alerting Nurse Sarah now."
-    A->>A: Immediate Handover Protocol
-    
-    par Parallel Actions
-        A->>DB: Create CRITICAL ALERT (RED)
-        DB->>N: Dashboard Flash & SMS Alert
-        A->>N: Automated Voice Call: "Urgent Alert for Karl"
-    end
-    
-    N->>P: Manual Priority Call
-    Note right of N: Nurse takes ownership<br/>and manages situation
-```
+**Process:**
+1.  **Agent Call:**
+    - *Agent:* "Hi Karl. checking in. Any chest pain today?"
+    - *Karl:* "Yes... I have this heavy pressure in my chest again. It started 20 minutes ago."
+    - *Agent:* "Is the pain radiating to your arm or jaw?"
+    - *Karl:* "A little bit to my left arm."
+2.  **Analysis:**
+    - The Agent recognizes symptoms of a recurring heart attack.
+    - **Immediate Protocol:** The Agent advises Karl to stay on the line or hang up and dial 911 (depending on configured protocol).
+3.  **Result:**
+    - Risk Level set to **RED (Emergency)**.
+    - **Alert Created:** "EMERGENCY: Recurrent Chest Pain. Possible AMI."
+    - **Nurse Action:** Sarah sees the emergency flag. She calls Karl immediately while coordinating with emergency services to ensure he gets to the ER.
 
 ---
 
@@ -228,22 +194,15 @@ sequenceDiagram
 ### FS-1: Patient & Follow-up Lifecycle Management
 | ID | Feature | Description |
 | :--- | :--- | :--- |
-| **FS-1.1** | **Session Initialization** | A new patient follow-up session is created from their digital Discharge Plan. The system defines a schedule for automated check-ins (e.g., D+1, D+3, D+7). |
-| **FS-1.2** | **Scheduled Follow-up** | At the scheduled time, the system automatically initiates patient contact via the preferred method (Voice Call or SMS). |
-| **FS-1.3** | **Risk Triage & Analysis** | The agent analyzes the patient's response to classify the risk level: **GREEN** (Stable), **ORANGE** (Warning), or **RED** (Critical). |
-| **FS-1.4** | **Auditable History** | Every interaction is logged chronologically in the patient's `interactionLog` for clinical review and audit purposes. |
+| **FS-1.1** | **Session & Schedule** | System defines a schedule (e.g., D+1, D+3). At the scheduled time, the **CareFlow Pulse Agent** creates a task. |
+| **FS-1.2** | **Automated Interview** | The **Caller Agent** conducts the interview using specific clinical protocols (Post-Discharge Call Document). |
+| **FS-1.3** | **Agent-Driven Triage** | The **Agent** (not the Nurse) analyzes the transcript and sets the Risk: **GREEN** (Stable), **YELLOW** (Warning/Education needed), **RED** (Critical/symptoms). |
+| **FS-1.4** | **Alert Generation** | The **Agent** automatically generates an Alert object in the database for any non-Green status, populating it with a summary of the issue. |
 
-### FS-2: Patient Communication Interface
+### FS-2: Nurse Coordinator Interface
 | ID | Feature | Description |
 | :--- | :--- | :--- |
-| **FS-2.1** | **Dynamic Prompt Generation** | Before each interaction, the agent generates a unique prompt including the patient's name, specific medications for that check-in, and known critical symptoms. |
-| **FS-2.2** | **Fluid Conversation** | The specialized Voice Agent service manages real-time STT/TTS and allows the patient to interrupt (barge-in) for a natural conversation flow. |
-| **FS-2.3** | **Two-Tiered Alerting** | **Tier 1 (Immediate):** The Voice Agent can trigger an instant webhook for unambiguous, life-threatening keywords. **Tier 2 (Contextual):** For all other cases, the full transcript is analyzed by the ADK Agent for more nuanced risk assessment. |
-| **FS-2.4** | **Safe Handover Protocol** | If a patient asks for medical advice, the agent must use the "Consulting the Care Team" script, explicitly stating it will contact the nurse and never providing advice itself. |
+| **FS-2.1** | **Real-Time Dashboard** | Displays patients sorted by Risk (Red top). Updates instantly when the Agent finishes a call. |
+| **FS-2.2** | **"Take Ownership"** | Nurse Sarah clicks to acknowledge an alert. This changes the status from "New" to "In Progress," letting the team know she is handling it. |
+| **FS-2.3** | **Audio & Transcript Access** | Nurse can replay the specific conversation segment where the patient reported the issue to verify context before calling. |
 
-### FS-3: Nurse Coordinator Interface
-| ID | Feature | Description |
-| :--- | :--- | :--- |
-| **FS-3.1** | **Real-Time Dashboard** | The dashboard displays all patient sessions, sorted by `riskLevel` (RED > ORANGE > GREEN), and updates instantly via a real-time connection to the database. |
-| **FS-3.2** | **Comprehensive Patient File** | A detailed view containing the Discharge Plan, the complete `interactionLog`, and the latest AI-generated summary (`aiBrief`). |
-| **FS-3.3** | **Alert Triage & Assignment** | A nurse can click to "Take Ownership" of an alert, which updates its status and notifies the team that it is being handled. |
