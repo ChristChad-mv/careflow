@@ -72,34 +72,22 @@
 - [x] next-themes upgraded to 0.4.4 (React 19 compatibility)
 - [x] All dependencies up to date
 
+### 9. CSRF Protection ✅
+- [x] NextAuth SameSite=lax cookies configured
+- [x] Secure cookies in production (__Secure prefix)
+- [x] Custom CSRF token generation (/api/csrf endpoint)
+- [x] Double-submit cookie pattern implementation
+- [x] Validation helpers (validateCsrfToken, checkCsrfToken)
+- [ ] Frontend integration (fetch token on app load)
+- [ ] Apply to all state-changing API routes
+
 ## ⚠️ Security Improvements Needed
 
 ### High Priority
 
-#### 1. CSRF Protection
-**Status**: Package deprecated, needs custom implementation  
-**Risk**: Cross-site request forgery  
-**Solution**: Implement SameSite cookies + custom CSRF tokens
-```typescript
-// Use NextAuth's built-in CSRF protection + SameSite cookies
-// In next-auth config:
-cookies: {
-  sessionToken: {
-    name: '__Secure-next-auth.session-token',
-    options: {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production'
-    }
-  }
-}
-```
-
-### Medium Priority
-
-#### 2. API Route Protection
+#### 1. API Route Protection
 **Status**: Example provided in api-example.ts  
-**Action**: Apply pattern to all API routes
+**Action**: Apply security pattern to all API routes
 - Add authentication check
 - Add rate limiting
 - Add input validation
@@ -114,7 +102,7 @@ cookies: {
 grep -r "dangerouslySetInnerHTML" src/
 ```
 
-#### 4. API Key Rotation
+#### 3. API Key Rotation
 **Status**: Manual  
 **Action**: Implement automated key rotation policy
 - Firebase API keys: Every 90 days
@@ -123,7 +111,7 @@ grep -r "dangerouslySetInnerHTML" src/
 
 ### Low Priority
 
-#### 5. Logging & Monitoring
+#### 4. Logging & Monitoring
 **Status**: Placeholder in code  
 **Action**: Integrate Cloud Logging
 ```typescript
@@ -131,7 +119,7 @@ grep -r "dangerouslySetInnerHTML" src/
 import { logger } from '@google-cloud/logging';
 ```
 
-#### 6. Error Handling
+#### 5. Error Handling
 **Status**: Basic error pages  
 **Action**: Implement error boundary and sanitize error messages
 
@@ -164,34 +152,32 @@ import { logger } from '@google-cloud/logging';
 ### ✅ Completed
 1. ✅ Fix npm audit vulnerability (0 vulnerabilities, Next.js 16.0.9)
 2. ✅ Implement rate limiting (Upstash Redis + dev fallback)
-3. ✅ **Test rate limiting** (110 commands, HTTP 429 after 20 requests)
-4. ✅ **Configure Upstash Redis** (innocent-cockatoo-36814.upstash.io)
+3. ✅ Test rate limiting (110 commands, HTTP 429 after 20 requests)
+4. ✅ Configure Upstash Redis (innocent-cockatoo-36814.upstash.io)
 5. ✅ Add input validation (Zod schemas + validation helpers)
 6. ✅ Create Firestore security rules (HIPAA-compliant)
 7. ✅ Fix all TypeScript compilation errors
 8. ✅ Production build successful (npm run build exit code 0)
+9. ✅ Implement CSRF protection (NextAuth cookies + custom tokens)
 
-### Immediate (Before Production)
-9. **Deploy Firestore rules** to production: `firebase deploy --only firestore:rules`
-10. **Apply API route pattern** to all endpoints (use /src/lib/api-example.ts as template)
-11. **Configure remaining .env variables** (NEXTAUTH_SECRET, GOOGLE_CLOUD_PROJECT, etc.)
-12. **Test in staging** with production-like data volume
-13. Enable Cloud Logging for production requests
-14. Set up monitoring alerts (Upstash usage, error rates)
+### Short-term
+10. Deploy Firestore rules to production: `firebase deploy --only firestore:rules`
+11. Apply API route security pattern to all endpoints (use /src/lib/api-example.ts as template)
+12. Configure remaining .env variables (NEXTAUTH_SECRET, GOOGLE_CLOUD_PROJECT, etc.)
+13. Test in staging with production-like data volume
+14. Set up Sentry error tracking
+15. Implement comprehensive audit logging
+16. Set up automated database backups
+17. Create incident response plan
+18. Enable Cloud Logging and monitoring alerts
 
-### Short-term (Within 1 month)
-11. Set up Sentry error tracking
-12. Implement comprehensive audit logging
-13. Add CSRF protection (custom implementation)
-14. Set up automated backups
-15. Create incident response plan
-
-### Long-term (Ongoing)
-16. Regular security audits
-17. Penetration testing
-18. Dependency updates
-19. Key rotation automation
-20. HIPAA compliance certification
+### Long-term
+19. Regular security audits (quarterly)
+20. Penetration testing (annual)
+21. Automated dependency updates (Dependabot)
+22. Key rotation automation
+23. HIPAA compliance certification
+24. Security training for development team
 
 ## 📞 Security Contacts
 
