@@ -1,14 +1,21 @@
-"use client";
-
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Users } from "lucide-react";
-import { mockPatients } from "@/data/mockData";
-import { useRouter } from "next/navigation";
+import { getPatients } from "@/lib/db";
+import Link from "next/link";
 
-export default function PatientList() {
-  const router = useRouter();
+export default async function PatientList() {
+  const patients = await getPatients();
+
+  // Sort patients: Critical > Warning > Safe > Others
+  const riskOrder: Record<string, number> = { 'critical': 0, 'warning': 1, 'safe': 2 };
+
+  patients.sort((a, b) => {
+    const riskA = riskOrder[a.currentStatus] ?? 99;
+    const riskB = riskOrder[b.currentStatus] ?? 99;
+    return riskA - riskB;
+  });
 
   const getRiskBadgeClass = (risk: string) => {
     switch (risk) {
@@ -34,7 +41,7 @@ export default function PatientList() {
       </div>
 
       <div className="space-y-4">
-        {mockPatients.map((patient) => (
+        {patients.map((patient) => (
           <Card key={patient.id}>
             <CardContent className="p-6">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
@@ -60,17 +67,22 @@ export default function PatientList() {
                 </div>
 
                 <div className="lg:col-span-1 flex justify-end">
-                  <Button
-                    variant="outline"
-                    onClick={() => router.push(`/patient/${patient.id}`)}
-                  >
-                    View
-                  </Button>
+                  <Link href={`/patient/${patient.id}`}>
+                    <Button variant="outline">
+                      View
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </CardContent>
           </Card>
         ))}
+
+        {patients.length === 0 && (
+          <div className="text-center py-10 text-muted-foreground">
+            No patients found.
+          </div>
+        )}
       </div>
     </div>
   );
