@@ -42,11 +42,16 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              // Script Src: Allow self, unsafe-eval (Next.js dev), unsafe-inline (Next.js hydration)
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://apis.google.com",
+              // Style Src: Allow self, unsafe-inline (CSS-in-JS), Google Fonts
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              // Font Src: Self + Google Fonts
               "font-src 'self' https://fonts.gstatic.com",
+              // Img Src: Self + Data URIs + HTTPS (for avatars)
               "img-src 'self' data: https:",
-              "connect-src 'self' https://vercel.live https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://www.googleapis.com https://*.firebaseapp.com",
+              // Connect Src: Critical for Firebase, Vercel, Google APIs
+              "connect-src 'self' https://vercel.live https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://www.googleapis.com https://*.firebaseapp.com https://apis.google.com",
               "frame-ancestors 'self'",
               "base-uri 'self'",
               "form-action 'self'"
