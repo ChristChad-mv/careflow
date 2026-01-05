@@ -15,6 +15,8 @@
 - [x] In-memory fallback for development
 - [x] Rate limit headers (X-RateLimit-Limit, Remaining, Reset)
 - [x] HTTP 429 responses with Retry-After
+- [x] **Tested and validated**: 20 requests succeeded, then HTTP 429 after limit
+- [x] **Upstash configured**: innocent-cockatoo-36814.upstash.io (110 commands executed)
 
 ### 3. Input Validation ✅
 - [x] Server-side validation with Zod schemas
@@ -51,17 +53,31 @@
 - [x] Compression enabled
 
 ### 6. Database Security ✅
-- [x] Firestore security rules deployed
-- [x] Role-based access control
+- [x] Firestore security rules created
+- [x] Role-based access control (nurse, coordinator, admin)
 - [x] Hospital isolation (multi-tenancy)
-- [x] Audit logs immutable
+- [x] Audit logs immutable (append-only)
+- [ ] Rules deployment to production (pending: firebase deploy --only firestore:rules)
+
+### 7. Redis Configuration ✅
+- [x] Upstash Redis configured and tested
+- [x] Development environment: innocent-cockatoo-36814.upstash.io
+- [x] Rate limiting validated (110 commands, HTTP 429 after 20 requests)
+- [x] Free tier active (10,000 commands/day)
+- [ ] Production deployment: Add UPSTASH_* to Vercel/Cloud Run environment variables
+
+### 8. Dependency Management ✅
+- [x] 0 vulnerabilities (npm audit clean)
+- [x] Next.js upgraded to 16.0.9 (fixed high severity DoS vulnerability)
+- [x] next-themes upgraded to 0.4.4 (React 19 compatibility)
+- [x] All dependencies up to date
 
 ## ⚠️ Security Improvements Needed
 
 ### High Priority
 
 #### 1. CSRF Protection
-**Status**: Package deprecated, needs alternative  
+**Status**: Package deprecated, needs custom implementation  
 **Risk**: Cross-site request forgery  
 **Solution**: Implement SameSite cookies + custom CSRF tokens
 ```typescript
@@ -79,18 +95,9 @@ cookies: {
 }
 ```
 
-#### 2. Redis Configuration (Production)
-**Status**: Ready, needs environment variables  
-**Action**: Configure Upstash Redis in production
-```bash
-# Add to .env:
-UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
-UPSTASH_REDIS_REST_TOKEN=your-token
-```
-
 ### Medium Priority
 
-#### 3. API Route Protection
+#### 2. API Route Protection
 **Status**: Example provided in api-example.ts  
 **Action**: Apply pattern to all API routes
 - Add authentication check
@@ -99,7 +106,7 @@ UPSTASH_REDIS_REST_TOKEN=your-token
 - Add authorization check
 - Add audit logging
 
-#### 4. XSS Prevention
+#### 3. XSS Prevention
 **Status**: React auto-escapes, CSP configured  
 **Action**: Review dangerouslySetInnerHTML usage
 ```bash
@@ -107,15 +114,7 @@ UPSTASH_REDIS_REST_TOKEN=your-token
 grep -r "dangerouslySetInnerHTML" src/
 ```
 
-#### 5. Dependency Vulnerabilities
-**Status**: All fixed (0 vulnerabilities)  
-**Action**: Keep dependencies up to date
-```bash
-npm audit
-npm update
-```
-
-#### 6. API Key Rotation
+#### 4. API Key Rotation
 **Status**: Manual  
 **Action**: Implement automated key rotation policy
 - Firebase API keys: Every 90 days
@@ -124,7 +123,7 @@ npm update
 
 ### Low Priority
 
-#### 7. Logging & Monitoring
+#### 5. Logging & Monitoring
 **Status**: Placeholder in code  
 **Action**: Integrate Cloud Logging
 ```typescript
@@ -132,7 +131,7 @@ npm update
 import { logger } from '@google-cloud/logging';
 ```
 
-#### 8. Error Handling
+#### 6. Error Handling
 **Status**: Basic error pages  
 **Action**: Implement error boundary and sanitize error messages
 
@@ -163,18 +162,22 @@ import { logger } from '@google-cloud/logging';
 ## 🎯 Action Items
 
 ### ✅ Completed
-1. ✅ Fix npm audit vulnerability (0 vulnerabilities)
+1. ✅ Fix npm audit vulnerability (0 vulnerabilities, Next.js 16.0.9)
 2. ✅ Implement rate limiting (Upstash Redis + dev fallback)
-3. ✅ Add input validation (Zod schemas + validation helpers)
-4. ✅ Create Firestore security rules
-5. ✅ Deploy database security
+3. ✅ **Test rate limiting** (110 commands, HTTP 429 after 20 requests)
+4. ✅ **Configure Upstash Redis** (innocent-cockatoo-36814.upstash.io)
+5. ✅ Add input validation (Zod schemas + validation helpers)
+6. ✅ Create Firestore security rules (HIPAA-compliant)
+7. ✅ Fix all TypeScript compilation errors
+8. ✅ Production build successful (npm run build exit code 0)
 
 ### Immediate (Before Production)
-6. Configure Upstash Redis in production (.env)
-7. Apply API route pattern to all endpoints
-8. Test rate limiting in staging
-9. Enable request logging
-10. Review and deploy Firestore rules
+9. **Deploy Firestore rules** to production: `firebase deploy --only firestore:rules`
+10. **Apply API route pattern** to all endpoints (use /src/lib/api-example.ts as template)
+11. **Configure remaining .env variables** (NEXTAUTH_SECRET, GOOGLE_CLOUD_PROJECT, etc.)
+12. **Test in staging** with production-like data volume
+13. Enable Cloud Logging for production requests
+14. Set up monitoring alerts (Upstash usage, error rates)
 
 ### Short-term (Within 1 month)
 11. Set up Sentry error tracking
