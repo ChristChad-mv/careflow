@@ -1,58 +1,74 @@
-"use server";
+'use server';
 
-import { initAdmin } from "@/lib/firebase-admin";
+import { getAdminDb } from "@/lib/firebase-admin";
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { auth, signOut } from "@/lib/auth";
 
-export async function updateUser(formData: FormData) {
+// Secure action for updating own profile
+export async function updateUserProfile(formData: FormData) {
     const session = await auth();
-    if (!session?.user?.email) {
-        throw new Error("Not authenticated");
-    }
+    if (!session?.user?.id) return { success: false, error: "Not authenticated" };
 
+    const db = await getAdminDb();
+
+    // Extract data from form
     const name = formData.get("name") as string;
     const hospitalId = formData.get("hospitalId") as string;
-    // Role is usually managed by admins, so we might skip it or make it read-only in UI
 
-    if (!name || !hospitalId) {
-        throw new Error("Missing required fields");
+    // Update user
+    await db.collection("users").doc(session.user.id).update({
+        name,
+        hospitalId
+        // Role and Email are usually immutable or managed by admins
+    });
+
+    revalidatePath('/profile');
+    return { success: true };
+}
+
+export async function signOutAction() {
+    await signOut({ redirectTo: "/" });
+}
+
+export async function updateAlert(alertId: string, data: {
+    status?: string;
+    priority?: string;
+    resolutionNote?: string;
+}) {
+    if (!alertId) throw new Error("Alert ID is required");
+
+    const db = await getAdminDb();
+
+    // Clean undefined values
+    const updateData = JSON.parse(JSON.stringify(data));
+
+    await db.collection("alerts").doc(alertId).update(updateData);
+
+    revalidatePath('/');
+    revalidatePath('/alerts');
+    revalidatePath(`/alerts/${alertId}`);
+    return { success: true };
+}
+
+export async function updatePatient(patientId: string, data: any) {
+    if (!patientId) throw new Error("Patient ID is required");
+
+    const db = await getAdminDb();
+
+    // Clean text fields like "instructions" that might come from textarea
+    if (data.medicationPlan) {
+        data.medicationPlan = data.medicationPlan.map((med: any) => ({
+            ...med,
+            instructions: med.instructions || ""
+        }));
     }
 
-    const admin = await initAdmin();
+    // Clean undefined values
+    const updateData = JSON.parse(JSON.stringify(data));
 
-    // We need the user's UID. 
-    // Since we don't have the UID in the session object by default in NextAuth v5 unless we put it there,
-    // we might need to look up the user by email or ensure UID is in session.
-    // In auth.ts, we are putting 'sub' (uid) into token, and token into session.user.id?
-    // Let's check auth.ts. 
-    // If session.user.id is available, we use it.
+    await db.collection("patients").doc(patientId).update(updateData);
 
-    // Assuming session.user.id is the UID.
-    // If not, we can look up by email.
-    let uid = session.user.id;
-
-    if (!uid) {
-        const userRecord = await admin.auth().getUserByEmail(session.user.email);
-        uid = userRecord.uid;
-    }
-
-    try {
-        // Update Firestore User Document
-        await admin.firestore().collection("users").doc(uid).update({
-            name,
-            hospitalId,
-            updatedAt: new Date(),
-        });
-
-        // Update Firebase Auth Profile (DisplayName)
-        await admin.auth().updateUser(uid, {
-            displayName: name,
-        });
-
-        revalidatePath("/profile");
-        return { success: true };
-    } catch (error) {
-        console.error("Error updating profile:", error);
-        return { success: false, error: "Failed to update profile" };
-    }
+    revalidatePath('/patients');
+    revalidatePath(`/patient/${patientId}`);
+    return { success: true };
 }
