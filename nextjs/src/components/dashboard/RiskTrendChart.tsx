@@ -24,7 +24,7 @@ export function RiskTrendChart() {
                 </CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="h-75 w-full">
+                <div className="h-[300px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={data}>
                             <defs>

@@ -11,19 +11,19 @@ import { z } from 'zod';
 const envSchema = z.object({
   // Node environment
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  
+
   // Public app configuration
   NEXT_PUBLIC_APP_URL: z.string().url().default('http://localhost:3000'),
   NEXT_PUBLIC_APP_NAME: z.string().default('CareFlow Pulse'),
-  
+
   // API configuration
   NEXT_PUBLIC_API_URL: z.string().url().optional(),
-  
+
   // Feature flags
-  NEXT_PUBLIC_ENABLE_AI_AGENT: z.string().default('false').transform(val => val === 'true'),
-  NEXT_PUBLIC_ENABLE_SMS_ALERTS: z.string().default('false').transform(val => val === 'true'),
-  NEXT_PUBLIC_ENABLE_AUDIT_LOGS: z.string().default('true').transform(val => val === 'true'),
-  
+  NEXT_PUBLIC_ENABLE_AI_AGENT: z.string().transform(val => val === 'true').default('false'),
+  NEXT_PUBLIC_ENABLE_SMS_ALERTS: z.string().transform(val => val === 'true').default('false'),
+  NEXT_PUBLIC_ENABLE_AUDIT_LOGS: z.string().transform(val => val === 'true').default('true'),
+
   // Google Cloud (optional for development)
   GOOGLE_CLOUD_PROJECT: z.string().optional(),
   GOOGLE_CLOUD_LOCATION: z.string().optional(),
@@ -68,19 +68,19 @@ export const config = {
     url: env.NEXT_PUBLIC_APP_URL,
     env: env.NODE_ENV,
   },
-  
+
   // API configuration
   api: {
     url: env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   },
-  
+
   // Feature flags
   features: {
     aiAgent: env.NEXT_PUBLIC_ENABLE_AI_AGENT,
     smsAlerts: env.NEXT_PUBLIC_ENABLE_SMS_ALERTS,
     auditLogs: env.NEXT_PUBLIC_ENABLE_AUDIT_LOGS,
   },
-  
+
   // Google Cloud configuration
   googleCloud: {
     project: env.GOOGLE_CLOUD_PROJECT,
@@ -89,7 +89,7 @@ export const config = {
     agentEngineEndpoint: env.AGENT_ENGINE_ENDPOINT,
     adkAppName: env.ADK_APP_NAME,
   },
-  
+
   // Helper functions
   isDevelopment: env.NODE_ENV === 'development',
   isProduction: env.NODE_ENV === 'production',

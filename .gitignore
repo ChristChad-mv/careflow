@@ -1,0 +1,128 @@
+# ====================
+# GLOBAL GITIGNORE
+# ====================
+
+# Environment variables
+.env
+.env.*
+!.env.example
+*.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Python virtual environments
+.venv/
+.venv*/
+venv/
+venv*/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Python build artifacts
+*.egg-info/
+.installed.cfg
+*.egg
+dist/
+build/
+*.whl
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+**/.terraform/*
+*.tfvars
+!**/vars/env.tfvars.example
+my_env.tfvars
+.locust_env
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+.spyderproject
+.spyproject
+.ropeproject
+*.sublime-workspace
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+.history/
+
+# OS specific
+.DS_Store
+Thumbs.db
+*.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pip-log.txt
+
+# Testing & Coverage
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/
+.tox/
+.nox/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.nyc_output/
+
+# Next.js / React
+.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Lock files (keep package-lock.json but ignore others)
+yarn.lock
+pnpm-lock.yaml
+
+# Temporary files
+*.tmp
+.cache/
+tmp/
+temp/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Misc
+.persist_vector_store
+tests/load_test/.results/*.html
+tests/load_test/.results/*.csv
+.saved_chats
+.requirements.txt
+tools/a2a-inspector/
+
+# Vercel
+.vercel

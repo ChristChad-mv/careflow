@@ -66,7 +66,7 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-linear-to-br from-background via-background to-primary/5">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-background via-background to-primary/5">
       <div className="w-full max-w-md space-y-6">
         {/* Logo/Branding */}
         <div className="text-center space-y-4 flex flex-col items-center">
