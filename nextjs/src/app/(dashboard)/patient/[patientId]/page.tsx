@@ -1,65 +1,25 @@
-"use client";
-
-import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Phone, Calendar, Pill, AlertTriangle, Clock, Bot, User } from "lucide-react";
-import { mockPatients, mockInteractions, mockAlerts } from "@/data/mockData";
 import { format } from "date-fns";
-import { validatePatientId } from "@/lib/validators";
-import { useMemo } from "react";
+import { getPatient, getPatientAlerts, getInteractions } from "@/lib/db";
 
-export default function PatientDetail() {
-  const params = useParams();
-  
-  // Validate patient ID using useMemo to avoid re-validation on every render
-  const { patientId, error } = useMemo(() => {
-    try {
-      const rawId = params.patientId as string;
-      const validatedId = validatePatientId(rawId);
-      return { patientId: validatedId, error: null };
-    } catch (err) {
-      return { 
-        patientId: null, 
-        error: err instanceof Error ? err.message : 'Invalid patient ID' 
-      };
-    }
-  }, [params.patientId]);
+interface PageProps {
+  params: Promise<{ patientId: string }>;
+}
 
-  // Show error if validation failed
-  if (error) {
-    return (
-      <div className="p-6">
-        <Card>
-          <CardContent className="py-12 text-center">
-            <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <p className="text-lg font-semibold text-destructive mb-2">Invalid Patient ID</p>
-            <p className="text-muted-foreground">{error}</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+export default async function PatientDetail({ params }: PageProps) {
+  const { patientId } = await params;
 
-  // Show loading while validating
-  if (!patientId) {
-    return (
-      <div className="p-6">
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-lg">Loading...</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-  
-  const patient = mockPatients.find(p => p.id === patientId);
-  const interactions = mockInteractions[patientId] || [];
-  const patientAlerts = mockAlerts.filter(a => a.patientId === patientId);
-  const currentAlert = patientAlerts[0];
+  const [patient, interactions, alerts] = await Promise.all([
+    getPatient(patientId),
+    getInteractions(patientId),
+    getPatientAlerts(patientId)
+  ]);
+
+  const currentAlert = alerts[0];
 
   if (!patient) {
     return (
@@ -145,7 +105,7 @@ export default function PatientDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {patient.medicationPlan.map((med, idx) => (
+              {patient.medicationPlan?.map((med, idx) => (
                 <div key={idx} className="bg-secondary p-3 rounded-lg">
                   <div className="font-semibold">{med.name}</div>
                   <div className="text-sm text-muted-foreground mt-1">
@@ -153,6 +113,9 @@ export default function PatientDetail() {
                   </div>
                 </div>
               ))}
+              {(!patient.medicationPlan || patient.medicationPlan.length === 0) && (
+                <div className="text-muted-foreground text-sm">No medications listed.</div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -174,9 +137,9 @@ export default function PatientDetail() {
                     <div className="text-sm font-semibold text-muted-foreground">AI Summary</div>
                     <p className="mt-2 text-foreground leading-relaxed">{currentAlert.brief}</p>
                   </div>
-                  
+
                   <Separator />
-                  
+
                   <div>
                     <div className="text-sm font-semibold text-muted-foreground">Recommended Action</div>
                     <p className="mt-2 text-foreground font-medium">
@@ -198,19 +161,18 @@ export default function PatientDetail() {
                 {interactions.map((interaction) => (
                   <div
                     key={interaction.id}
-                    className={`p-4 rounded-lg ${
-                      interaction.sender === 'ai'
+                    className={`p-4 rounded-lg ${interaction.sender === 'ai'
                         ? 'bg-primary/10 border-l-4 border-primary'
                         : interaction.sender === 'patient'
-                        ? 'bg-secondary border-l-4 border-accent'
-                        : 'bg-muted border-l-4 border-muted-foreground'
-                    }`}
+                          ? 'bg-secondary border-l-4 border-accent'
+                          : 'bg-muted border-l-4 border-muted-foreground'
+                      }`}
                   >
                     <div className="flex items-center gap-2 mb-2">
                       {interaction.sender === 'ai' && <Bot className="h-4 w-4 text-primary" />}
                       {interaction.sender === 'patient' && <User className="h-4 w-4 text-accent" />}
                       {interaction.sender === 'system' && <Clock className="h-4 w-4 text-muted-foreground" />}
-                      
+
                       <span className="text-xs font-semibold uppercase">
                         {interaction.sender}
                       </span>
@@ -223,6 +185,11 @@ export default function PatientDetail() {
                     </p>
                   </div>
                 ))}
+                {interactions.length === 0 && (
+                  <div className="text-center text-muted-foreground py-4">
+                    No interactions recorded yet.
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
