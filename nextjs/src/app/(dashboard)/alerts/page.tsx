@@ -6,17 +6,23 @@ import { getAlerts } from "@/lib/db";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 
-export default async function CriticalAlerts() {
-  const alerts = await getAlerts();
 
-  const getRiskBadgeClass = (risk: string) => {
-    switch (risk) {
+export default async function CriticalAlerts() {
+  const allAlerts = await getAlerts();
+  const alerts = allAlerts.sort((a, b) => {
+    const priorityOrder = { critical: 0, warning: 1, safe: 2 };
+    // @ts-ignore - Handle potential undefined priorities gracefully
+    return (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2);
+  });
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
       case 'critical':
-        return 'status-critical animate-critical-pulse';
+        return 'text-red-500 bg-red-50 border-red-200';
       case 'warning':
-        return 'status-warning';
+        return 'text-yellow-500 bg-yellow-50 border-yellow-200';
       default:
-        return 'status-safe';
+        return 'text-green-500 bg-green-50 border-green-200';
     }
   };
 
@@ -48,17 +54,17 @@ export default async function CriticalAlerts() {
           {alerts.map((alert) => (
             <Card
               key={alert.id}
-              className={`border-2 ${alert.riskLevel === 'critical'
-                  ? 'border-destructive bg-destructive/5'
-                  : 'border-warning bg-warning/5'
+              className={`border-2 ${alert.priority === 'critical'
+                ? 'border-destructive bg-destructive/5'
+                : 'border-warning bg-warning/5'
                 }`}
             >
               <CardContent className="p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
                   {/* Risk Level */}
                   <div className="lg:col-span-2">
-                    <Badge className={`status-badge ${getRiskBadgeClass(alert.riskLevel)} text-base px-4 py-2`}>
-                      {alert.riskLevel.toUpperCase()}
+                    <Badge variant="outline" className={getPriorityColor(alert.priority)}>
+                      {(alert.priority || 'UNKNOWN').toUpperCase()}
                     </Badge>
                   </div>
 
@@ -73,7 +79,7 @@ export default async function CriticalAlerts() {
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Clock className="h-4 w-4" />
                       <span className="text-sm font-medium">
-                        {formatDistanceToNow(alert.timestamp, { addSuffix: true })}
+                        {formatDistanceToNow(alert.createdAt, { addSuffix: true })}
                       </span>
                     </div>
                   </div>
@@ -86,10 +92,10 @@ export default async function CriticalAlerts() {
                   </div>
 
                   {/* Action Button */}
-                  <div className="lg:col-span-2 flex justify-end">
-                    <Link href={`/patient/${alert.patientId}`}>
+                  <div className="lg:col-span-2 flex justify-end gap-2">
+                    <Link href={`/alerts/${alert.id}`}>
                       <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold">
-                        View Brief & Take Ownership
+                        View & Manage
                       </Button>
                     </Link>
                   </div>
