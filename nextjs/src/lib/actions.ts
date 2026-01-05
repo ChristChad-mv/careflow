@@ -4,6 +4,7 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { revalidatePath } from "next/cache";
 import { auth, signOut } from "@/lib/auth";
 import { updatePatientSchema, updateAlertSchema } from "@/lib/schemas";
+import { AuditService } from "@/lib/audit";
 
 // Secure action for updating own profile
 export async function updateUserProfile(formData: FormData) {
@@ -55,6 +56,19 @@ export async function updateAlert(alertId: string, data: unknown) {
 
     await db.collection("alerts").doc(alertId).update(updateData);
 
+    // --- HIPAA AUDIT LOGGING ---
+    await AuditService.log({
+        action: 'WRITE',
+        resourceType: 'alert',
+        resourceId: alertId,
+        hospitalId: session.user.hospitalId || 'unknown', // Best effort hospital ID from session
+        actor: {
+            userId: session.user.id,
+            role: session.user.role || 'user'
+        },
+        details: `Updated alert status/priority`
+    });
+
     revalidatePath('/');
     revalidatePath('/alerts');
     revalidatePath(`/alerts/${alertId}`);
@@ -65,7 +79,9 @@ export async function updatePatient(patientId: string, data: unknown) {
     if (!patientId) throw new Error("Patient ID is required");
 
     const session = await auth();
-    const userHospitalId = session?.user?.hospitalId; // Assumes hospitalId is on session or fetched from DB
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    const userHospitalId = session.user.hospitalId; // Now safe to access
 
     // Fallback: fetch user from DB to be sure of hospitalId
     const db = await getAdminDb();
@@ -105,6 +121,19 @@ export async function updatePatient(patientId: string, data: unknown) {
     const updateData = JSON.parse(JSON.stringify(parsed.data));
 
     await patientRef.update(updateData);
+
+    // --- HIPAA AUDIT LOGGING ---
+    await AuditService.log({
+        action: 'WRITE',
+        resourceType: 'patient',
+        resourceId: patientId,
+        hospitalId: userHospitalId || 'unknown',
+        actor: {
+            userId: session.user.id,
+            role: session.user.role || 'user' // Assuming role exists on session or default
+        },
+        details: `Updated fields: ${Object.keys(parsed.data).join(', ')}`
+    });
 
     revalidatePath('/patients');
     revalidatePath(`/patient/${patientId}`);
