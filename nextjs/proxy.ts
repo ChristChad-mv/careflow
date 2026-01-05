@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import NextAuth from 'next-auth';
 import { authConfig } from '@/lib/auth.config';
+import { getRatelimit } from '@/lib/rate-limit';
 
 const { auth } = NextAuth(authConfig);
 
@@ -40,7 +41,7 @@ function isPublicPath(pathname: string): boolean {
   return publicPaths.some(path => pathname.startsWith(path));
 }
 
-export default auth((request) => {
+export default auth(async (request) => {
   const requestId = generateRequestId();
   const clientIp = getClientIp(request);
   const startTime = Date.now();
@@ -50,21 +51,11 @@ export default auth((request) => {
   const isPublic = isPublicPath(pathname);
   const isAuthenticated = !!request.auth;
 
-  // Log request (in production, send to logging service)
-  if (process.env.NODE_ENV === 'production') {
-    // TODO: Send to logging service (e.g., Cloud Logging, Datadog)
-    console.log({
-      requestId,
-      method: request.method,
-      url: request.url,
-      path: pathname,
-      ip: clientIp,
-      authenticated: isAuthenticated,
-      userId: request.auth?.user?.id,
-      userRole: request.auth?.user?.role,
-      userAgent: request.headers.get('user-agent'),
-      timestamp: new Date().toISOString(),
-    });
+  // Log request in production to monitoring service
+  // Note: In production, integrate with Cloud Logging, Datadog, or similar
+  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_REQUEST_LOGGING === 'true') {
+    // Future: Send to centralized logging service
+    // Example: await sendToCloudLogging({...})
   }
 
   // Redirect to login if accessing protected route without authentication
@@ -91,25 +82,41 @@ export default auth((request) => {
   // Security headers (additional to next.config.ts)
   response.headers.set('x-client-ip', clientIp);
 
-  // --- RATE LIMITING (Memory-based for Demo / Single Instance) ---
-  // In production, use Redis (e.g., Upstash) for distributed state.
-  // Limit: 20 requests per minute per IP for sensitive routes (Actions/API)
+  // Rate limiting for API and POST requests
   if (pathname.startsWith('/api') || request.method === 'POST') {
-    // Note: In strict edge middleware, global variables might reset.
-    // This is effective for single-container deployments or protecting against rapid bursts.
-
-    // Simple bucket: <IP> -> { count, startTime }
-    // This part is skipped for now to avoid complexity with variable persistence in Vercel Edge.
-    // We will rely on WAF for DDOS, but we CAN add a simple header check.
-
-    // Implementation:
-    // If we had Redis, we would do:
-    // const { success } = await ratelimit.limit(clientIp);
-    // if (!success) return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 });
-
-    // Placeholder for lint
-    if (process.env.NODE_ENV === 'development') {
-      // console.log(`Rate limit check for ${clientIp}`);
+    const limiterType = pathname.startsWith('/api/auth') ? 'auth' : 'api';
+    const ratelimit = getRatelimit(limiterType);
+    
+    if (ratelimit) {
+      const result = await ratelimit.limit(clientIp);
+      
+      if (!result.success) {
+        const resetTime = result.reset instanceof Date ? result.reset : new Date(result.reset);
+        const retryAfter = Math.ceil((resetTime.getTime() - Date.now()) / 1000);
+        
+        return NextResponse.json(
+          { 
+            error: 'Too Many Requests',
+            message: 'You have exceeded the rate limit. Please try again later.',
+            retryAfter
+          },
+          { 
+            status: 429,
+            headers: {
+              'X-RateLimit-Limit': result.limit.toString(),
+              'X-RateLimit-Remaining': '0',
+              'X-RateLimit-Reset': resetTime.toISOString(),
+              'Retry-After': retryAfter.toString()
+            }
+          }
+        );
+      }
+      
+      // Add rate limit headers to successful requests
+      const resetTime = result.reset instanceof Date ? result.reset : new Date(result.reset);
+      response.headers.set('X-RateLimit-Limit', result.limit.toString());
+      response.headers.set('X-RateLimit-Remaining', result.remaining.toString());
+      response.headers.set('X-RateLimit-Reset', resetTime.toISOString());
     }
   }
 
@@ -125,8 +132,9 @@ export const config = {
      * - _next/image (image optimization)
      * - favicon.ico
      * - api/auth (NextAuth.js handles these)
+     * - api/rate-limit-test (public test endpoint)
      * - public files (.svg, .png, etc.)
      */
-    '/((?!_next/static|_next/image|favicon.ico|api/auth|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/auth|api/rate-limit-test|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
