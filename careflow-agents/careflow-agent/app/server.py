@@ -40,6 +40,8 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 # Import the existing agent configuration
 from agent import root_agent, CareFlowAgent
+from app.core.security.model_armor import ModelArmorClient
+from app.plugins.model_armor_plugin import ModelArmorPlugin
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -128,13 +130,18 @@ class CareFlowAgentExecutor(AgentExecutor):
             from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
             from google.adk.artifacts import InMemoryArtifactService
             
-            # Initialize Runner with our Custom Agent
+            # Initialize Model Armor
+            model_armor_client = ModelArmorClient()
+            model_armor_plugin = ModelArmorPlugin(client=model_armor_client)
+
+            # Initialize Runner with our Custom Agent and Security Plugin
             runner = Runner(
                 app_name=self.agent.name,
                 agent=self.agent,
                 session_service=InMemorySessionService(),
                 memory_service=InMemoryMemoryService(),
                 artifact_service=InMemoryArtifactService(),
+                plugins=[model_armor_plugin]
             )
             
             # Create a session

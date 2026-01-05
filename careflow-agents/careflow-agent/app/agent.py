@@ -25,6 +25,37 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 from toolbox_core import ToolboxSyncClient
+from google.adk.agents.callback_context import CallbackContext
+from app.core.security.model_armor import ModelArmorClient
+
+# Global Model Armor Client
+model_armor_client = ModelArmorClient()
+
+async def sanitize_response_callback(callback_context: CallbackContext) -> genai_types.Content:
+    """
+    Callback that runs after the Pulse Agent generates a response.
+    It scans the output for PII/PHI and applies redaction via Model Armor.
+    """
+    raw_response = callback_context.response.parts[0].text if callback_context.response and callback_context.response.parts else ""
+    if not raw_response:
+        return callback_context.response
+
+    logger.info(f"Model Armor sanitizing response for agent: {callback_context.agent_name}")
+    sanitize_result = await model_armor_client.sanitize_response(raw_response)
+    
+    if sanitize_result.get("is_blocked"):
+        logger.warning(f"Model Armor BLOCKED response for agent {callback_context.agent_name}: {sanitize_result}")
+        return genai_types.Content(
+            role="model",
+            parts=[genai_types.Part.from_text(
+                text="[REDACTED] The system has detected sensitive information that cannot be shared."
+            )]
+        )
+    
+    return genai_types.Content(
+        role="model",
+        parts=[genai_types.Part.from_text(text=sanitize_result.get("sanitized_text", raw_response))]
+    )
 
 # Load MCP Toolbox tools
 # print(f"📡 Connecting to MCP toolbox server at http://127.0.0.1:5000...")
@@ -443,6 +474,7 @@ class CareFlowAgent(BaseAgent):
             instruction=AGENT_INSTRUCTION,
             tools=all_tools + a2a_tools, # Add A2A tools here
             output_key="patient_monitoring",
+            after_agent_callback=sanitize_response_callback
         )
         
         # 2. Initialize BaseAgent
