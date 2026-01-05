@@ -1,4 +1,5 @@
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
+
+import { initializeApp, cert, getApps, applicationDefault } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import fs from 'fs';
@@ -34,39 +35,107 @@ const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIR
 const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
-if (!projectId || !clientEmail || !privateKey) {
-    console.error('❌ Missing Firebase credentials in environment variables.');
-    console.error('Required: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY');
+console.log('---------------------------------------------------------');
+console.log('🔥  FIREBASE CONFIGURATION CHECK');
+console.log('---------------------------------------------------------');
+console.log(`🆔  Project ID : ${projectId}`);
+console.log(`📧  Client Email: ${clientEmail ? clientEmail : 'Not provided (Using ADC)'}`);
+console.log('---------------------------------------------------------');
+
+if (!projectId) {
+    console.error('❌ Missing FIREBASE_PROJECT_ID (or NEXT_PUBLIC_FIREBASE_PROJECT_ID).');
     process.exit(1);
 }
 
-// Initialize Firebase Admin
-if (getApps().length === 0) {
-    initializeApp({
-        credential: cert({
-            projectId,
-            clientEmail,
-            privateKey,
-        }),
-    });
+if (projectId?.includes('careflow-b7a79')) {
+    console.warn('⚠️  WARNING: It looks like you are using the "careflow-b7a79" project.');
+    console.warn('   The user requested NOT to use this specific project file/id if it is incorrect.');
 }
 
-const db = getFirestore();
-const auth = getAuth();
+// Initialize Firebase Admin
+let app;
+if (getApps().length === 0) {
+    if (clientEmail && privateKey) {
+        app = initializeApp({
+            credential: cert({
+                projectId,
+                clientEmail,
+                privateKey,
+            }),
+        });
+        console.log('🔐 Authenticated with Service Account (Env Vars)');
+    } else {
+        app = initializeApp({
+            projectId,
+            credential: applicationDefault()
+        });
+        console.log('👤 Authenticated with Application Default Credentials (ADC/GCloud)');
+    }
+} else {
+    app = getApps()[0];
+}
+
+// Connect to the specific named database
+const db = getFirestore(app, 'careflow-db');
+const auth = getAuth(app);
+
+const purgeCollections = async () => {
+    console.log('🗑️ Purging existing collections...');
+    const collections = ['users', 'patients', 'alerts'];
+    for (const colName of collections) {
+        const snapshot = await db.collection(colName).get();
+        if (snapshot.empty) continue;
+
+        const batch = db.batch();
+        snapshot.docs.forEach((doc) => {
+            batch.delete(doc.ref);
+        });
+        await batch.commit();
+        console.log(`   - Purged ${snapshot.size} docs from ${colName}`);
+    }
+};
+
+const ensureAuthUser = async (email: string, uid: string, displayName: string) => {
+    try {
+        await auth.updateUser(uid, {
+            email,
+            displayName,
+            password: 'password123', // Reset password to default for testing
+            emailVerified: true
+        });
+        console.log(`   - Auth User updated: ${email}`);
+    } catch (error: any) {
+        if (error.code === 'auth/user-not-found') {
+            await auth.createUser({
+                uid,
+                email,
+                displayName,
+                password: 'password123',
+                emailVerified: true
+            });
+            console.log(`   - Auth User created: ${email}`);
+        } else {
+            console.error(`   ❌ Error managing auth user ${email}:`, error);
+        }
+    }
+};
 
 const seedUsers = async () => {
     console.log('🌱 Seeding Users...');
 
     const users = [
+        // HOSPITAL 1: Central Hospital (Nurse Sarah)
         {
-            userId: "user_nurse_sarah_123",
-            email: "nurse@careflow.com",
+            userId: "user_nurse_sarah", // UID matches seed
+            email: "sarah@hosp1.com",
             name: "Sarah Johnson, RN",
             role: "nurse",
             department: "Cardiology",
             hospitalId: "HOSP001",
             phone: "+15559876543",
-            assignedPatientIds: ["550e8400-e29b-41d4-a716-446655440000"],
+            assignedPatientIds: [
+                "p_h1_001"
+            ],
             preferences: {
                 notificationMethod: "both",
                 alertSound: true,
@@ -74,17 +143,21 @@ const seedUsers = async () => {
             },
             createdAt: Timestamp.now(),
             lastLoginAt: Timestamp.now(),
-            isActive: true
+            isActive: true,
+            customClaims: { role: "nurse", hospitalId: "HOSP001", department: "Cardiology" }
         },
+        // HOSPITAL 2: St. Mary's Clinic (Nurse John)
         {
-            userId: "user_coordinator_michael_456",
-            email: "coordinator@careflow.com",
-            name: "Michael Chen",
-            role: "coordinator",
-            department: "Patient Care",
-            hospitalId: "HOSP001",
-            phone: "+15551112222",
-            assignedPatientIds: [],
+            userId: "user_nurse_john",
+            email: "john@hosp2.com",
+            name: "John Smith, RN",
+            role: "nurse",
+            department: "Geriatrics",
+            hospitalId: "HOSP002",
+            phone: "+15551234567",
+            assignedPatientIds: [
+                "p_h2_001", "p_h2_002"
+            ],
             preferences: {
                 notificationMethod: "email",
                 alertSound: false,
@@ -92,166 +165,110 @@ const seedUsers = async () => {
             },
             createdAt: Timestamp.now(),
             lastLoginAt: Timestamp.now(),
-            isActive: true
-        },
-        {
-            userId: "user_admin_emily_789",
-            email: "admin@careflow.com",
-            name: "Dr. Emily Rodriguez",
-            role: "admin",
-            hospitalId: "HOSP001",
-            phone: "+15553334444",
-            assignedPatientIds: [],
-            preferences: {
-                notificationMethod: "email",
-                alertSound: false,
-                timezone: "America/New_York"
-            },
-            createdAt: Timestamp.now(),
-            lastLoginAt: Timestamp.now(),
-            isActive: true
+            isActive: true,
+            customClaims: { role: "nurse", hospitalId: "HOSP002", department: "Geriatrics" }
         }
     ];
 
     for (const user of users) {
-        // 1. Create/Update Firestore Document
-        await db.collection('users').doc(user.userId).set(user);
-        console.log(`✅ Firestore: Created user profile for ${user.name}`);
+        // 1. Ensure Firebase Auth User exists
+        await ensureAuthUser(user.email, user.userId, user.name);
 
-        // 2. Create/Update Firebase Auth User
-        try {
-            let authUser;
-            try {
-                authUser = await auth.getUserByEmail(user.email);
-                console.log(`ℹ️ Auth: User ${user.email} already exists. Updating...`);
-                await auth.updateUser(authUser.uid, {
-                    displayName: user.name,
-                    emailVerified: true,
-                });
-            } catch (e: unknown) {
-                const error = e as { code?: string };
-                if (error.code === 'auth/user-not-found') {
-                    console.log(`cw Auth: Creating new user ${user.email}...`);
-                    authUser = await auth.createUser({
-                        uid: user.userId, // Sync UID with Firestore ID
-                        email: user.email,
-                        emailVerified: true,
-                        password: 'password123',
-                        displayName: user.name,
-                        disabled: false,
-                    });
-                } else {
-                    throw e;
-                }
-            }
+        // 2. Set Custom Claims for RBAC
+        await auth.setCustomUserClaims(user.userId, user.customClaims);
 
-            // 3. Set Custom Claims (Role, HospitalId)
-            await auth.setCustomUserClaims(authUser.uid, {
-                role: user.role,
-                hospitalId: user.hospitalId,
-                department: user.department
-            });
-            console.log(`✅ Auth: Set custom claims for ${user.email}`);
-
-        } catch (error) {
-            console.error(`❌ Error managing Auth user ${user.email}:`, error);
-        }
+        // 3. Create in Firestore
+        await db.collection('users').doc(user.userId).set({
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            department: user.department,
+            hospitalId: user.hospitalId,
+            phone: user.phone,
+            assignedPatientIds: user.assignedPatientIds,
+            preferences: user.preferences,
+            createdAt: user.createdAt,
+            lastLoginAt: user.lastLoginAt,
+            isActive: user.isActive
+        });
+        console.log(`✅ Upserted Firestore profile: ${user.name}`);
     }
+    return users; // Return users to help next steps
 };
 
 const seedPatients = async () => {
     console.log('🌱 Seeding Patients...');
 
-    const patientData = {
-        patientId: "550e8400-e29b-41d4-a716-446655440000",
-        name: "Sarah Mitchell",
-        dateOfBirth: Timestamp.fromDate(new Date('1978-03-15')),
-        contact: {
-            phone: "+15551234567",
-            email: "sarah.mitchell@email.com",
-            preferredMethod: "voice"
-        },
-        dischargePlan: {
-            dischargeDate: Timestamp.fromDate(new Date('2025-11-10')),
-            diagnosis: "Post-operative cardiac surgery (CABG)",
-            dischargingPhysician: "Dr. Emily Rodriguez",
+    // HOSPITAL 1 PATIENTS
+    const patientsH1 = [
+        {
+            id: "p_h1_001",
             hospitalId: "HOSP001",
-            medications: [
-                {
-                    name: "Aspirin",
-                    dosage: "81mg",
-                    frequency: "Once daily at 8:00 AM",
-                    scheduleHour: 8,
-                    startDate: Timestamp.now()
-                },
-                {
-                    name: "Metoprolol",
-                    dosage: "50mg",
-                    frequency: "Twice daily at 8:00 AM and 8:00 PM",
-                    scheduleHour: 8,
-                    startDate: Timestamp.now()
-                }
-            ],
-            criticalSymptoms: ["chest pain", "shortness of breath", "dizziness", "irregular heartbeat"],
-            warningSymptoms: ["increased swelling", "persistent fatigue", "mild chest discomfort"]
-        },
-        riskLevel: "RED", // Set to RED to demonstrate alert
-        lastAssessmentDate: Timestamp.now(),
-        alert: {
-            isCritical: true,
-            reason: "Patient reports chest pain radiating to left arm and dizziness",
-            timestamp: Timestamp.now(),
-            assignedTo: "user_nurse_sarah_123",
-            assignedAt: Timestamp.now(),
-            status: "in_progress"
-        },
-        assignedNurse: {
-            userId: "user_nurse_sarah_123",
-            name: "Sarah Johnson, RN",
-            phone: "+15559876543",
-            email: "sarah.johnson@hospital.com"
-        },
-        aiBrief: "URGENT: Patient reports concerning cardiac symptoms consistent with post-CABG complications. Immediate assessment required.",
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-        status: "active"
-    };
+            name: "James Wilson (HOSP1)",
+            email: "james.wilson@email.com",
+            dateOfBirth: "1955-03-15",
+            contact: { phone: "+33744533386", preferredMethod: "phone" },
+            assignedNurse: { name: "Sarah Johnson, RN", email: "sarah@hosp1.com", phone: "+15559876543" },
+            dischargePlan: {
+                diagnosis: "Post-CABG",
+                dischargeDate: Timestamp.now(),
+                hospitalId: "HOSP001",
+                dischargingPhysician: "Dr. A. Carter",
+                medications: [
+                    { name: "Metoprolol", dosage: "50mg", frequency: "Twice daily", instructions: "Take with food", scheduleHour: 8, startDate: Timestamp.now() }
+                ],
+                criticalSymptoms: ["Chest pain > 5/10", "Shortness of breath at rest"],
+                warningSymptoms: ["Leg swelling", "Fatigue"]
+            },
+            nextAppointment: { date: "2025-12-10T09:00:00Z", type: "Follow-up", location: "Cardiology Center" },
+            riskLevel: "safe", // Green
+            aiBrief: "Patient stable. Incision clean.",
+            status: "active"
+        }
+    ];
 
-    await db.collection('patients').doc(patientData.patientId).set(patientData);
-    console.log(`✅ Created patient: ${patientData.name}`);
+    // HOSPITAL 2 PATIENTS (Empty for this test)
+    const patientsH2: any[] = [];
 
-    // Create an alert for this patient
-    const alertData = {
-        alertId: "alert_550e8400abc",
-        patientId: patientData.patientId,
-        patientName: patientData.name,
-        riskLevel: "RED",
-        trigger: "Chest pain radiating to left arm and dizziness",
-        aiBrief: patientData.aiBrief,
-        status: "in_progress",
-        assignedTo: {
-            userId: "user_nurse_sarah_123",
-            userName: "Sarah Johnson, RN",
-            assignedAt: Timestamp.now()
-        },
-        createdAt: Timestamp.now(),
-        resolvedAt: null,
-        resolutionNote: null,
-        patientRef: `patients/${patientData.patientId}` // Store as string path for simplicity in this seed
-    };
+    const allPatients = [...patientsH1, ...patientsH2];
 
-    await db.collection('alerts').doc(alertData.alertId).set(alertData);
-    console.log(`✅ Created alert: ${alertData.trigger}`);
+    for (const p of allPatients) {
+        await db.collection('patients').doc(p.id).set(p);
+        console.log(`✅ Upserted patient: ${p.name} (${p.hospitalId})`);
+    }
+
+    // Seed Alerts based on patients
+    console.log('🌱 Seeding Alerts...');
+    for (const p of allPatients) {
+        if (p.riskLevel === 'critical' || p.riskLevel === 'warning') {
+            const alertId = `alert_${p.id}`;
+            await db.collection('alerts').doc(alertId).set({
+                id: alertId,
+                patientId: p.id,
+                hospitalId: p.hospitalId,
+                patientName: p.name,
+                riskLevel: p.riskLevel,
+                priority: p.riskLevel, // Using new priority field
+                status: 'active',
+                aiBrief: p.aiBrief,
+                trigger: p.riskLevel === 'critical' ? "Critical Update from Daily Round" : "Routine Check-in Flag",
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+            });
+            console.log(`🚨 Upserted alert for: ${p.name}`);
+        }
+    }
 };
 
 const main = async () => {
     try {
+        await purgeCollections();
         await seedUsers();
         await seedPatients();
-        console.log('✨ Database seeding completed successfully!');
+        console.log('✨ Database seeding (Purge + Auth + Data) completed successfully.');
         process.exit(0);
     } catch (error) {
-        console.error('❌ Error seeding database:', error);
+        console.error('❌ Error Seeding Database:', error);
         process.exit(1);
     }
 };
