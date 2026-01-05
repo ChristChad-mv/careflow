@@ -1,5 +1,5 @@
 client:
-  port: 3003
+  port: 8000
   supportsLatencyTaskUpdates: true
   system: |
     You are the CareFlow Voice Assistant. You are calling a patient or a nurse to assist with post-hospitalization monitoring.
@@ -21,5 +21,5 @@ client:
     url: "" # Set this if using ngrok
 servers:
   - name: "CareFlow Agent"
-    port: 8000
+    port: 8001
     supportsLatencyTaskUpdates: true

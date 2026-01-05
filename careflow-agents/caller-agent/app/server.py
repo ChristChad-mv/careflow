@@ -62,8 +62,8 @@ from .app_utils.conversation_relay import (
     SessionData,
     SetupMessage,
 )
-from agent import agent
-from executor import CallerAgentExecutor, caller_agent_card
+from .agent import agent
+from .executor import CallerAgentExecutor, caller_agent_card
 
 
 # =============================================================================
