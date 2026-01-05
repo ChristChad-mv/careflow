@@ -9,11 +9,13 @@ This project is organized as follows:
 ```
 caller-agent/
 ├── app/                 # Core application code
-│   ├── agent.py         # Main agent logic
-│   ├── fast_api_app.py  # FastAPI Backend server
+│   ├── agent.py         # LangGraph agent with Twilio integration
+│   ├── server.py        # FastAPI server (A2A + WebSocket + TwiML)
+│   ├── executor/        # A2A protocol executor implementation
+│   ├── prompts/         # System prompts for the agent
 │   └── app_utils/       # App utilities and helpers
-│       ├── executor/    # A2A protocol executor implementation
-│       └── converters/  # Message converters for A2A protocol
+│       ├── config.py    # Configuration management
+│       └── llm.py       # LLM model setup
 ├── .cloudbuild/         # CI/CD pipeline configurations for Google Cloud Build
 ├── deployment/          # Infrastructure and deployment scripts
 ├── notebooks/           # Jupyter notebooks for prototyping and evaluation
@@ -36,14 +38,14 @@ To run the full server (handles Twilio Voice calls AND A2A requests):
     cd careflow-agent/careflow-pulse-caller
     ```
 
-2.  Run the voice server:
+2.  Run the server:
     ```bash
-    PYTHONPATH=. python3 voice.py --port 8080
+    uv run python app/server.py
     ```
-    The server will start on port **8080**.
+    The server will start on port **8000** (configured in `.env`).
 
     *   **Twilio Webhook**: Configure your Twilio number to point to `https://<your-url>/twiml`.
-    *   **A2A Endpoint**: The agent is discoverable at `http://localhost:8080/.well-known/agent.json`.
+    *   **A2A Endpoint**: The agent is discoverable at `http://localhost:8000/.well-known/agent.json`.
 
 ## Running as a Client (Chat Console)
 
