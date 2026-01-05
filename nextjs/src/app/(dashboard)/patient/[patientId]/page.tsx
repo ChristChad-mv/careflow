@@ -5,8 +5,9 @@ import { Phone, Calendar, Pill, User, MapPin, Stethoscope, Mail, AlertTriangle }
 import { getPatient } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { EditMedicationDialog } from "@/components/patient/EditMedicationDialog";
+
 import { EditAppointmentDialog } from "@/components/patient/EditAppointmentDialog";
+import { EditMedicationDialog } from "@/components/alerts/EditMedicationDialog";
 
 export default async function PatientProfile({ params }: { params: Promise<{ patientId: string }> }) {
   const { patientId } = await params;
