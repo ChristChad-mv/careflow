@@ -45,7 +45,7 @@ from a2a.types import AgentCard
 from .app_utils.config import NGROK_URL
 from .app_utils.conversation_relay import SessionData
 from .app_utils.llm import ModelConfig, get_model
-from .prompts import CALLER_SYSTEM_PROMPT
+from .app_utils.prompts.system_prompts import CALLER_SYSTEM_PROMPT
 
 import logging
 

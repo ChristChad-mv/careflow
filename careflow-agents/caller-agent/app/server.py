@@ -63,7 +63,7 @@ from .app_utils.conversation_relay import (
     SetupMessage,
 )
 from .agent import agent
-from .executor import CallerAgentExecutor, caller_agent_card
+from .app_utils.executor.caller_executor import CallerAgentExecutor, caller_agent_card
 
 
 # =============================================================================
@@ -106,13 +106,12 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-# Parse CLI arguments
-args = parse_arguments()
-server_port = args.port or int(PORT)
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
 
-# Set environment variable for latency task updates support
-if args.supportsLatencyTaskUpdates:
-    os.environ['SUPPORTS_LATENCY_TASK_UPDATES'] = 'true'
+# Default port from environment
+server_port = int(PORT)
 
 
 # =============================================================================
@@ -641,4 +640,12 @@ def start_server() -> None:
 
 
 if __name__ == "__main__":
+    # Parse CLI arguments only when running directly
+    args = parse_arguments()
+    server_port = args.port or server_port
+    
+    # Set environment variable for latency task updates support
+    if args.supportsLatencyTaskUpdates:
+        os.environ['SUPPORTS_LATENCY_TASK_UPDATES'] = 'true'
+    
     start_server()

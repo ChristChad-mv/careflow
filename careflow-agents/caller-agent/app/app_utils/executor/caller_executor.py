@@ -40,8 +40,8 @@ from a2a.types import (
     TextPart,
 )
 
-from ..agent import CallerAgent
-from ..app_utils.conversation_relay import ConversationMessage, SessionData
+from ...agent import CallerAgent
+from ..conversation_relay import ConversationMessage, SessionData
 
 
 logger = logging.getLogger(__name__)
