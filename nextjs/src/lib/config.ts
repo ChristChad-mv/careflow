@@ -2,21 +2,18 @@
  * Environment Configuration
  * 
  * Centralized configuration management with validation and type safety.
- * This ensures all environment variables are validated at startup.
+ * All environment variables are validated at startup.
  */
 
 import { z } from 'zod';
 
-// Define the schema for environment variables
+// Environment variable schema with strict validation
 const envSchema = z.object({
-  // Node environment
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 
-  // Public app configuration
+  // Public configuration
   NEXT_PUBLIC_APP_URL: z.string().url().default('http://localhost:3000'),
   NEXT_PUBLIC_APP_NAME: z.string().default('CareFlow Pulse'),
-
-  // API configuration
   NEXT_PUBLIC_API_URL: z.string().url().optional(),
 
   // Feature flags
@@ -24,7 +21,7 @@ const envSchema = z.object({
   NEXT_PUBLIC_ENABLE_SMS_ALERTS: z.string().transform(val => val === 'true').default('false'),
   NEXT_PUBLIC_ENABLE_AUDIT_LOGS: z.string().transform(val => val === 'true').default('true'),
 
-  // Google Cloud (optional for development)
+  // Google Cloud (optional for development, required for production)
   GOOGLE_CLOUD_PROJECT: z.string().optional(),
   GOOGLE_CLOUD_LOCATION: z.string().optional(),
   REASONING_ENGINE_ID: z.string().optional(),
@@ -95,9 +92,3 @@ export const config = {
   isProduction: env.NODE_ENV === 'production',
   isTest: env.NODE_ENV === 'test',
 } as const;
-
-// Validate environment on module load
-if (typeof window === 'undefined') {
-  // Server-side only - log configuration status
-
-}
