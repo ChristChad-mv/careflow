@@ -14,6 +14,6 @@ const firebaseConfig = {
 // Initialize Firebase (Singleton pattern)
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db = getFirestore(app, 'careflow-db');
 
 export { app, auth, db };
