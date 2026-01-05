@@ -56,7 +56,7 @@ export function AppSidebar({ alertCount = 0 }: { alertCount?: number }) {
                       className="flex items-center gap-3 px-6 py-3 hover:bg-white/5 transition-all duration-200 group"
                       activeClassName="bg-primary/10 text-primary font-semibold border-l-4 border-primary"
                     >
-                      <item.icon className="h-5 w-5 flex-shrink-0 group-hover:text-primary transition-colors" />
+                      <item.icon className="h-5 w-5 shrink-0 group-hover:text-primary transition-colors" />
                       {!isCollapsed && (
                         <span className="flex-1">{item.title}</span>
                       )}
