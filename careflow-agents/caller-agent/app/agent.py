@@ -37,8 +37,8 @@ from langchain_core.messages import (
     SystemMessage,
 )
 from langchain_core.tools import tool
+from langchain.agents import create_agent
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel, Field
 
 from a2a.types import AgentCard
@@ -254,7 +254,7 @@ class CallerAgent:
         self.ws: Optional[WebSocket] = None
         
         # Build the ReAct agent with tools
-        self.agent = create_react_agent(
+        self.agent = create_agent(
             model=self.model,
             tools=self._get_a2a_tools() + [call_patient],
             checkpointer=self.memory
