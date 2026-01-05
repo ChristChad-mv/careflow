@@ -15,6 +15,14 @@ export const metadata: Metadata = {
   title: "CareFlow Pulse - Post-Hospitalization Monitor",
   description: "Professional healthcare monitoring system for post-hospitalization patient follow-up and critical alert management",
   authors: [{ name: "CareFlow Medical Systems" }],
+  icons: {
+    icon: [
+      { url: '/icon.tsx', type: 'image/png', sizes: '32x32' },
+    ],
+    apple: [
+      { url: '/apple-icon.tsx', type: 'image/png', sizes: '180x180' },
+    ],
+  },
 };
 
 export default function RootLayout({
@@ -23,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${fontSans.className} font-sans antialiased`}>
         <Providers>
           <TooltipProvider>
