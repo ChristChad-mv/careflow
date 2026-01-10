@@ -37,6 +37,7 @@ CareFlow Pulse is designed to be HIPAA compliant by leveraging Google Cloud Plat
 
 - **Component:** Google Model Armor.
 - **Function:** Real-time sanitation of Inputs (Prompts) and Outputs (Model Responses).
+- **Policy: Fail-Closed Security.** The system is configured to block interactions if the Model Armor API is unavailable or returns an error, ensuring zero exposure to unvetted content.
 - **Protection 1 (Input/Attack Surface):** Analyzes incoming prompts to block **Prompt Injection**, **Jailbreak attempts**, and **Adversarial inputs** designed to bypass safety filters or manipulate the clinical persona.
 - **Protection 2 (Output/Data Leakage):** Applies a secondary **PHI/PII Sanitization** layer (DLP) on all model responses. This ensures that even if the model attempts to hallucinate or leak sensitive data (like MRNs, names, or unmasked history), the output is blocked or redacted before reaching the user.
 - **Protection 3 (Safety):** Filters for Toxic content, Hate speech, and other harmful categories to ensure professional clinical interaction.
