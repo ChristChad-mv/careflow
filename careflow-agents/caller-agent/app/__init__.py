@@ -13,7 +13,8 @@
 # limitations under the License.
 
 from .agent import agent, CallerAgent, call_patient
-from .app_utils.executor.caller_executor import CallerAgentExecutor, caller_agent_card
+from .app_utils.executor.caller_executor import CallerAgentExecutor
+from .schemas.agent_card.v1.caller_card import caller_card as caller_agent_card
 from .app_utils.prompts.system_prompts import CALLER_SYSTEM_PROMPT
 
 __all__ = [
@@ -22,5 +23,5 @@ __all__ = [
     "call_patient",
     "CallerAgentExecutor",
     "caller_agent_card",
-    "CALLER_SYSTEM_PROMPT",
+    "CALLER_SYSTEM_PROMPT", 
 ]
