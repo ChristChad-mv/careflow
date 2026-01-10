@@ -1,73 +1,43 @@
-# Copyright 2025 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-import logging
 import os
+"""
+Telemetry Configuration
+OpenTelemetry and Traceloop instrumentation setup.
+"""
+import logging
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.starlette import StarletteInstrumentor
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-import google.auth
-from google.adk.cli.adk_web_server import _setup_instrumentation_lib_if_installed
-from google.adk.telemetry.google_cloud import get_gcp_exporters, get_gcp_resource
-from google.adk.telemetry.setup import maybe_set_otel_providers
+from .config_loader import OTLP_ENDPOINT, DEPLOYMENT_ENV
 
+logger = logging.getLogger(__name__)
 
-def setup_telemetry() -> str | None:
-    """Configure OpenTelemetry and GenAI telemetry with GCS upload."""
+def setup_telemetry(app, service_name: str, service_version: str = "1.0.0"):
+    """
+    Configures OpenTelemetry and Jaeger for the application.
+    """
+    logger.info(f"Configuring Telemetry for {service_name} (OTLP Endpoint: {OTLP_ENDPOINT})")
+    
+    resource = Resource(attributes={
+        "service.name": service_name,
+        "service.version": service_version,
+        "deployment.environment": DEPLOYMENT_ENV
+    })
+    
+    # Create and register TracerProvider
+    tracer_provider = TracerProvider(resource=resource)
+    trace.set_tracer_provider(tracer_provider)
+    
+    # Configure Jaeger Exporter (OTLP gRPC)
+    try:
+        otlp_exporter = OTLPSpanExporter(endpoint=OTLP_ENDPOINT, insecure=True)
+        tracer_provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
+        logger.info(f"Telemetry enabled. Exporting to {OTLP_ENDPOINT}")
+    except Exception as e:
+        logger.error(f"Failed to initialize OTLP exporter: {e}")
 
-    bucket = os.environ.get("LOGS_BUCKET_NAME")
-    capture_content = os.environ.get(
-        "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "false"
-    )
-    if bucket and capture_content != "false":
-        logging.info(
-            "Prompt-response logging enabled - mode: NO_CONTENT (metadata only, no prompts/responses)"
-        )
-        os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "NO_CONTENT"
-        os.environ.setdefault("OTEL_INSTRUMENTATION_GENAI_UPLOAD_FORMAT", "jsonl")
-        os.environ.setdefault("OTEL_INSTRUMENTATION_GENAI_COMPLETION_HOOK", "upload")
-        os.environ.setdefault(
-            "OTEL_SEMCONV_STABILITY_OPT_IN", "gen_ai_latest_experimental"
-        )
-        commit_sha = os.environ.get("COMMIT_SHA", "dev")
-        os.environ.setdefault(
-            "OTEL_RESOURCE_ATTRIBUTES",
-            f"service.namespace=careflow-agent,service.version={commit_sha}",
-        )
-        path = os.environ.get("GENAI_TELEMETRY_PATH", "completions")
-        os.environ.setdefault(
-            "OTEL_INSTRUMENTATION_GENAI_UPLOAD_BASE_PATH",
-            f"gs://{bucket}/{path}",
-        )
-    else:
-        logging.info(
-            "Prompt-response logging disabled (set LOGS_BUCKET_NAME=gs://your-bucket and OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=NO_CONTENT to enable)"
-        )
-
-    # Set up OpenTelemetry exporters for Cloud Trace and Cloud Logging
-    credentials, project_id = google.auth.default()
-    otel_hooks = get_gcp_exporters(
-        enable_cloud_tracing=True,
-        enable_cloud_metrics=False,
-        enable_cloud_logging=True,
-        google_auth=(credentials, project_id),
-    )
-    otel_resource = get_gcp_resource(project_id)
-    maybe_set_otel_providers(
-        otel_hooks_to_setup=[otel_hooks],
-        otel_resource=otel_resource,
-    )
-
-    # Set up GenAI SDK instrumentation
-    _setup_instrumentation_lib_if_installed()
-
-    return bucket
+    # Instrument the Starlette app
+    StarletteInstrumentor().instrument_app(app)
