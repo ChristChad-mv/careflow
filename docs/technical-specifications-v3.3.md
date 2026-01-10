@@ -1,15 +1,16 @@
-# **CareFlow Pulse: Technical Specifications (v3.2)**
+# **CareFlow Pulse: Technical Specifications (v3.3)**
 
 | | |
 | :--- | :--- |
-| **Document Version:** | 3.2 |
-| **Date:** | 2026-01-02 |
+| **Document Version:** | 3.3 |
+| **Date:** | 2026-01-10 |
 | **Status:** | **Current** |
 | **Author:** | Christ |
 
 ---
 
 ## **Revision History**
+
 | Version | Date | Author | Changes |
 | :--- | :--- | :--- | :--- |
 | 1.0 | 2025-12-20 | Christ | Initial Draft - Basic architecture overview |
@@ -17,166 +18,107 @@
 | 3.0 | 2025-12-26 | Christ | Major architecture update: Dual-agent system (CareFlow Pulse + Caller), MCP protocol integration, A2A inter-agent communication, Twilio ConversationRelay, Cloud Run deployment |
 | 3.1 | 2025-12-26 | Christ | Major architecture update: Dual-agent system (CareFlow Pulse + Caller), MCP protocol integration, A2A inter-agent communication, Twilio ConversationRelay, Cloud Run deployment (v2) |
 | 3.2 | 2026-01-02 | Christ | Cloud Scheduler Infrastructure as Code: Terraform configuration with multi-environment deployment (staging/prod), OIDC authentication, automated retry logic, comprehensive monitoring setup |
+| 3.3 | 2026-01-10 | Christ | Advanced AI Security: Integrated Google Model Armor (v0.3.0) with Fail-Closed architecture, synchronized regional endpoints across dual-agent system, and established comprehensive Security & Compliance specs. |
 
 ---
 
 ## **Table of Contents**
 
-### **1. Introduction**
-   - 1.1. Purpose of this Document
-   - 1.2. Intended Audience
-   - 1.3. Document Scope
-   - 1.4. References & Dependencies
+### 1. Introduction
+- 1.1. Purpose of this Document
+- 1.2. Intended Audience
+- 1.3. Document Scope
+- 1.4. References & Dependencies
 
-### **2. System Architecture Overview**
-   - 2.1. High-Level Architecture Diagram
-   - 2.2. Technology Stack
-   - 2.3. Component Interaction Flow
-   - 2.4. Deployment Architecture
+### 2. System Architecture Overview
+- 2.1. High-Level Architecture Diagram
+- 2.2. Technology Stack
+- 2.3. Component Interaction Flow
+- 2.4. Deployment Architecture
 
-### **3. Database Design (Firestore)**
-   - 3.1. Overview & Design Principles
-   - 3.2. Collection: `/patients`
-   - 3.3. Sub-Collection: `/patients/{patientId}/interactions`
-   - 3.4. Sub-Collection: `/patients/{patientId}/medicationLog`
-   - 3.5. Collection: `/alerts`
-   - 3.6. Collection: `/users`
-   - 3.7. Indexes & Query Optimization
-   - 3.8. Security Rules
-   - 3.9. Data Migration & Seeding
+### 3. Database Design (Firestore)
+- 3.1. Overview & Design Principles
+- 3.2. Collection: `/patients`
+- 3.3. Sub-Collection: `/patients/{patientId}/interactions`
+- 3.4. Sub-Collection: `/patients/{patientId}/medicationLog`
+- 3.5. Collection: `/alerts`
+- 3.6. Collection: `/users`
+- 3.7. Indexes & Query Optimization
+- 3.8. Security Rules
+- 3.9. Data Migration & Seeding
 
-### **4. Backend: Dual-Agent AI System**
-   - 4.1. Architecture Overview: Two Specialized Agents
-   - 4.2. CareFlow Pulse Agent (Medical Intelligence)
-      - 4.2.1. Google ADK Implementation
-      - 4.2.2. MCP Protocol Integration
-      - 4.2.3. Firestore Tools (6 MCP Tools)
-      - 4.2.4. A2A Server Configuration
-   - 4.3. CareFlow Caller Agent (Voice Interface)
-      - 4.3.1. LangGraph REACT Architecture
-      - 4.3.2. Twilio ConversationRelay Integration
-      - 4.3.3. ElevenLabs TTS Configuration
-      - 4.3.4. A2A Client for Medical Agent Delegation
-   - 4.4. MCP (Model Context Protocol)
-      - 4.4.1. Toolbox Executable Setup
-      - 4.4.2. Firestore Connection Configuration
-      - 4.4.3. Available MCP Tools
-   - 4.5. A2A (Agent-to-Agent Protocol)
-      - 4.5.1. Protocol Overview (JSON-RPC + SSE)
-      - 4.5.2. AgentCard Definition
-      - 4.5.3. Inter-Agent Communication Flow
-   - 4.6. Prompt Engineering Strategy
-   - 4.7. Error Handling & Fallback Logic
+### 4. Backend: AI Agent System (Google ADK)
+- 4.1. Agent Architecture Overview
+- 4.2. Pulse Agent (Orchestrator & Intelligence)
+- 4.3. Caller Agent (Voice & Messaging Interface)
+- 4.4. Clinical Reasoning: Triage & Analysis
+- 4.5. Clinical Reasoning: Medical Synthesis
+- 4.6. ADK Tools & Integrations
+- 4.7. Prompt Engineering Strategy
+- 4.8. Error Handling & Fallback Logic
 
-### **5. Backend: API Endpoints**
-   - 5.1. Endpoint Overview
-   - 5.2. `POST /api/careflow/trigger-scheduled-calls`
-   - 5.3. `POST /api/careflow/twilio-sms`
-   - 5.4. `POST /api/careflow/voice-alert`
-   - 5.5. Authentication & Authorization
-   - 5.6. Rate Limiting & Security
+### 5. Backend: API Endpoints
+- 5.1. Endpoint Overview
+- 5.2. `POST /api/careflow/trigger-scheduled-calls`
+- 5.3. `POST /api/careflow/twilio-sms`
+- 5.4. `POST /api/careflow/voice-alert`
+- 5.5. Authentication & Authorization
+- 5.6. Rate Limiting & Security
 
-### **6. External Integrations**
-   - 6.1. Twilio ConversationRelay (Voice AI)
-      - 6.1.1. WebSocket Connection Setup
-      - 6.1.2. Real-Time Voice Streaming
-      - 6.1.3. Webhook Configuration
-      - 6.1.4. TwiML Endpoint Implementation
-   - 6.2. ElevenLabs (Text-to-Speech)
-      - 6.2.1. Voice Selection & Configuration
-      - 6.2.2. Integration with ConversationRelay
-      - 6.2.3. Latency Optimization
-   - 6.3. Twilio SMS
-      - 6.3.1. SMS Messaging Flow
-      - 6.3.2. Patient Response Handling
-   - 6.4. Google Cloud Run
-      - 6.4.1. Deployment Configuration (2 Services)
-      - 6.4.2. Environment Variables Setup
-      - 6.4.3. Service Communication
-      - 6.4.4. Scaling & Performance
+### 6. External Integrations
+- 6.1. Twilio ConversationRelay
+- 6.2. ElevenLabs TTS
+- 6.3. Google Cloud Platform (GCP)
 
-### **7. Frontend: Next.js Application**
-   - 7.1. Application Structure
-   - 7.2. Authentication System (NextAuth)
-      - 7.2.1. User Roles & Permissions
-      - 7.2.2. Session Management
-      - 7.2.3. Protected Routes
-   - 7.3. Dashboard Pages
-      - 7.3.1. `/dashboard` - Overview
-      - 7.3.2. `/patients` - Patient List
-      - 7.3.3. `/patient/{patientId}` - Patient Detail
-      - 7.3.4. `/alerts` - Alert Management
-      - 7.3.5. `/config` - System Configuration
-   - 7.4. Real-Time Data Synchronization
-   - 7.5. State Management Strategy
-   - 7.6. UI Component Library (shadcn/ui)
+### 7. Frontend: Next.js Application
+- 7.1. Technology Stack
+- 7.2. Architecture Principles
 
-### **8. Data Flow & User Journeys**
-   - 8.1. Scheduled Patient Follow-Up (Green Path)
-   - 8.2. Critical Alert Generation (Red Path)
-   - 8.3. Nurse Alert Response Workflow
-   - 8.4. Patient SMS Reply Flow
-   - 8.5. Medication Adherence Tracking
+### 8. Data Flow & User Journeys
+- 8.1. Journey: Automated Morning Rounds
+- 8.2. Journey: Critical Symptom Triage
 
-### **9. Security & Compliance**
-   - 9.1. Data Encryption
-   - 9.2. Authentication & Authorization
-   - 9.3. HIPAA Compliance Considerations
-   - 9.4. Audit Logging
-   - 9.5. Data Retention & Deletion Policies
+### 9. Security & Compliance
+- 9.1. Data Encryption & Integrity
+- 9.2. Multi-Tenant Isolation
+- 9.3. AI Safety & Model Armor
+- 9.4. HIPAA Compliance Considerations
+- 9.5. Audit Logging
+- 9.6. Reference Documentation
 
-### **10. Configuration & Environment Variables**
-   - 10.1. Backend Environment Variables
-   - 10.2. Frontend Environment Variables
-   - 10.3. Twilio Configuration
-   - 10.4. Google Cloud Configuration
+### 10. Configuration & Environment Variables
+- 10.1. Backend Environment Variables (The Fleet)
 
-### **11. Deployment Guide**
-   - **11.1. Backend Deployment (Dual-Agent System)**
-     - CareFlow Pulse Agent (Orchestrator)
-     - CareFlow Caller Agent (Voice Interface)
-   - **11.2. Cloud Scheduler Deployment (Terraform)**
-     - Infrastructure as Code
-     - Multi-Environment Strategy (Staging + Prod)
-     - OIDC Authentication & IAM
-   - **11.3. Frontend Deployment (Vercel)**
-   - **11.4. Database Setup (Firestore)**
-   - **11.5. MCP Toolbox Setup**
-   - **11.6. CI/CD Pipeline**
-   - **11.7. Monitoring & Logging**
+### 11. Deployment Guide
+- 11.2. Infrastructure as Code (Terraform)
+- 11.2. Cloud Scheduler Deployment (Terraform)
+- 11.3. Frontend Deployment (Vercel)
 
-### **12. Testing Strategy**
-   - 12.1. Unit Testing
-   - 12.2. Integration Testing
-   - 12.3. End-to-End Testing
-   - 12.4. Load Testing
-   - 12.5. Test Data & Mocking
+### 12. Testing Strategy
+- 12.1. Agent Evaluation (`adk eval`)
+- 12.2. Automated Unit & Integration Tests
+- 12.3. Manual Voice Testing
 
-### **13. Performance Optimization**
-   - 13.1. Database Query Optimization
-   - 13.2. Frontend Performance
-   - 13.3. API Response Times
-   - 13.4. Caching Strategy
+### 13. Performance Optimization
+- 13.1. Voice Latency Hierarchy
+- 13.2. Database Performance
 
-### **14. Error Handling & Monitoring**
-   - 14.1. Error Classification
-   - 14.2. Logging Strategy
-   - 14.3. Alerting & Notifications
-   - 14.4. Debugging Tools
+### 14. Error Handling & Monitoring
+- 14.1. Clinical Safety Handover
+- 14.2. Operational Monitoring
 
-### **15. Future Enhancements & Roadmap**
-   - 15.1. EHR Integration
-   - 15.2. Patient Mobile App
-   - 15.3. Advanced Analytics Dashboard
-   - 15.4. Multi-Language Support
-   - 15.5. Predictive ML Models
+### 15. Future Enhancements & Roadmap
+- 15.1. Vision-Based Adherence (v3.5)
+- 15.2. EHR Integration (v4.0)
+- 15.3. Multi-Language Support
 
 ### **Appendices**
-   - **Appendix A:** API Request/Response Examples
-   - **Appendix B:** Database Schema Diagrams
-   - **Appendix C:** Firestore Security Rules (Complete)
-   - **Appendix D:** Environment Variable Reference
-   - **Appendix E:** Glossary of Terms
+
+- **Appendix A:** API Request/Response Examples
+- **Appendix B:** Database Schema Diagrams
+- **Appendix C:** Firestore Security Rules (Complete)
+- **Appendix D:** Environment Variable Reference
+- **Appendix E:** Glossary of Terms
 
 ---
 
@@ -188,7 +130,7 @@ This Technical Specification document provides a comprehensive, implementation-r
 
 - **Complete database schema** with field-level specifications
 - **Detailed API endpoint definitions** with request/response formats
-- **Integration specifications** for third-party services (Twilio, Deepgram, Google Cloud)
+- **Integration specifications** for third-party services (Twilio, ElevenLabs, Google Cloud)
 - **Architecture diagrams** showing component interactions
 - **Security and compliance guidelines** for healthcare data handling
 - **Deployment procedures** for production environments
@@ -211,6 +153,7 @@ This document is written for technical stakeholders involved in the development,
 | **Project Managers** | Sections 1-2, 15: Overview, architecture, and future roadmap for planning and stakeholder communication |
 
 **Prerequisites:** Readers should have familiarity with:
+
 - Modern web development (TypeScript, React, Next.js)
 - Python backend development
 - Cloud platforms (Google Cloud Platform)
@@ -227,45 +170,52 @@ This document is written for technical stakeholders involved in the development,
 This technical specification covers the complete end-to-end implementation of CareFlow Pulse v1.0, including:
 
 ✅ **Database Architecture**
-   - Complete Firestore collection and sub-collection schemas
-   - Field definitions with types, constraints, and validation rules
-   - Index strategies for query optimization
-   - Security rules for data access control
+
+- Complete Firestore collection and sub-collection schemas
+- Field definitions with types, constraints, and validation rules
+- Index strategies for query optimization
+- Security rules for data access control
 
 ✅ **Backend AI Agent System**
-   - Multi-agent architecture using Google ADK (Agent Development Kit)
-   - Agent roles, responsibilities, and interaction patterns
-   - Prompt engineering strategies for healthcare context
-   - Integration with Vertex AI Agent Engine
+
+- Multi-agent architecture using Google ADK (Agent Development Kit)
+- Agent roles, responsibilities, and interaction patterns
+- Prompt engineering strategies for healthcare context
+- Integration with Vertex AI Agent Engine
 
 ✅ **API Layer**
-   - All REST endpoints exposed by the backend
-   - Webhook endpoints for external service callbacks
-   - Authentication and authorization mechanisms
-   - Request/response schemas and error handling
+
+- All REST endpoints exposed by the backend
+- Webhook endpoints for external service callbacks
+- Authentication and authorization mechanisms
+- Request/response schemas and error handling
 
 ✅ **External Service Integrations**
-   - Twilio for voice calls and SMS messaging
-   - Deepgram for AI-powered voice conversations
-   - Google Cloud Scheduler for time-based triggers
-   - Configuration and webhook setup for each service
+
+- Twilio for voice calls and SMS messaging
+- Twilio ConversationRelay + ElevenLabs for AI-powered voice conversations
+- Google Cloud Scheduler for time-based triggers
+- Configuration and webhook setup for each service
 
 ✅ **Frontend Application**
-   - Next.js 16 application structure with App Router
-   - NextAuth authentication with role-based access control
-   - Real-time dashboard with Firestore listeners
-   - UI components and page-level specifications
+
+- Next.js 16 application structure with App Router
+- NextAuth authentication with role-based access control
+- Real-time dashboard with Firestore listeners
+- UI components and page-level specifications
 
 ✅ **Security & Compliance**
-   - Data encryption (at rest and in transit)
-   - Healthcare data handling best practices
-   - HIPAA compliance considerations
-   - Audit logging requirements
+
+- Data encryption (at rest and in transit)
+- Healthcare data handling best practices
+- HIPAA compliance considerations
+- Audit logging requirements
 
 ✅ **Deployment & Operations**
-   - Environment configuration for dev, staging, and production
-   - Deployment procedures for all components
-   - Monitoring, logging, and alerting strategies
+
+- Environment configuration for dev, staging, and production
+- Deployment procedures for all components
+- Monitoring, logging, and alerting strategies
 
 #### **Out of Scope (Future Versions):**
 
@@ -320,8 +270,9 @@ The following external resources are referenced throughout this document:
 #### **Technology Stack Dependencies**
 
 **Backend:**
+
 - Python 3.10-3.12
-- google-adk >= 1.6.1 (CareFlow Pulse Agent)
+- google-adk >= 1.16.0 (CareFlow Pulse Agent)
 - langgraph (CareFlow Caller Agent)
 - langchain-google-genai >= 2.0.7
 - a2a-sdk (Agent-to-Agent communication)
@@ -330,8 +281,9 @@ The following external resources are referenced throughout this document:
 - Deployed on Google Cloud Run (2 separate services)
 
 **Frontend:**
+
 - Node.js 18+ / npm or bun
-- Next.js 16.0.3
+- Next.js 16.0.9
 - React 19.2.0
 - NextAuth 5.0.0-beta.30
 - TypeScript 5.8.3
@@ -340,9 +292,11 @@ The following external resources are referenced throughout this document:
 - Deployed on Vercel
 
 **Database:**
+
 - Google Cloud Firestore (NoSQL document database)
 
 **External Services:**
+
 - Twilio ConversationRelay (Real-time voice streaming)
 - Twilio SMS (Text messaging)
 - ElevenLabs (Text-to-speech synthesis)
@@ -473,7 +427,7 @@ Cloud Scheduler (Daily) --> [Dispatcher Function] --> Loops Active Hospitals -->
 
 | Component | Technology | Version | Purpose |
 | :--- | :--- | :--- | :--- |
-| **Framework** | Next.js | 16.0.3 | React-based full-stack framework with App Router |
+| **Framework** | Next.js | 16.0.9 | React-based full-stack framework with App Router |
 | **Language** | TypeScript | 5.8.3 | Type-safe JavaScript for reliability |
 | **UI Library** | React | 19.2.0 | Component-based UI rendering |
 | **Authentication** | NextAuth | 5.0.0-beta.30 | Healthcare staff authentication with role-based access |
@@ -491,7 +445,7 @@ Cloud Scheduler (Daily) --> [Dispatcher Function] --> Loops Active Hospitals -->
 
 | Component | Technology | Version | Purpose |
 | :--- | :--- | :--- | :--- |
-| **CareFlow Pulse Agent** | Google ADK | 1.6.1+ | Medical reasoning agent with MCP toolbox integration |
+| **CareFlow Pulse Agent** | Google ADK | 1.16.0+ | Medical reasoning agent with MCP toolbox integration |
 | **CareFlow Caller Agent** | LangGraph | Latest | Voice interface agent with REACT architecture |
 | **Language** | Python | 3.10-3.12 | Backend logic for both agents |
 | **AI Model** | Gemini 3 Flash (Preview) | Latest | Fast, intelligent LLM for medical triage and conversation |
@@ -561,15 +515,17 @@ This section describes the typical request flow through the system for key scena
    │   │
    │   ├─→ Generate Dynamic Prompt (patient context + safety rules)
    │   │
-   │   └─→ Twilio Voice API: Initiate call
-   │       │
-   │       └─→ Connect to Deepgram for conversation
-   │
+   │    ├─→ Twilio Voice API: Initiate call
+    │       │
+    │       └─→ Connect to Twilio ConversationRelay for streaming
+    │           │
+    │           └─→ ElevenLabs for real-time TTS synthesis
+    │
 4. Patient answers, conversation happens
-   │
-5. Deepgram sends webhook with transcript
-   │
-   ├─→ POST /api/careflow/voice-alert
+    │
+5. Twilio CR sends WebSocket events/final transcript
+    │
+    ├─→ POST /api/careflow/voice-alert
    │
 6. CareFlow-Analyze Agent
    │
@@ -713,14 +669,14 @@ CareFlow Pulse is deployed across multiple Google Cloud and Vercel environments.
     ┌──────────────────────────────────────────────────────────┐
     │              EXTERNAL SERVICES (Third-Party)              │
     │                                                            │
-    │  ┌──────────────────┐         ┌──────────────────┐       │
-    │  │  Twilio          │         │  Deepgram        │       │
-    │  │  • Voice calls   │         │  • STT/TTS       │       │
-    │  │  • SMS gateway   │         │  • Conversation  │       │
-    │  │  • Webhooks      │         │  • Barge-in      │       │
-    │  └──────────────────┘         └──────────────────┘       │
+      ┌──────────────────┐         ┌──────────────────┐
+    │  Twilio          │         │  ElevenLabs      │
+    │  • Voice calls   │         │  • TTS synthesis │
+    │  • SMS gateway   │         │  • Ultra-low     │
+    │  • Conv. Relay   │         │    latency       │
+    └──────────────────┘         └──────────────────┘
+       │
     └────────────────────────────────────────────────────────────┘
-```
 
 **Environment Separation:**
 
@@ -731,6 +687,7 @@ CareFlow Pulse is deployed across multiple Google Cloud and Vercel environments.
 | **Production** | Live system serving real patients | Production GCP project, production Twilio numbers, strict security |
 
 **Deployment Process:**
+
 1. **Frontend**: Git push to `main` → Automatic Vercel deployment
 2. **Backend**: `make deploy` → ADK packages and deploys to Vertex AI Agent Engine
 3. **Database**: Firestore rules deployed via Firebase CLI or console
@@ -757,13 +714,14 @@ CareFlow Pulse uses **Google Cloud Firestore** as its primary database. Firestor
 3. **Denormalization for Performance**: Active alerts are duplicated in a separate `/alerts` collection for fast dashboard queries
 4. **Timestamp Everything**: All documents include `createdAt` and `updatedAt` timestamps for audit trails
 5. **Indexed Fields**: Fields used in queries (e.g., `riskLevel`, `status`, `scheduleHour`) are indexed for performance
-7. **Multi-Tenancy (Logical Isolation)**: Every top-level document (`/patients`, `/alerts`, `/users`) MUST ideally contain a `hospitalId` field. Queries are strictly scoped by this field to ensure data isolation.
+6. **Multi-Tenancy (Logical Isolation)**: Every top-level document (`/patients`, `/alerts`, `/users`) MUST ideally contain a `hospitalId` field. Queries are strictly scoped by this field to ensure data isolation.
    - **Agent Enforcement**: Agents are deployed with `HOSPITAL_ID` env var and refuse to query data without this filter.
    - **Frontend Enforcement**: UI components filter data based on the logged-in user's `hospitalId`.
 
 #### **Database Structure Overview**
 
 ```
+
 Firestore Root
 │
 ├── /patients/{patientId}                    [Main patient records]
@@ -773,6 +731,7 @@ Firestore Root
 ├── /alerts/{alertId}                        [Active alerts for dashboard]
 │
 └── /users/{userId}                          [Healthcare staff accounts]
+
 ```
 
 ---
@@ -797,7 +756,7 @@ Firestore Root
 | `lastAssessmentDate` | `Timestamp` | ✅ | When risk was last evaluated | `Timestamp(2025-11-15 08:20)` | Updated after each interaction |
 | `alert` | `Map` or `null` | ⚠️ | Active alert object (null if no alert) | See below | Only present for ORANGE/RED patients |
 | `assignedNurse` | `Map` | ✅ | Primary nurse coordinator | See below | For handover and notifications |
-| `aiBrief` | `string` | ❌ | Latest AI-generated summary | `"Patient stable, no concerns"` | Generated by CareFlow-Brief agent |
+| `aiBrief` | `string` | ❌ | Latest AI-generated summary | `"Patient stable, no concerns"` | Generated by Pulse Agent during post-call analysis |
 | `createdAt` | `Timestamp` | ✅ | Record creation timestamp | `Timestamp(2025-11-10 14:30)` | Immutable |
 | `updatedAt` | `Timestamp` | ✅ | Last modification timestamp | `Timestamp(2025-11-15 08:20)` | Auto-updated on changes |
 | `status` | `string` | ✅ | Patient monitoring status | `"active"` | Enum: `active`, `completed`, `transferred` |
@@ -840,6 +799,7 @@ dischargePlan: {
 ```
 
 **💡 Design Note:** The `scheduleHour` field (8, 12, or 20) allows efficient Firestore queries:
+
 ```javascript
 // Query patients who need a call at 8:15 AM
 db.collection('patients')
@@ -956,7 +916,7 @@ assignedNurse: {
 | `content` | `Map` | ✅ | Type-specific content object | See below | Structure varies by type |
 | `riskClassification` | `string` | ❌ | Risk level determined from this interaction | `"RED"` | Only for AGENT_ANALYSIS types |
 | `aiBrief` | `string` | ❌ | AI-generated summary for critical events | `"Patient stable, medications taken on time"` | Only for RED/ORANGE events |
-| `agentName` | `string` | ❌ | Which ADK agent handled this | `"CareFlow-Analyze"` | For debugging |
+| `agentName` | `string` | ❌ | Which agent handled this | `"Pulse Agent"` | For audit trail and debugging |
 | `processingTime` | `number` | ❌ | Processing duration in milliseconds | `1234` | Performance monitoring |
 
 #### **Type Enum**
@@ -975,6 +935,7 @@ type InteractionType =
 #### **Content Object by Type**
 
 **For `OUTBOUND_CALL`:**
+
 ```typescript
 content: {
   message?: string;                   // Opening message from agent
@@ -987,6 +948,7 @@ content: {
 ```
 
 **For `OUTBOUND_SMS`:**
+
 ```typescript
 content: {
   message: string;                    // SMS body sent to patient
@@ -996,6 +958,7 @@ content: {
 ```
 
 **For `INBOUND_SMS`:**
+
 ```typescript
 content: {
   patientMessage: string;             // What patient texted back
@@ -1005,6 +968,7 @@ content: {
 ```
 
 **For `AGENT_ANALYSIS`:**
+
 ```typescript
 content: {
   analysisResult: {
@@ -1018,6 +982,7 @@ content: {
 ```
 
 **For `STATUS_CHANGE`:**
+
 ```typescript
 content: {
   statusChange: {
@@ -1030,6 +995,7 @@ content: {
 ```
 
 **For `NURSE_NOTE`:**
+
 ```typescript
 content: {
   nurseNote: {
@@ -1042,6 +1008,7 @@ content: {
 ```
 
 **For `SYSTEM_EVENT`:**
+
 ```typescript
 content: {
   eventType: string;                  // "medication_reminder_sent"
@@ -1065,7 +1032,7 @@ content: {
   },
   "riskClassification": "RED",
   "aiBrief": "Patient reports chest pain radiating to left arm. Immediate intervention required.",
-  "agentName": "CareFlow-Analyze",
+  "agentName": "Pulse Agent",
   "processingTime": 2345
 }
 ```
@@ -1417,6 +1384,7 @@ seedPatients().catch(console.error);
 ```
 
 **Run with:**
+
 ```bash
 npx tsx scripts/seedFirestore.ts
 ```
@@ -1442,33 +1410,31 @@ Rather than using a single monolithic AI agent, CareFlow Pulse employs a **speci
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                   CareFlow-Main (Orchestrator)              │
-│                                                               │
-│  Responsibilities:                                           │
-│  • Receives external triggers (webhooks, scheduler)          │
-│  • Routes requests to specialized agents                     │
-│  • Manages Firestore synchronization                         │
-│  • Coordinates multi-step workflows                          │
-│  • Error handling and fallback logic                         │
-└───────────┬───────────────┬─────────────────┬───────────────┘
-            │               │                 │
-            │               │                 │
-    ┌───────▼──────┐ ┌─────▼────────┐ ┌──────▼──────────┐
-    │  CareFlow-   │ │  CareFlow-   │ │   CareFlow-     │
-    │   Connect    │ │   Analyze    │ │     Brief       │
-    └──────────────┘ └──────────────┘ └─────────────────┘
+│                    Pulse Agent (Orchestrator)               │
+│                    • Medical Intelligence (ADK)             │
+│                    • MCP Toolbox Integration                │
+└───────────┬───────────────────────────────────────────┬─────┘
+            │                                           │
+            │ A2A Protocol (JSON-RPC)                   │
+            ▼                                           ▼
+┌───────────────────────────┐           ┌───────────────────────────┐
+│       Caller Agent        │           │     (Future Agents)       │
+│  • Voice Interface (Twilio)│           │  • EHR Connector          │
+│  • ElevenLabs TTS         │           │  • Patient Mobile App     │
+└───────────────────────────┘           └───────────────────────────┘
 ```
 
 #### **Deployment Platform: Google Cloud Run (The Fleet)**
 
 All agents are packaged and deployed as **Stateless Services** on Google Cloud Run. To strictly enforce Multi-Tenancy:
 
--   **Replication**: We deploy **One Agent Service per Hospital**.
--   **Isolation**: Each service has a specific `HOSPITAL_ID` environment variable (e.g., `HOSP001`).
--   **Logic**: The agent reads this variable at startup and strictly filters all Firestore queries by this ID.
--   **Discovery**: The "Dispatcher" knows the URL of each hospital's agent service.
+- **Replication**: We deploy **One Agent Service per Hospital**.
+- **Isolation**: Each service has a specific `HOSPITAL_ID` environment variable (e.g., `HOSP001`).
+- **Logic**: The agent reads this variable at startup and strictly filters all Firestore queries by this ID.
+- **Discovery**: The "Dispatcher" knows the URL of each hospital's agent service.
 
 **Deployment Command:**
+
 ```bash
 # Deploy for Hospital 1
 gcloud run deploy careflow-agent-hosp001 \
@@ -1485,9 +1451,9 @@ This strategy ensures that `HOSP001` agent **physically cannot** access `HOSP002
 
 ---
 
-### **4.2. Agent: `CareFlow-Main` (Orchestrator)**
+### **4.2. Pulse Agent (Orchestrator & Intelligence)**
 
-**Role:** The orchestrator is the entry point for all external interactions. It receives webhook calls, scheduler triggers, and routes work to specialized agents.
+**Role:** The Pulse Agent is the "brain" of CareFlow. It is built with Google ADK and handles high-level medical reasoning, risk classification, and database orchestration via MCP.
 
 **File:** `app/agent.py` (root_agent)
 
@@ -1553,26 +1519,24 @@ patients = firestore_tool.query(
     ]
 )
 
-# 2. For each patient, delegate to CareFlow-Connect
+# 2. For each patient, delegate to Caller Agent via A2A
 for patient in patients:
-    connect_agent.initiate_call(
+    caller_agent.initiate_voice_session(
         patient_id=patient['patientId'],
         patient_name=patient['name'],
-        medications=patient['dischargePlan']['medications'],
-        critical_symptoms=patient['dischargePlan']['criticalSymptoms']
+        clinical_context=patient['dischargePlan']
     )
 
-# 3. Wait for call completion webhook
-# 4. Delegate analysis to CareFlow-Analyze
-# 5. Update Firestore with results
-# 6. If RED alert, delegate to CareFlow-Brief for summary
+# 3. Handle call completion events (SSE/Webhook)
+# 4. Perform Medical Risk Analysis (RED/ORANGE/GREEN)
+# 5. Update Firestore and trigger alerts
 ```
 
 ---
 
-### **4.3. Agent: `CareFlow-Connect` (Connector)**
+### **4.3. Caller Agent (Voice & Messaging Interface)**
 
-**Role:** Generates dynamic, context-rich prompts for voice interactions and initiates outbound communication (voice calls or SMS).
+**Role:** The Caller Agent (LangGraph-based) serves as the "voice" of the system. It connects to Twilio ConversationRelay to maintain natural, real-time conversations with patients.
 
 **File:** `app/agent.py` (specialized agent, invoked by orchestrator)
 
@@ -1591,6 +1555,7 @@ for patient in patients:
 The CareFlow-Connect agent must generate a unique prompt for each patient call that includes:
 
 **Required Elements in Prompt:**
+
 1. **Patient Identification**: Name, diagnosis, discharge date
 2. **Medication List**: All medications scheduled for this time slot with dosages and frequencies
 3. **Critical Symptoms**: List from `dischargePlan.criticalSymptoms` that trigger immediate escalation
@@ -1599,6 +1564,7 @@ The CareFlow-Connect agent must generate a unique prompt for each patient call t
 6. **Conversation Style Guidelines**: Warm, empathetic, simple language, avoid medical jargon
 
 **Prompt Structure:**
+
 - Role definition: "You are CareFlow, a friendly AI assistant..."
 - Patient context section with medical history
 - Today's medication checklist
@@ -1606,15 +1572,15 @@ The CareFlow-Connect agent must generate a unique prompt for each patient call t
 - Handover script: "Thank you for telling me that... I'm alerting your nurse now..."
 - Example opening greeting
 
-**Tools Invoked:**
-- `twilio_voice_call`: Initiates call to patient's phone number, connects to Deepgram with generated prompt
-- `twilio_sms_sender`: Sends text message as fallback if voice call fails or patient prefers SMS
+- `Twilio ConversationRelay`: Streams voice audio to/from the patient.
+- `ElevenLabs TTS`: Synthesizes ultra-realistc medical persona voice.
+- `A2A Client`: Receives clinical context and returns session results to Pulse Agent.
 
 ---
 
-### **4.4. Agent: `CareFlow-Analyze` (Medical Triage)**
+### **4.4. Clinical Reasoning: Triage & Analysis**
 
-**Role:** Analyzes patient responses (voice transcripts or SMS text) to classify risk level and determine if escalation is needed.
+**Role:** A core competency of the **Pulse Agent**. It analyzes interaction data (transcripts, telemetry) to quantify clinical risk.
 
 **File:** `app/agent.py` (specialized agent)
 
@@ -1633,6 +1599,7 @@ The CareFlow-Connect agent must generate a unique prompt for each patient call t
 The CareFlow-Analyze agent receives the conversation transcript and must perform risk assessment using a structured prompt that includes:
 
 **Required Context:**
+
 - Patient diagnosis and days since discharge
 - Critical symptoms list from Firestore
 - Warning symptoms list from Firestore
@@ -1641,6 +1608,7 @@ The CareFlow-Analyze agent receives the conversation transcript and must perform
 **Risk Classification Criteria:**
 
 **🔴 RED (Critical - Immediate Action Required):**
+
 - Patient mentions ANY symptom from criticalSymptoms list
 - Severe pain reported (8-10/10 scale)
 - Signs of infection (high fever >101°F, confusion, severe swelling)
@@ -1648,6 +1616,7 @@ The CareFlow-Analyze agent receives the conversation transcript and must perform
 - Patient sounds distressed or in immediate danger
 
 **🟠 ORANGE (Warning - Close Monitoring Needed):**
+
 - Patient mentions symptoms from warningSymptoms list
 - Moderate pain (5-7/10 scale)
 - Missed multiple medication doses
@@ -1655,12 +1624,14 @@ The CareFlow-Analyze agent receives the conversation transcript and must perform
 - Patient sounds uncertain about recovery progress
 
 **🟢 GREEN (Safe - Routine Monitoring):**
+
 - No concerning symptoms mentioned
 - Medications taken as scheduled
 - Positive recovery indicators
 - Patient sounds confident and comfortable
 
 **Required Output Structure (JSON):**
+
 - `riskLevel`: String enum (GREEN/ORANGE/RED)
 - `keyFindings`: Array of symptom keywords found
 - `reasoning`: Brief explanation (1-2 sentences)
@@ -1671,6 +1642,7 @@ The CareFlow-Analyze agent receives the conversation transcript and must perform
 #### **Example Analysis Output**
 
 **Input Transcript:**
+
 ```
 Agent: Good morning Sarah, how are you feeling today?
 Patient: Not great. I have a lot of chest pain, and I'm feeling dizzy.
@@ -1679,6 +1651,7 @@ Patient: It's like pressure, and it goes down my left arm.
 ```
 
 **Analysis Output:**
+
 ```json
 {
   "riskLevel": "RED",
@@ -1695,20 +1668,23 @@ Patient: It's like pressure, and it goes down my left arm.
 Based on the risk classification, the orchestrator must execute different workflows:
 
 **For RED Alerts:**
+
 1. Update `/patients/{id}`: Set `riskLevel` to RED, update `lastAssessmentDate`, populate `alert` object with critical flag
 2. Create document in `/alerts` collection with patient details and AI brief
 3. Log interaction in `/patients/{id}/interactions` with type `AGENT_ANALYSIS`
-4. Invoke CareFlow-Brief agent to generate detailed summary
+4. Generate detailed clinical summary (AI Brief)
 5. Initiate voice call to assigned nurse with critical alert message
 6. If nurse doesn't answer, send SMS alert as fallback
 
 **For ORANGE Alerts:**
+
 1. Update `/patients/{id}`: Set `riskLevel` to ORANGE, populate `alert` object (non-critical flag)
 2. Create document in `/alerts` collection
 3. Log interaction in sub-collection
 4. Dashboard notification only (no immediate call to nurse)
 
 **For GREEN Status:**
+
 1. Update `/patients/{id}`: Set `riskLevel` to GREEN, clear `alert` field (set to null)
 2. Log interaction in sub-collection
 3. Update `/medicationLog` if medications were confirmed taken
@@ -1716,9 +1692,9 @@ Based on the risk classification, the orchestrator must execute different workfl
 
 ---
 
-### **4.5. Agent: `CareFlow-Brief` (Synthesis)**
+### **4.5. Clinical Reasoning: Medical Synthesis**
 
-**Role:** Generates concise, actionable summaries for nurses when a RED or ORANGE alert is triggered. This is the "AI Brief" that appears on the dashboard.
+**Role:** Generates concise, actionable summaries for nurses when a RED or ORANGE alert is triggered.
 
 **File:** `app/agent.py` (specialized agent)
 
@@ -1737,11 +1713,13 @@ Based on the risk classification, the orchestrator must execute different workfl
 The CareFlow-Brief agent must create a concise clinical summary (2-3 sentences) for nurse coordinators that includes:
 
 **Required Elements:**
+
 1. **WHAT**: Patient's reported symptoms (from transcript)
 2. **WHY**: Clinical context explaining why it's concerning given their diagnosis and post-discharge timeline
 3. **ACTION**: Specific recommended next steps for the nurse
 
 **Formatting Requirements:**
+
 - Start with "URGENT:" prefix for RED alerts
 - Use appropriate medical terminology
 - Professional but urgent tone
@@ -1749,12 +1727,14 @@ The CareFlow-Brief agent must create a concise clinical summary (2-3 sentences) 
 - Specific and actionable
 
 **Input Data Needed:**
+
 - Patient name and diagnosis
 - Days since discharge
 - Full conversation transcript
 - AI risk analysis results (risk level, key findings)
 
 **Output Storage:**
+
 - Store in `/patients/{id}.aiBrief` field
 - Store in `/alerts/{id}.aiBrief` field
 - Display on nurse dashboard
@@ -1762,6 +1742,7 @@ The CareFlow-Brief agent must create a concise clinical summary (2-3 sentences) 
 #### **Example Output**
 
 **Brief for Dashboard:**
+
 ```
 URGENT: Patient reports severe chest pain with left arm radiation and dizziness 
 during morning check-in. Post-CABG day 5 patient exhibiting classic signs of 
@@ -1770,6 +1751,7 @@ ER referral or EMS dispatch.
 ```
 
 This brief is stored in:
+
 - `/patients/{patientId}.aiBrief`
 - `/alerts/{alertId}.aiBrief`
 
@@ -1781,59 +1763,28 @@ And displayed prominently on the nurse dashboard.
 
 ADK agents interact with external systems through **tools**—Python functions that the agents can "call" to perform actions.
 
-#### **Tool 1: `firestore_tool`**
+#### **Tool 1: `mcp_firestore_toolbox`**
 
-**Purpose:** Read and write data to Firestore
+**Purpose:** Secure, governed access to Firestore via the Model Context Protocol (MCP).
 
-**Operations:**
-- `query(collection, filters)`: Query documents with where clauses, returns list of documents
-- `get(collection, doc_id)`: Retrieve single document by ID
-- `update(collection, doc_id, data)`: Update existing document fields
-- `create(collection, data)`: Create new document with auto-generated ID
-- `delete(collection, doc_id)`: Delete document (use with caution)
+**Capabilities:**
+
+- `get_patient_risk`: Retrieves isolated patient risk context.
+- `create_alert`: Generates documented nurse alerts.
+- `update_patient_risk`: Updates clinical risk status.
+- `log_interaction`: Appends to the auditable interaction history.
 
 **Authentication:** Uses Google Cloud service account credentials configured in ADK deployment
 
-#### **Tool 2: `twilio_voice_call`**
+#### **Tool 2: `a2a_caller_client`**
 
-**Purpose:** Initiate outbound voice calls via Twilio
-
-**Parameters:**
-- `to`: Patient phone number in E.164 format (+15551234567)
-- `from_`: Twilio phone number
-- `twiml`: TwiML instructions (XML) or URL to Deepgram webhook
-- `status_callback`: Webhook URL for call status updates
-
-**Returns:** Twilio Call SID (unique identifier for tracking)
-
-**Configuration Required:**
-- Twilio Account SID
-- Twilio Auth Token
-- Purchased Twilio phone number
-
-#### **Tool 3: `twilio_sms_sender`**
-
-**Purpose:** Send SMS messages to patients
+**Purpose:** Hand off voice session execution to the Caller Agent.
 
 **Parameters:**
-- `to`: Patient phone number
-- `body`: Message text (max 160 characters recommended)
-- `status_callback`: Webhook URL for delivery status
 
-**Returns:** Twilio Message SID
-
-#### **Tool 4: `deepgram_voice_agent_connector`**
-
-**Purpose:** Connect Twilio call audio stream to Deepgram for AI-powered conversation
-
-**Implementation Method:** Generate TwiML with `<Stream>` verb that connects to Deepgram WebSocket endpoint
-
-**Parameters Passed to Deepgram:**
-- `model`: Deepgram model (e.g., "nova-2")
-- `language`: Language code (e.g., "en-US")
-- `prompt`: Dynamic conversation prompt generated by CareFlow-Connect
-
-**Return:** TwiML XML string to be used by Twilio
+- `patient_id`: Target recipient.
+- `clinical_context`: Dynamic context derived from Firestore.
+- `callback_url`: Endpoint for session result delivery.
 
 ---
 
@@ -1864,11 +1815,13 @@ All agent prompts should follow this consistent structure:
 #### **Prompt Versioning Strategy**
 
 **Version Control:**
+
 - All prompts must be version-controlled in Git
 - Each prompt file should include version number (semantic versioning: X.Y.Z)
 - Include changelog documenting what changed and why
 
 **Versioning Format:**
+
 - Major version (X): Breaking changes in output format or behavior
 - Minor version (Y): New features or refined criteria
 - Patch version (Z): Bug fixes or minor wording improvements
@@ -1895,6 +1848,7 @@ Healthcare systems require robust error handling. CareFlow Pulse implements mult
 #### **Retry Logic Specification**
 
 **For Firestore Operations:**
+
 - Implement exponential backoff retry
 - Maximum 3 retry attempts
 - Wait time: 2 seconds, then 4 seconds, then 8 seconds
@@ -1902,6 +1856,7 @@ Healthcare systems require robust error handling. CareFlow Pulse implements mult
 - After 3 failures, escalate to DevOps alert
 
 **For Twilio API Calls:**
+
 - Retry once immediately for network errors
 - Do not retry for invalid number errors (4xx status codes)
 - Log failure reason to Firestore interaction log
@@ -1912,11 +1867,13 @@ Healthcare systems require robust error handling. CareFlow Pulse implements mult
 Implement circuit breaker for external service dependencies (Twilio, Deepgram) to prevent cascading failures:
 
 **Circuit States:**
+
 - **Closed (Normal)**: All requests flow through
 - **Open (Failure)**: No requests sent, immediate fallback after 5 consecutive failures
 - **Half-Open (Testing)**: After 60 seconds, allow 1 test request
 
 **Fallback Actions:**
+
 - Twilio voice failure → Send SMS instead
 - Deepgram failure → Log error, create ORANGE alert for manual nurse follow-up
 - Firestore failure → Queue write operations, retry when connection restored
@@ -1955,6 +1912,7 @@ The ADK backend deployed on Vertex AI Agent Engine exposes REST API endpoints fo
 **HTTP Method:** `POST`
 
 **Headers:**
+
 - `Content-Type: application/json`
 - `Authorization: Bearer {GOOGLE_CLOUD_TOKEN}` (for Cloud Scheduler authentication)
 
@@ -1967,6 +1925,7 @@ The ADK backend deployed on Vertex AI Agent Engine exposes REST API endpoints fo
 | `dryRun` | `boolean` | ❌ | If true, simulate without actually calling patients | `false` (default) |
 
 **Example Request:**
+
 ```json
 POST /api/careflow/trigger-scheduled-calls
 Content-Type: application/json
@@ -1983,12 +1942,12 @@ Content-Type: application/json
 1. **Query Firestore** for active patients:
    - Filter: `status == "active"`
    - Filter: `dischargePlan.medications[]` contains at least one med with `scheduleHour == {hour}`
-   
+
 2. **For each patient:**
    - Retrieve full patient document from Firestore
-   - Invoke CareFlow-Connect agent to generate dynamic prompt
-   - Initiate Twilio voice call with Deepgram connection
-   - Log outbound call in `/patients/{id}/interactions` with type `OUTBOUND_CALL`
+   - Delegate voice session to **Caller Agent** via A2A protocol
+   - Provide clinical context (medications, symptoms) in the A2A task
+   - Log outbound call initiation in `/patients/{id}/interactions`
 
 3. **Handle Exceptions:**
    - Invalid patient phone number → Log error, skip patient, continue with others
@@ -2008,6 +1967,7 @@ Content-Type: application/json
 | `timestamp` | `string` | ISO 8601 timestamp of processing |
 
 **Example Success Response:**
+
 ```json
 {
   "status": "success",
@@ -2025,6 +1985,7 @@ Content-Type: application/json
 ```
 
 **Error Response (500 Internal Server Error):**
+
 ```json
 {
   "status": "error",
@@ -2052,6 +2013,7 @@ No explicit rate limiting required (controlled by Cloud Scheduler frequency).
 **HTTP Method:** `POST`
 
 **Headers:**
+
 - `Content-Type: application/x-www-form-urlencoded` (Twilio default)
 - `X-Twilio-Signature: {signature}` (for webhook validation)
 
@@ -2066,6 +2028,7 @@ No explicit rate limiting required (controlled by Cloud Scheduler frequency).
 | `AccountSid` | `string` | Twilio account ID | `"AC1234567890abcdef"` |
 
 **Example Request (URL-encoded):**
+
 ```
 From=%2B15551234567&To=%2B15559876543&Body=YES+I+took+my+medication&MessageSid=SM1234567890abcdef
 ```
@@ -2081,7 +2044,7 @@ From=%2B15551234567&To=%2B15559876543&Body=YES+I+took+my+medication&MessageSid=S
    - If not found, send generic "Thank you" SMS and log unknown sender
 
 3. **Analyze Message Content:**
-   - Pass SMS body to CareFlow-Analyze agent
+   - Pass SMS body to **Pulse Agent**
    - Determine if message indicates:
      - Medication adherence confirmation (keywords: "yes", "took", "done")
      - Symptom report (keywords from critical/warning symptom lists)
@@ -2090,7 +2053,7 @@ From=%2B15551234567&To=%2B15559876543&Body=YES+I+took+my+medication&MessageSid=S
 4. **Update Firestore:**
    - Log interaction in `/patients/{id}/interactions` with type `INBOUND_SMS`
    - If medication confirmed, create entry in `/medicationLog` with status `taken`
-   - If symptoms reported, invoke CareFlow-Analyze for risk classification
+   - If symptoms reported, perform medical risk classification
    - Update `riskLevel` and `alert` fields if necessary
 
 5. **Generate Response SMS:**
@@ -2111,6 +2074,7 @@ Twilio expects a **TwiML response** (XML) to optionally send a reply SMS.
 ```
 
 **For Critical Symptoms Detected:**
+
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -2135,15 +2099,16 @@ Log error internally but always return 200 to Twilio to prevent retries.
 
 ### **5.4. `POST /api/careflow/voice-alert`**
 
-**Purpose:** Webhook endpoint for Deepgram and Twilio to POST voice call results, including full conversation transcripts and call status.
+**Purpose:** Webhook endpoint for the **Caller Agent** to POST voice call results, including full conversation transcripts and telemetry.
 
 #### **Request Specification**
 
 **HTTP Method:** `POST`
 
 **Headers:**
+
 - `Content-Type: application/json`
-- `X-Deepgram-Signature: {signature}` (for webhook validation)
+- `X-A2A-Signature: {signature}` (for A2A protocol validation)
 
 **Request Body Schema:**
 
@@ -2154,10 +2119,11 @@ Log error internally but always return 200 to Twilio to prevent retries.
 | `callStatus` | `string` | ✅ | Final call status | `"completed"`, `"no-answer"`, `"busy"`, `"failed"` |
 | `callDuration` | `number` | ❌ | Call duration in seconds | `180` (null if not completed) |
 | `transcript` | `string` | ❌ | Full conversation transcript | `"Agent: Hello Sarah... Patient: I have chest pain..."` |
-| `criticalAlertTriggered` | `boolean` | ✅ | If Deepgram detected critical keyword during call | `true` or `false` |
+| `clinicalRisk` | `string` | ✅ | Suggested risk level from session | `"RED"` or `"GREEN"` |
 | `timestamp` | `string` | ✅ | ISO 8601 timestamp | `"2025-11-15T08:20:45.123Z"` |
 
 **Example Request (Completed Call):**
+
 ```json
 {
   "callSid": "CA1234567890abcdef",
@@ -2165,12 +2131,13 @@ Log error internally but always return 200 to Twilio to prevent retries.
   "callStatus": "completed",
   "callDuration": 180,
   "transcript": "Agent: Good morning Sarah, this is CareFlow checking in on your recovery. How are you feeling today?\nPatient: Not good. I have chest pain and I'm dizzy.\nAgent: Thank you for telling me that, Sarah. For your safety, I'm alerting your nurse coordinator now.",
-  "criticalAlertTriggered": true,
+  "clinicalRisk": "RED",
   "timestamp": "2025-11-15T08:20:45.123Z"
 }
 ```
 
 **Example Request (No Answer):**
+
 ```json
 {
   "callSid": "CA9876543210fedcba",
@@ -2178,7 +2145,7 @@ Log error internally but always return 200 to Twilio to prevent retries.
   "callStatus": "no-answer",
   "callDuration": null,
   "transcript": null,
-  "criticalAlertTriggered": false,
+  "clinicalRisk": "UNKNOWN",
   "timestamp": "2025-11-15T08:16:30.456Z"
 }
 ```
@@ -2187,24 +2154,23 @@ Log error internally but always return 200 to Twilio to prevent retries.
 
 1. **Identify Patient:**
    - Query Firestore `/patients` where `contact.phone == {patientPhone}`
-   - If not found, log error and return 200 (avoid Deepgram retries)
+   - If not found, log error and return 200
 
 2. **Handle Call Status:**
-   
+
    **If `callStatus == "completed"` and transcript exists:**
-   - Log interaction in `/patients/{id}/interactions` with type `OUTBOUND_CALL`
-   - Include full transcript and call duration
-   - Invoke CareFlow-Analyze agent to classify risk from transcript
-   - If `criticalAlertTriggered == true`, immediately escalate to RED alert
-   - Update Firestore patient document with analysis results
-   - If RED/ORANGE, invoke CareFlow-Brief to generate summary
-   - If RED, call assigned nurse via Twilio
-   
+    - Log interaction in `/patients/{id}/interactions` with type `OUTBOUND_CALL`
+    - Include full transcript and call duration
+    - Perform final medical risk classification
+    - Update Firestore patient document with analysis results
+    - Generate clinical summary (AI Brief)
+    - If RED, alert assigned nurse
+
    **If `callStatus == "no-answer"` or `"busy"`:**
    - Log interaction with type `SYSTEM_EVENT` and status `no-answer`
    - Schedule retry call in 2 hours (add to Cloud Scheduler or in-memory queue)
    - Send SMS fallback: "Hi [Name], we tried to call but couldn't reach you. Please reply YES when you've taken your medication."
-   
+
    **If `callStatus == "failed"`:**
    - Log error in interaction with reason
    - Create ORANGE alert for nurse to manually follow up
@@ -2240,13 +2206,6 @@ Even on errors, return 200 to prevent webhook retries:
 }
 ```
 
-#### **Webhook Validation**
-
-Validate Deepgram signature using:
-1. Deepgram API key (secret)
-2. HMAC-SHA256 of request body
-3. Compare with `X-Deepgram-Signature` header
-
 ---
 
 ### **5.5. Authentication & Authorization**
@@ -2258,11 +2217,13 @@ Google Cloud Scheduler authenticates to Agent Engine endpoints using:
 **Method:** Service Account with IAM role `roles/run.invoker`
 
 **Configuration:**
+
 - Create service account: `scheduler-careflow@{project-id}.iam.gserviceaccount.com`
 - Grant `Cloud Run Invoker` role on Agent Engine service
 - Configure Cloud Scheduler jobs to use this service account's identity token
 
 **Header Sent by Scheduler:**
+
 ```
 Authorization: Bearer {GOOGLE_OIDC_TOKEN}
 ```
@@ -2272,20 +2233,21 @@ Authorization: Bearer {GOOGLE_OIDC_TOKEN}
 **Method:** Signature validation using Twilio Auth Token
 
 **Implementation Required:**
+
 - Extract `X-Twilio-Signature` from request header
 - Compute expected signature using Twilio library or manual HMAC-SHA1
 - Compare signatures; reject if mismatch (return 403 Forbidden)
 
 **Do NOT rely on IP allowlisting** (Twilio IPs can change)
 
-#### **Deepgram Webhook Security**
+#### **Caller Agent Webhook Security**
 
-**Method:** API key validation or signature verification
+**Method:** A2A Protocol Authentication (JSON-RPC over SSE)
 
 **Configuration:**
-- Store Deepgram API key as secret in Google Secret Manager
-- Validate `X-Deepgram-Signature` header on incoming webhooks
-- Reject requests without valid signature
+
+- Validate `X-A2A-Signature` using shared secret
+- Reject requests with invalid message IDs or timestamps
 
 ---
 
@@ -2294,15 +2256,18 @@ Authorization: Bearer {GOOGLE_OIDC_TOKEN}
 #### **Rate Limiting Strategy**
 
 **Cloud Scheduler Endpoints:**
+
 - No explicit rate limiting needed (controlled by scheduler frequency)
 - Expected traffic: 3 requests/day (morning, noon, evening)
 
-**Webhook Endpoints (Twilio, Deepgram):**
+**Webhook Endpoints (Twilio, A2A):**
+
 - Implement per-endpoint rate limiting: **100 requests/minute**
 - Per-source IP rate limiting: **10 requests/second**
 - Rationale: Normal traffic is ~1 request per patient call; rate limits prevent abuse
 
 **Implementation:**
+
 - Use Google Cloud Armor (Layer 7 DDoS protection) in front of Agent Engine
 - Configure rate limiting rules in Cloud Armor policy
 
@@ -2325,6 +2290,7 @@ Content-Security-Policy: default-src 'self'
 #### **Logging & Monitoring**
 
 **All endpoints must log:**
+
 - Request timestamp and source IP
 - Endpoint called and HTTP method
 - Response status code and processing time
@@ -2334,12 +2300,129 @@ Content-Security-Policy: default-src 'self'
 **Logs sent to:** Google Cloud Logging with structured format (JSON)
 
 **Monitoring Alerts:**
+
 - Alert if endpoint returns 5xx errors more than 5 times in 5 minutes
 - Alert if endpoint latency exceeds 5 seconds
 - Alert if authentication failures spike (potential attack)
 
 ---
 
+## **6. External Integrations**
+
+CareFlow Pulse relies on a coordinated ecosystem of medical-grade and voice-optimized services to provide seamless patient monitoring.
+
+### **6.1. Twilio ConversationRelay**
+
+The **Caller Agent** uses Twilio ConversationRelay to bridge professional telephony with real-time AI processing.
+
+- **Audio Streaming:** Bi-directional 8kHz μ-law audio stream via WebSockets.
+- **Interruption Handling:** Native barge-in detection with sub-100ms response suspension.
+- **Protocol:** TwiML `<Connect><ConversationRelay /></Connect>` with dynamic session parameters.
+- **Webhook Integration:** Receives `session_ended` and `transcript` payloads.
+
+### **6.2. ElevenLabs TTS**
+
+For high-fidelity, empathetic medical personas, we integrate ElevenLabs via the `ElevenLabs SDK`.
+
+- **Voice Configuration:** `21m00Tcm4TlvDq8ikWAM` (Rachel) - Selected for clarity and professional tone.
+- **Latency Control:** PCM 44.1kHz delivery with frame-level chunking to maintain sub-500ms TTFB (Time To First Byte).
+- **Stability/Clarity:** Optimized for medical terminology pronunciation.
+
+### **6.3. Google Cloud Platform (GCP)**
+
+- **Vertex AI:** Powers the Pulse Agent (Gemini 3 Flash) for clinical reasoning.
+- **Model Armor:** Serves as the security firewall for PII/PHI redaction.
+- **Cloud Run:** Hosts the stateless Agent Fleet with multi-tenant isolation.
+- **Firebase/Firestore:** Provides the real-time document store for patient telemetry.
+
+---
+
+## **7. Frontend: Next.js Application**
+
+The CareFlow Dashboard is a modern, real-time interface designed for nurse efficiency and rapid triage.
+
+### **7.1. Technology Stack**
+
+- **Framework:** Next.js 16.0.9 (App Router)
+- **Real-time:** `firebase/firestore` snapshots for instant alert propagation.
+- **Auth:** `NextAuth.js` with Hospital ID session grounding.
+- **Styling:** Tailwind CSS with a clean, medical-grade design system.
+
+### **7.2. Architecture Principles**
+
+- **Optimistic Updates:** UI reflects actions immediately while syncing to Firestore in the background.
+- **Role-Based Views:** Nurses see only their assigned patients and active hospital branch.
+- **Component isolation:** Atomic design pattern for high reusability of charts, logs, and alert cards.
+
+---
+
+## **8. Data Flow & User Journeys**
+
+### **8.1. Journey: Automated Morning Rounds**
+
+1. **Trigger:** Cloud Scheduler POSTs to `/api/careflow/trigger-scheduled-calls` at 08:15 AM.
+2. **Orchestration:** Pulse Agent queries patients with `scheduleHour: 8`.
+3. **Delegation:** Pulse Agent sends A2A tasks to Caller Agent for each patient.
+4. **Interaction:** Caller Agent conducts the call via Twilio + ElevenLabs.
+5. **Collection:** After hangup, Caller Agent POSTs full transcript and telemetry to Pulse Agent.
+6. **Closing:** Pulse Agent updates Firestore and, if necessary, triggers an Alert.
+
+### **8.2. Journey: Critical Symptom Triage**
+
+1. **Detection:** During a call, the patient mentions "Chest pain."
+2. **Escalation:** Caller Agent pauses the interview and initiates stable handover.
+3. **Alerting:** Pulse Agent creates a **RED** alert in `/alerts` with an AI Brief.
+4. **Visibility:** The Nurse Dashboard flashes Red and plays an audible tone.
+5. **Intervention:** The Nurse Coordinator clicks "Take Ownership" and initiates manual contact.
+
+---
+
+## **9. Security & Compliance**
+
+CareFlow Pulse implements a multi-layered security strategy designed for healthcare environments, focusing on data privacy, multi-tenant isolation, and AI safety.
+
+### **9.1. Data Encryption & Integrity**
+
+- **At-Rest:** All data in Google Cloud Firestore is encrypted using Google-managed encryption keys.
+- **In-Transit:** TLS 1.2+ is enforced for all API traffic (Frontend to Backend, Agent-to-Agent).
+- **Integrity:** Point-in-Time Recovery (PITR) enabled in Firestore for 7-day data resilience.
+
+### **9.2. Multi-Tenant Isolation**
+
+- **Logical Separation:** Every patient, interaction, and alert document is tagged with a `hospitalId`.
+- **Database Rules:** Firestore security rules enforce Row-Level Security (RLS), preventing users or agents from accessing data outside their assigned hospital.
+- **Agent Scoping:** Each agent service is deployed with a strict `HOSPITAL_ID` environment variable that acts as a hard boundary for all tool-driven database queries.
+
+### **9.3. AI Safety & Model Armor**
+
+The system incorporates **Google Cloud Model Armor** as a dedicated security firewall between users and the AI models (Gemini).
+
+- **Fail-Closed Policy:** In accordance with clinical safety standards, the security layer defaults to "Blocked" if the Model Armor service becomes unreachable or returns an error.
+- **Prompt Injection Defense:** Scans all incoming user messages (voice transcripts and SMS) for adversarial patterns, jailbreak attempts, or instructions designed to override the medical clinical persona.
+- **Output Sanitization (PHI Redaction):** All model responses are scanned for Protected Health Information (PHI) and redacted in real-time before being sent to the Caller Agent or displayed on the dashboard.
+- **SDK & Infrastructure:** Uses `google-cloud-modelarmor >= 0.3.0` with localized regional endpoints (`modelarmor.us.rep.googleapis.com`) for minimal latency and high policy discovery reliability.
+
+### **9.4. HIPAA Compliance Considerations**
+
+- **BAA Scope:** Built exclusively on Google Cloud services covered by the Business Associate Agreement (BAA).
+- **Minimal Access:** AI agents only access the specific patient fields required for the current clinical context.
+- **Identity:** NextAuth.js provides secure JWT-based authentication for all staff members.
+
+### **9.5. Audit Logging**
+
+- **System Actions:** All patient data modifications are logged to the `audit_logs` collection.
+- **Security Events:** Unauthorized access attempts and Model Armor block events are recorded in Google Cloud Logging for security review.
+- **Immutability:** Audit logs are protected by Firestore rules to prevent modification or deletion.
+
+### **9.6. Reference Documentation**
+
+For more detailed information, refer to:
+
+- [HIPAA Compliance Technical Guide](file:///home/audrey/Bureau/careflow/docs/hipaa_compliance_guide.md)
+- [Frontend Security Checklist](file:///home/audrey/Bureau/careflow/docs/FRONTEND-SECURITY.md)
+- [Security Audit Report](file:///home/audrey/Bureau/careflow/docs/security_audit_report.md)
+
+---
 
 ## **10. Configuration & Environment Variables**
 
@@ -2354,55 +2437,64 @@ Each Agent Service in the fleet requires specific configuration.
 | `GOOGLE_CLOUD_PROJECT` | ✅ | GCP Project ID | `"careflow-478811"` |
 | `TWILIO_ACCOUNT_SID` | ✅ | Twilio Account SID | `"AC..."` |
 | `TWILIO_AUTH_TOKEN` | ✅ | Twilio Auth Token | `"..."` |
-| `DEEPGRAM_API_KEY` | ✅ | Deepgram API Key | `"..."` |
+| `ELEVENLABS_API_KEY` | ✅ | ElevenLabs API Key | `"..."` |
+| `A2A_SECRET` | ✅ | Secret for Inter-Agent Auth | `"..."` |
 
 ---
 
 ## **11. Deployment Guide**
 
-### **11.1. Backend Deployment (Dual-Agent System)**
+### **11.2. Infrastructure as Code (Terraform)**
 
-CareFlow Pulse uses a **dual-agent architecture** deployed as serverless Cloud Run services:
+Deployment of core infrastructure is managed via **Terraform** to ensure consistency across environments.
 
-#### **Agent 1: CareFlow Pulse Agent (Medical Intelligence & Orchestration)**
+#### **Cloud Scheduler Configuration**
 
-**Purpose**: Orchestrates patient rounds, manages medical logic, queries Firestore, delegates voice calls via A2A protocol.
+Automated patient rounds are triggered by Cloud Scheduler jobs.
 
-**Deployment**:
-```bash
-cd careflow-agents/careflow-agent
+```hcl
+resource "google_cloud_scheduler_job" "morning_rounds" {
+  name             = "morning-rounds-hosp001"
+  description      = "Trigger morning patient rounds for HOSP001"
+  schedule         = "0 8 * * *"
+  time_zone        = "America/New_York"
+  attempt_deadline = "320s"
 
-# Build and deploy to Cloud Run
-make deploy
-
-# Or manually:
-gcloud builds submit --tag gcr.io/careflow-478811/careflow-agent:latest
-gcloud run deploy careflow-agent \
-  --image gcr.io/careflow-478811/careflow-agent:latest \
-  --region us-central1 \
-  --platform managed \
-  --allow-unauthenticated \
-  --set-env-vars GOOGLE_CLOUD_PROJECT=careflow-478811,FIRESTORE_DATABASE=careflow-db
+  http_target {
+    http_method = "POST"
+    uri         = "${google_cloud_run_service.pulse_agent.status[0].url}/api/careflow/trigger-scheduled-calls"
+    body        = base64encode("{\"timeSlot\": \"morning\", \"hour\": 8}")
+    
+    oidc_token {
+      service_account_email = google_service_account.scheduler_sa.email
+    }
+  }
+}
 ```
 
-**Environment Variables**:
-```bash
-GOOGLE_CLOUD_PROJECT=careflow-478811
-FIRESTORE_DATABASE=careflow-db
-GOOGLE_GENAI_USE_VERTEXAI=true
-LOG_LEVEL=INFO
-```
+#### **IAM Roles & Service Accounts**
 
-**Exposed Endpoint**:
-- `POST /api/careflow/trigger-scheduled-calls` - Receives Cloud Scheduler triggers
+Strict IAM bindings enforce the principle of least privilege.
+
+| Service Account | Role | Purpose |
+| :--- | :--- | :--- |
+| `pulse-agent-sa` | `roles/datastore.user` | Firestore CRUD access |
+| `pulse-agent-sa` | `roles/aiplatform.user` | Vertex AI / Gemini access |
+| `scheduler-sa` | `roles/run.invoker` | Permission to trigger Agent endpoints |
+| `pulse-agent-sa` | `roles/modelarmor.user` | Access to Model Armor security policies |
+
+#### **GCP Project Scoping**
+
+Terraform modules are scoped by `HOSPITAL_ID` to support factory-style replication for new tenants.
 
 ---
 
 #### **Agent 2: CareFlow Caller Agent (Voice Interface)**
 
-**Purpose**: Handles voice interactions via Twilio ConversationRelay, streams audio with ElevenLabs, receives A2A messages from Pulse Agent.
+**Purpose:** Handles voice interactions via Twilio ConversationRelay, streams audio with ElevenLabs, receives A2A messages from Pulse Agent.
 
 **Deployment**:
+
 ```bash
 cd careflow-agents/caller-agent
 
@@ -2420,6 +2512,7 @@ gcloud run deploy caller-agent \
 ```
 
 **Environment Variables**:
+
 ```bash
 TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxx
@@ -2429,6 +2522,7 @@ GOOGLE_CLOUD_PROJECT=careflow-478811
 ```
 
 **Exposed Endpoints**:
+
 - `POST /` - A2A protocol endpoint (receives messages from Pulse Agent)
 - `POST /twilio-webhook` - Twilio voice status callbacks
 
@@ -2455,6 +2549,7 @@ Patient Phone Calls
 All scheduler resources are managed via **Terraform** in `scheduler/terraform/`:
 
 **File Structure**:
+
 ```
 scheduler/terraform/
 ├── main.tf          # Scheduler jobs (3 times × 2 environments = 6 jobs)
@@ -2514,6 +2609,7 @@ resource "google_cloud_scheduler_job" "morning_rounds" {
 | `careflow-evening-rounds` | 8:15 PM | `15 20 * * *` | Evening medication review |
 
 **Total Resources Deployed**: 16
+
 - 6 Cloud Scheduler Jobs (3 × staging + 3 × prod)
 - 2 Service Accounts (`careflow-scheduler`)
 - 2 IAM Bindings (`roles/run.invoker`)
@@ -2522,6 +2618,7 @@ resource "google_cloud_scheduler_job" "morning_rounds" {
 #### **Deployment Steps**
 
 **Step 1: Configure Variables**
+
 ```bash
 cd scheduler/terraform
 nano vars/env.tfvars
@@ -2546,17 +2643,20 @@ pulse_agent_service_name = "careflow-agent"
 ```
 
 **Step 2: Initialize Terraform**
+
 ```bash
 terraform init
 ```
 
 **Step 3: Preview & Deploy**
+
 ```bash
 terraform plan -var-file=vars/env.tfvars
 terraform apply -var-file=vars/env.tfvars
 ```
 
 **Step 4: Verify Deployment**
+
 ```bash
 # List scheduler jobs
 gcloud scheduler jobs list --project=careflow-478811 --location=us-central1
@@ -2577,6 +2677,7 @@ Cloud Scheduler authenticates to Cloud Run using **OIDC tokens** (no API keys):
 4. **Validation**: Cloud Run verifies audience and issuer
 
 **IAM Binding** (managed by Terraform):
+
 ```terraform
 resource "google_cloud_run_v2_service_iam_member" "pulse_agent_invoker" {
   for_each = local.deploy_project_ids
@@ -2592,6 +2693,7 @@ resource "google_cloud_run_v2_service_iam_member" "pulse_agent_invoker" {
 #### **Retry Configuration**
 
 Each job has automatic retry logic:
+
 ```terraform
 retry_config {
   retry_count          = 3       # Max 3 attempts
@@ -2602,6 +2704,7 @@ retry_config {
 ```
 
 **Retry Scenarios**:
+
 - Cloud Run cold start delays
 - Temporary network failures
 - Downstream service rate limiting
@@ -2609,6 +2712,7 @@ retry_config {
 #### **Operations**
 
 **Pause Jobs** (Maintenance):
+
 ```bash
 for job in morning-rounds noon-rounds evening-rounds; do
   gcloud scheduler jobs pause careflow-$job \
@@ -2617,6 +2721,7 @@ done
 ```
 
 **Resume Jobs**:
+
 ```bash
 for job in morning-rounds noon-rounds evening-rounds; do
   gcloud scheduler jobs resume careflow-$job \
@@ -2626,6 +2731,7 @@ done
 
 **Update Schedule**:
 Edit `main.tf`, change `schedule` parameter, then:
+
 ```bash
 terraform apply -var-file=vars/env.tfvars
 ```
@@ -2633,11 +2739,13 @@ terraform apply -var-file=vars/env.tfvars
 #### **Monitoring**
 
 **Key Metrics**:
+
 1. Job success rate: `cloudscheduler.googleapis.com/job/attempt_count`
 2. Execution duration: `cloudscheduler.googleapis.com/job/execution_duration`
 3. Agent response latency: `run.googleapis.com/request_latencies`
 
 **Alert Policy** (3 consecutive failures):
+
 ```bash
 gcloud alpha monitoring policies create \
   --display-name="CareFlow Scheduler Failures" \
@@ -2654,9 +2762,98 @@ For complete documentation, see: [`scheduler/README.md`](../scheduler/README.md)
 ### **11.3. Frontend Deployment (Vercel)**
 
 The Next.js frontend is deployed as a single application.
+
 - **Environment:**
   - `NEXT_PUBLIC_FIREBASE_PROJECT_ID=careflow-478811`
 - **Multi-Tenancy:**
   - The frontend uses the logged-in user's `hospitalId` (from Auth session) to filter data views.
   - No separate deployment is needed for the frontend.
 
+---
+
+## **12. Testing Strategy**
+
+CareFlow Pulse follows a multi-layered testing strategy to ensure clinical safety and technical reliability.
+
+### 12.1. Agent Evaluation (`adk eval`)
+
+We use the ADK Evaluation framework to measure agent performance against clinical scenarios.
+
+- **Dataset:** `tests/evaluation/clinical_scenarios.json`
+- **Metrics:**
+  - **Relevance:** Does the agent ask the right symptom questions?
+  - **Tool Accuracy:** Does it call `create_alert` correctly for RED scenarios?
+  - **Tone:** Is the persona empathetic and professional?
+
+- **CI/CD Integration:** Eval runs automatically on every PR to `main`.
+
+### 12.2. Automated Unit & Integration Tests
+
+- **Backend:** `pytest` for tool logic, Firestore interactions, and Model Armor plugin behavior.
+- **Frontend:** `Vitest` and `React Testing Library` for dashboard components.
+- **API:** `Playwright` for E2E testing of the full round-triggering flow.
+
+### 12.3. Manual Voice Testing
+
+Given the voice nature of the Caller Agent, manual "Golden Path" call sessions are conducted weekly to verify:
+
+- ElevenLabs voice latency and emotional resonance.
+- Twilio ConversationRelay barge-in sensitivity.
+
+---
+
+## 13. Performance Optimization
+
+### 13.1. Voice Latency Hierarchy
+
+To achieve natural conversation flow, we target sub-2s response latency:
+
+1. **Streaming STT (Twilio):** Real-time transcriptions sent to Caller Agent.
+2. **Streaming LLM (Gemini):** Partial chunks sent to TTS as soon as context is sufficient.
+3. **Streaming TTS (ElevenLabs)::** Audio frames streamed back to Twilio immediately.
+
+### 13.2. Database Performance
+
+- **Firestore Indexing:** Composite indexes on `hospitalId` + `riskLevel` + `createdAt` for sub-100ms dashboard refreshes.
+- **Caching:** Pulse Agent caches hospital-specific configuration for 30 minutes to reduce Firestore reads.
+
+---
+
+## 14. Error Handling & Monitoring
+
+### 14.1. Clinical Safety Handover
+
+If the AI Agent detects an unrecoverable error or high patient distress:
+
+1. **Fallback Message:** "I'm having trouble connecting to my medical systems. Please stay on the line, I'm alerting your nurse coordinator immediately."
+2. **Escalation:** Triggers a `roles/critical_handover` alert in Firestore.
+
+### 14.2. Operational Monitoring
+
+- **Google Cloud Logging:** All agent thoughts and tool calls are logged with `TRACE` level.
+- **Error Reporting:** Real-time alerts on HTTP 5xx or Model Armor block spikes.
+- **Custom Telemetry:** Tracks "Time to Handover" and "Call Completion Rate" per hospital.
+
+---
+
+## 15. Future Enhancements & Roadmap
+
+### 15.1. Vision-Based Adherence (v3.5)
+
+Allow patients to text photos of their medication bottles to the Pulse Agent for automatic verification using Gemini Multimodal Vision.
+
+### 15.2. EHR Integration (v4.0)
+
+Direct HL7 FHIR integration with Epic and Cerner to eliminate manual patient data entry.
+
+### 15.3. Multi-Language Support
+
+Expansion of Caller Agent to support Spanish and French using ElevenLabs' multilingual models.
+
+---
+
+## **Appendices**
+
+- **Appendix A:** [ADK Prompt Engineering Guide](file:///home/audrey/Bureau/careflow/docs/prompt_engineering.md)
+
+- **Appendix B:** [Infrastructure Blueprint (Terraform Resources)](file:///home/audrey/Bureau/careflow/docs/infrastructure_blueprint.md)
