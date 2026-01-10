@@ -1,6 +1,6 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.language_models.chat_models import BaseChatModel
-from .config import OPENAI_API_KEY, GEMINI_API_KEY
+from ..config import OPENAI_API_KEY, GEMINI_API_KEY
 from typing import Optional, TypedDict, Any, Dict
 import logging
 

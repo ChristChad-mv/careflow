@@ -11,8 +11,11 @@ Author: CareFlow Pulse Team
 Version: 1.0.0
 """
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -282,6 +285,54 @@ ConversationEvent = Union[
 
 
 # =============================================================================
+# CONVERSATION UTILITIES
+# =============================================================================
+
+def handle_interruption(interrupt_message: 'InterruptMessage', session_data: SessionData) -> None:
+    """
+    Handle user interruption during agent response.
+    
+    When a user interrupts the agent mid-speech, this function:
+    1. Calculates how much of the response was actually spoken
+    2. Updates conversation history with the partial response
+    3. Marks the interruption point for context continuity
+    
+    Args:
+        interrupt_message: Contains the utterance spoken until interruption
+        session_data: Current session state including conversation history
+    """
+    logger.info("Handling user interruption...")
+    
+    if not session_data.current_response:
+        return
+    
+    utterance_until_interrupt = interrupt_message.utterance_until_interrupt
+    current_response = session_data.current_response
+    
+    # Calculate interruption position
+    interrupt_position = len(current_response)
+    if utterance_until_interrupt and utterance_until_interrupt.strip():
+        position = current_response.lower().find(utterance_until_interrupt.lower())
+        if position != -1:
+            interrupt_position = position + len(utterance_until_interrupt)
+    
+    # Extract the portion actually spoken
+    spoken_portion = current_response[:interrupt_position]
+    
+    if spoken_portion.strip():
+        session_data.conversation.append(ConversationMessage(
+            role='assistant',
+            content=spoken_portion,
+            timestamp='',  # Will be set by caller
+            interrupted=True,
+            interrupted_at=interrupt_position
+        ))
+        logger.info(f"Interrupted at position {interrupt_position}/{len(current_response)}")
+    
+    session_data.interrupted_at = interrupt_position
+
+
+# =============================================================================
 # EXPORTS
 # =============================================================================
 
@@ -297,4 +348,5 @@ __all__ = [
     'InterruptMessage',
     'ErrorMessage',
     'ConversationEvent',
+    'handle_interruption',
 ]
