@@ -10,7 +10,7 @@ This document outlines the security audit performed on the CareFlow Pulse system
 - **Action Items:**
     - [x] Identified `print()` statements in `agent.py` and `config.py`.
     - [x] Removed `console.log` in `nextjs/src/lib/config.ts`.
-    - [x] Removed non-essential debug prints (e.g., "Connecting to MCP").
+    - [x] Removed non-essential debug prints (e.g., "Connectin² to MCP").
     - [x] **Kept** Agent-to-Agent interaction logs (vital for monitoring).
 
 ### 2.2 Configuration Security
