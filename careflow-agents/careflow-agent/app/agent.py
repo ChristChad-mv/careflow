@@ -24,16 +24,16 @@ from .app_utils.config_loader import (
     HOSPITAL_ID
 )
 from .app_utils.prompts.system_prompts import CAREFLOW_SYSTEM_PROMPT
-from .tools.mcp__tool_loader import init_mcp_tools, all_tools
+from .tools import mcp__tool_loader
 from .tools.a2a_tools import a2a_tools
-from .callbacks.after_agent_callback import sanitize_response_callback
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Initialize MCP tools immediately
-init_mcp_tools()
+# Initialize MCP tools immediately
+mcp__tool_loader.init_mcp_tools()
 
 AGENT_DESCRIPTION = "An AI agent that monitors post-hospitalization patients, analyzes symptoms, and generates alerts for healthcare coordinators."
 
@@ -55,9 +55,8 @@ class CareFlowAgent(BaseAgent):
                 thinking_config=genai_types.ThinkingConfig(include_thoughts=True)
             ),
             instruction=CAREFLOW_SYSTEM_PROMPT,
-            tools=all_tools + a2a_tools,
-            output_key="patient_monitoring",
-            after_agent_callback=sanitize_response_callback
+            tools=mcp__tool_loader.all_tools + a2a_tools,
+            output_key="patient_monitoring"
         )
         
         super().__init__(
