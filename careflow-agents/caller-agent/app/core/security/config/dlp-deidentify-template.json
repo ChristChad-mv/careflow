@@ -1,0 +1,123 @@
+{
+  "displayName": "CareFlow HIPAA PHI Anonymization",
+  "description": "Redacts or masks all PHI for HIPAA compliance",
+  "deidentifyConfig": {
+    "infoTypeTransformations": {
+      "transformations": [
+        {
+          "infoTypes": [
+            {
+              "name": "PERSON_NAME"
+            }
+          ],
+          "primitiveTransformation": {
+            "replaceWithInfoTypeConfig": {}
+          }
+        },
+        {
+          "infoTypes": [
+            {
+              "name": "PHONE_NUMBER"
+            },
+            {
+              "name": "EMAIL_ADDRESS"
+            }
+          ],
+          "primitiveTransformation": {
+            "characterMaskConfig": {
+              "maskingCharacter": "*",
+              "numberToMask": 0
+            }
+          }
+        },
+        {
+          "infoTypes": [
+            {
+              "name": "US_SOCIAL_SECURITY_NUMBER"
+            },
+            {
+              "name": "CREDIT_CARD_NUMBER"
+            },
+            {
+              "name": "MEDICAL_RECORD_NUMBER"
+            },
+            {
+              "name": "US_DRIVER_LICENSE_NUMBER"
+            },
+            {
+              "name": "US_PASSPORT"
+            }
+          ],
+          "primitiveTransformation": {
+            "cryptoReplaceFfxFpeConfig": {
+              "cryptoKey": {
+                "transient": {
+                  "name": "phi-transient-key"
+                }
+              },
+              "commonAlphabet": "NUMERIC"
+            }
+          }
+        },
+        {
+          "infoTypes": [
+            {
+              "name": "DATE_OF_BIRTH"
+            },
+            {
+              "name": "DATE"
+            }
+          ],
+          "primitiveTransformation": {
+            "dateShiftConfig": {
+              "upperBoundDays": 30,
+              "lowerBoundDays": -30,
+              "cryptoKey": {
+                "transient": {
+                  "name": "phi-transient-date-key"
+                }
+              }
+            }
+          }
+        },
+        {
+          "infoTypes": [
+            {
+              "name": "STREET_ADDRESS"
+            },
+            {
+              "name": "LOCATION"
+            }
+          ],
+          "primitiveTransformation": {
+            "replaceConfig": {
+              "newValue": {
+                "stringValue": "[LOCATION REDACTED]"
+              }
+            }
+          }
+        },
+        {
+          "infoTypes": [
+            {
+              "name": "IP_ADDRESS"
+            },
+            {
+              "name": "MAC_ADDRESS"
+            },
+            {
+              "name": "URL"
+            }
+          ],
+          "primitiveTransformation": {
+            "replaceConfig": {
+              "newValue": {
+                "stringValue": "[REDACTED]"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

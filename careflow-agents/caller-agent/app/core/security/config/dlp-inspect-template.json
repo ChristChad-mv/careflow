@@ -1,0 +1,74 @@
+{
+  "displayName": "CareFlow HIPAA PHI Inspection",
+  "description": "Detects all Protected Health Information (PHI) for HIPAA compliance",
+  "inspectConfig": {
+    "infoTypes": [
+      {
+        "name": "PERSON_NAME"
+      },
+      {
+        "name": "PHONE_NUMBER"
+      },
+      {
+        "name": "EMAIL_ADDRESS"
+      },
+      {
+        "name": "DATE_OF_BIRTH"
+      },
+      {
+        "name": "US_SOCIAL_SECURITY_NUMBER"
+      },
+      {
+        "name": "CREDIT_CARD_NUMBER"
+      },
+      {
+        "name": "MEDICAL_RECORD_NUMBER"
+      },
+      {
+        "name": "US_HEALTHCARE_NPI"
+      },
+      {
+        "name": "STREET_ADDRESS"
+      },
+      {
+        "name": "US_DRIVER_LICENSE_NUMBER"
+      },
+      {
+        "name": "US_PASSPORT"
+      },
+      {
+        "name": "IP_ADDRESS"
+      },
+      {
+        "name": "MAC_ADDRESS"
+      },
+      {
+        "name": "URL"
+      },
+      {
+        "name": "IBAN_CODE"
+      },
+      {
+        "name": "SWIFT_CODE"
+      },
+      {
+        "name": "VEHICLE_IDENTIFICATION_NUMBER"
+      },
+      {
+        "name": "AGE"
+      },
+      {
+        "name": "DATE"
+      },
+      {
+        "name": "LOCATION"
+      }
+    ],
+    "minLikelihood": "UNLIKELY",
+    "limits": {
+      "maxFindingsPerItem": 0,
+      "maxFindingsPerRequest": 0
+    },
+    "includeQuote": true
+  }
+}
