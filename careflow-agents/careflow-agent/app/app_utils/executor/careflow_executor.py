@@ -38,6 +38,19 @@ class CareFlowAgentExecutor(AgentExecutor):
     def __init__(self, agent: CareFlowAgent):
         self.agent = agent
         self.cancelled_tasks: Set[str] = set()
+        
+        # Initialize ADK Runner once for the executor lifetime
+        model_armor_client = ModelArmorClient()
+        model_armor_plugin = ModelArmorPlugin(client=model_armor_client)
+
+        self.runner = Runner(
+            app_name=self.agent.name,
+            agent=self.agent,
+            session_service=InMemorySessionService(),
+            memory_service=InMemoryMemoryService(),
+            artifact_service=InMemoryArtifactService(),
+            plugins=[model_armor_plugin]
+        )
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         if context.task_id:
@@ -92,7 +105,7 @@ class CareFlowAgentExecutor(AgentExecutor):
                     kind="message",
                     role=Role.agent,
                     messageId=str(uuid.uuid4()),
-                    parts=[Part(root=TextPart(kind="text", text="CareFlow Agent is analyzing..."))],
+                    parts=[Part(root=TextPart(kind="text", text="Pulse Agent received task, processing..."))],
                     taskId=taskId,
                     contextId=contextId,
                 ),
@@ -103,19 +116,22 @@ class CareFlowAgentExecutor(AgentExecutor):
         await event_queue.enqueue_event(working_status)
 
         try:
-            # 3. Initialize ADK Runner with Security Plugin
-            model_armor_client = ModelArmorClient()
-            model_armor_plugin = ModelArmorPlugin(client=model_armor_client)
-
-            runner = Runner(
-                app_name=self.agent.name,
-                agent=self.agent,
-                session_service=InMemorySessionService(),
-                memory_service=InMemoryMemoryService(),
-                artifact_service=InMemoryArtifactService(),
-                plugins=[model_armor_plugin]
+            # 3. Ensure session exists in the service before running
+            session = await self.runner.session_service.get_session(
+                session_id=contextId,
+                user_id="a2a_caller",
+                app_name=self.agent.name
             )
             
+            if not session:
+                logger.info(f"Creating new session for context {contextId}")
+                session = await self.runner.session_service.create_session(
+                    session_id=contextId, 
+                    user_id="a2a_caller",
+                    app_name=self.agent.name,
+                    state={}
+                )
+
             # 4. Extract user text and run the agent
             user_text = "".join([part.root.text + "\n" for part in user_message.parts if part.root.kind == "text" and hasattr(part.root, "text")])
             if not user_text.strip():
@@ -127,9 +143,9 @@ class CareFlowAgentExecutor(AgentExecutor):
             )
             
             response_text = ""
-            async for event in runner.run_async(
+            async for event in self.runner.run_async(
                 user_id="a2a_caller",
-                session_id=contextId,  # Use contextId to maintain session continuity
+                session_id=session.id,
                 new_message=input_content
             ):
                 if event.is_final_response() and event.content and event.content.parts:
