@@ -104,6 +104,7 @@ def get_env_json(key: str, default: Optional[Any] = None) -> Any:
 
 # Server Configuration
 NGROK_URL: Optional[str] = get_env_var('NGROK_URL')
+PUBLIC_URL: Optional[str] = get_env_var('PUBLIC_URL')
 PORT: str = get_env_var('PORT', '3000')
 
 # API Keys
@@ -137,6 +138,7 @@ __all__ = [
     'get_env_int',
     'get_env_json',
     'NGROK_URL',
+    'PUBLIC_URL',
     'PORT',
     'OPENAI_API_KEY',
     'GEMINI_API_KEY',
