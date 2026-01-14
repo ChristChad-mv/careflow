@@ -74,6 +74,12 @@ const nextConfig: NextConfig = {
     domains: [],
     formats: ['image/avif', 'image/webp'],
   },
+
+  // Force turbopack to use the project directory as root
+  // to avoid scanning the entire home directory
+  turbopack: {
+    root: '.',
+  },
 };
 
 export default nextConfig;
