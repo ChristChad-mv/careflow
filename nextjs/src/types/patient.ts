@@ -29,6 +29,7 @@ export interface Patient {
     type: string;
     location: string;
   };
+  lastCallSid?: string; // For Audio-First Reporting
 }
 
 export interface Medication {
@@ -40,6 +41,7 @@ export interface Medication {
 
 export interface Alert {
   id: string;
+  hospitalId?: string;
   patientId: string;
   patientName: string;
   priority: RiskLevel;
@@ -47,7 +49,7 @@ export interface Alert {
   trigger: string;
   brief?: string;
   status: 'active' | 'resolved' | 'in_progress';
-  resolutionNote?: string;
+  callSid?: string;
 }
 
 export interface Interaction {
@@ -56,4 +58,6 @@ export interface Interaction {
   sender: 'ai' | 'patient' | 'system';
   content: string;
   type?: 'message' | 'event';
+  callSid?: string; // For Audio-First Reporting
 }
+
