@@ -15,7 +15,7 @@ resource "google_service_account" "mcp_sa" {
   for_each = local.deploy_project_ids
 
   project      = each.value
-  account_id   = "${var.project_name}-sa"
+  account_id   = "${each.key}-mcp-sa"
   display_name = "MCP Toolbox Service Account (${each.key})"
   description  = "Service account for MCP Toolbox Cloud Run service with Firestore access"
 

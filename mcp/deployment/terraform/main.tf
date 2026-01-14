@@ -45,7 +45,7 @@ resource "google_project_service" "cicd_services" {
 resource "google_cloud_run_v2_service" "mcp_toolbox" {
   for_each = local.deploy_project_ids
 
-  name                = var.project_name
+  name                = "${var.project_name}-${each.key}"
   location            = var.region
   project             = each.value
   deletion_protection = false
