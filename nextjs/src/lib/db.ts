@@ -45,7 +45,8 @@ const convertPatient = (doc: FirebaseFirestore.DocumentSnapshot): Patient => {
         currentStatus: mapRiskLevel(data.riskLevel || 'GREEN'),
         dischargePlan: dischargePlan,
         assignedNurse: data.assignedNurse,
-        nextAppointment: data.nextAppointment
+        nextAppointment: data.nextAppointment,
+        lastCallSid: data.lastCallSid // For Audio-First Reporting
     };
 };
 
@@ -84,14 +85,34 @@ const convertDoc = <T>(doc: FirebaseFirestore.DocumentSnapshot): T => {
 };
 
 // Helper to convert Firestore data to Alert object with normalization
+// Helper to convert Firestore data to Alert object with normalization
 const convertAlert = (doc: FirebaseFirestore.DocumentSnapshot): Alert => {
     const raw = convertDoc<any>(doc);
     // Prioritize 'priority' field, fallback to 'riskLevel' for legacy data
     const rawLevel = raw.priority || raw.riskLevel || 'GREEN';
+
+    // Ensure createdAt is a valid Date object
+    let date = raw.createdAt || raw.timestamp;
+
+    // If it's a Firestore Timestamp that wasn't converted (unlikely with convertDoc, but safe)
+    if (date && typeof date.toDate === 'function') {
+        date = date.toDate();
+    }
+    // If it's a string
+    else if (typeof date === 'string') {
+        date = new Date(date);
+    }
+
+    // If missing or invalid
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+        date = new Date(); // Fallback to 'now' to prevent crash
+    }
+
     return {
         ...raw,
         priority: mapRiskLevel(rawLevel),
-        createdAt: raw.createdAt || raw.timestamp, // Fallback if mixed data
+        createdAt: date,
+        callSid: raw.callSid // Map callSid
     };
 };
 
@@ -161,7 +182,9 @@ export async function getAlerts(): Promise<Alert[]> {
     let query = db.collection("alerts").where('hospitalId', '==', user.hospitalId);
 
     // Filter by timestamp if needed, or just get latest
-    const snapshot = await query.orderBy("createdAt", "desc").limit(500).get(); // Safety limit
+    // Note: Removed orderBy("createdAt", "desc") to avoid needing a composite index for (hospitalId, createdAt)
+    // We sort in memory below anyway.
+    const snapshot = await query.limit(500).get(); // Safety limit
     let alerts = snapshot.docs.map(doc => convertAlert(doc));
 
     // Nurse Role: Filter by assigned patients only (IN MEMORY)
@@ -304,3 +327,5 @@ export async function getDashboardStats() {
         }
     };
 }
+
+
