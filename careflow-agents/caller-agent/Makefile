@@ -29,6 +29,15 @@ playground:
 local-backend:
 	uv run uvicorn app.server:app --host localhost --port 8000 --reload
 
+# Start a direct chat session with the agent (bypasses server/Twilio)
+chat:
+	uv run chat_console.py
+
+# Start a simulated patient handset (Connects to running server via WebSocket)
+# This one is interactive and waits for port 8002 signals
+phone:
+	uv run scripts/console_phone.py
+
 # ==============================================================================
 # A2A Protocol Inspector
 # ==============================================================================

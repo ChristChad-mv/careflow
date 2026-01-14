@@ -15,6 +15,11 @@ install:
 local-backend:
 	uv run python -m app.server --port 8080 --reload
 
+# Launch MCP Toolbox server locally (Requires Firestore credentials)
+mcp-server:
+	@echo "🚀 Starting MCP Toolbox server..."
+	../../mcp/toolbox serve ../../mcp/tools.yaml
+
 # ==============================================================================
 # A2A Protocol Inspector
 # ==============================================================================
