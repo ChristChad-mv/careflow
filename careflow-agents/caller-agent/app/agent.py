@@ -306,6 +306,8 @@ class CallerAgent:
             for msg in session_data.conversation:
                 if msg.role == 'user':
                     messages.append(HumanMessage(content=msg.content))
+                elif msg.role == 'system':
+                    messages.append(SystemMessage(content=msg.content))
                 else:
                     messages.append(AIMessage(content=msg.content))
             
