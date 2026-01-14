@@ -32,13 +32,19 @@ function generateRequestId(): string {
  */
 function isPublicPath(pathname: string): boolean {
   const publicPaths = [
+    '/',
     '/auth/login',
     '/auth/register',
     '/auth/error',
     '/auth/forgot-password',
+    '/privacy-policy',
+    '/hipaa-compliance',
+    '/security',
   ];
 
-  return publicPaths.some(path => pathname.startsWith(path));
+  return publicPaths.some(path =>
+    path === '/' ? pathname === '/' : pathname.startsWith(path)
+  );
 }
 
 export default auth(async (request) => {
@@ -86,21 +92,21 @@ export default auth(async (request) => {
   if (pathname.startsWith('/api') || request.method === 'POST') {
     const limiterType = pathname.startsWith('/api/auth') ? 'auth' : 'api';
     const ratelimit = getRatelimit(limiterType);
-    
+
     if (ratelimit) {
       const result = await ratelimit.limit(clientIp);
-      
+
       if (!result.success) {
         const resetTime = result.reset instanceof Date ? result.reset : new Date(result.reset);
         const retryAfter = Math.ceil((resetTime.getTime() - Date.now()) / 1000);
-        
+
         return NextResponse.json(
-          { 
+          {
             error: 'Too Many Requests',
             message: 'You have exceeded the rate limit. Please try again later.',
             retryAfter
           },
-          { 
+          {
             status: 429,
             headers: {
               'X-RateLimit-Limit': result.limit.toString(),
@@ -111,7 +117,7 @@ export default auth(async (request) => {
           }
         );
       }
-      
+
       // Add rate limit headers to successful requests
       const resetTime = result.reset instanceof Date ? result.reset : new Date(result.reset);
       response.headers.set('X-RateLimit-Limit', result.limit.toString());
