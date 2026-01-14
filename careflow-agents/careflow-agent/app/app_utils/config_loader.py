@@ -31,7 +31,7 @@ AGENT_MODEL: str = get_env_var('AGENT_MODEL', 'gemini-3-pro-preview')
 HOSPITAL_ID: str = get_env_var('HOSPITAL_ID', 'HOSP001')
 
 # External Services
-CAREFLOW_CALLER_URL: str = get_env_var('CAREFLOW_CALLER_URL', 'http://localhost:8080')
+CAREFLOW_CALLER_URL: str = get_env_var('CAREFLOW_CALLER_URL', 'http://localhost:8000')
 MCP_TOOLBOX_URL: str = get_env_var('MCP_TOOLBOX_URL', 'http://127.0.0.1:5000')
 
 # API Keys
