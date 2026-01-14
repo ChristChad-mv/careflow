@@ -1,7 +1,7 @@
 import os
 import logging
 from typing import Optional, Dict, Any, List
-# Ensure google-cloud-modelarmor is installed
+
 try:
     from google.cloud import modelarmor_v1
 except ImportError:
@@ -105,10 +105,22 @@ class ModelArmorClient:
             result = {
                 "is_blocked": is_blocked,
                 "invocation_result": sanitization_result.invocation_result.name,
+                "filter_results": {}
             }
             
             if is_blocked:
-                logger.warning(f"🚨 Model Armor BLOCKED prompt")
+                # Log the filter results for debugging
+                filter_info = {}
+                if hasattr(sanitization_result, 'filter_results'):
+                    try:
+                        # Attempt to get a readable dict of results
+                        for name, res in sanitization_result.filter_results.items():
+                            filter_info[name] = str(res)
+                    except Exception:
+                        filter_info = "could not parse filter results"
+                
+                logger.warning(f"🚨 Model Armor BLOCKED prompt. Filter Results: {filter_info}")
+                result["filter_results"] = filter_info
             else:
                 logger.debug(f"✅ Model Armor prompt scan passed")
             
