@@ -109,6 +109,27 @@ class MessageHandler:
         logger.info(f"Call setup - SID: {setup_msg.call_sid}, Direction: {setup_msg.direction}")
         if setup_msg.custom_parameters:
             logger.info(f"Custom parameters: {setup_msg.custom_parameters}")
+            
+            # Context Injection for Console/Simulated Calls
+            patient_name = setup_msg.custom_parameters.get('patient_name')
+            patient_id = setup_msg.custom_parameters.get('patient_id')
+            context = setup_msg.custom_parameters.get('context')
+            
+            if patient_name and patient_id:
+                logger.info(f"Injecting context for patient: {patient_name} ({patient_id})")
+                system_instruction = (
+                    f"URGENT CONTEXT: You are now connected with patient {patient_name} "
+                    f"(ID: {patient_id})."
+                )
+                if context:
+                    system_instruction += f"\nSpecific Instructions:\n{context}"
+                system_instruction += "\n\nThe patient has just picked up. Start the interview."
+                
+                self.session_data.conversation.append(ConversationMessage(
+                    role='system',
+                    content=system_instruction,
+                    timestamp=datetime.now().isoformat()
+                ))
     
     async def handle_prompt(self, message: dict) -> bool:
         """
