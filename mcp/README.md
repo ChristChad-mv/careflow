@@ -7,6 +7,7 @@ Model Context Protocol (MCP) toolbox for CareFlow Pulse. Provides Firestore data
 The **Model Context Protocol (MCP)** is an open protocol that standardizes how AI applications connect to external data sources and tools. The MCP toolbox acts as a bridge between our AI agents and Firestore database.
 
 **Benefits:**
+
 - 🔒 **Secure**: No direct database credentials in agent code
 - 🔌 **Pluggable**: Easy to swap data sources without changing agent code
 - 📊 **Structured**: Type-safe queries with validation
@@ -51,6 +52,7 @@ mcp/
 The `tools.yaml` file defines:
 
 1. **Data Source**: Firestore connection
+
    ```yaml
    sources:
      careflow-firestore:
@@ -107,13 +109,14 @@ chmod +x toolbox
 # From project root
 ./mcp/toolbox serve mcp/tools.yaml
 
-# Or from mcp/ directory
-./toolbox serve tools.yaml
+# Or from mcp/ directory (Recommended for testing)
+./toolbox --tools-file "tools.yaml"
 ```
 
-The MCP server will start on **http://localhost:5000**
+The MCP server will start on **<http://localhost:5000>**
 
 Expected output:
+
 ```
 INFO Starting MCP toolbox server
 INFO Loaded 6 tools from tools.yaml
@@ -221,6 +224,7 @@ curl http://localhost:5000/health
 ```
 
 Response:
+
 ```json
 {
   "status": "healthy",
@@ -319,6 +323,7 @@ terraform plan
 ```
 
 This will create:
+
 - ✅ Cloud Run services (staging + production)
 - ✅ Service accounts with IAM roles
 - ✅ API enablement (Cloud Run, Firestore, Logging)
@@ -350,6 +355,7 @@ curl $MCP_PROD_URL/health
 ### Terraform Configuration
 
 **Key Files**:
+
 - [deployment/terraform/main.tf](deployment/terraform/main.tf) - Cloud Run service configuration
 - [deployment/terraform/variables.tf](deployment/terraform/variables.tf) - Input variables
 - [deployment/terraform/iam.tf](deployment/terraform/iam.tf) - IAM permissions (Firestore access)
@@ -364,6 +370,7 @@ curl $MCP_PROD_URL/health
 | `roles/cloudtrace.agent` | Send traces |
 
 **Cloud Run Configuration**:
+
 - **CPU**: 1 vCPU
 - **Memory**: 512 MiB
 - **Min Instances**: 0 (scale to zero)
@@ -405,6 +412,7 @@ git push origin main
 ```
 
 The CI/CD pipeline will automatically:
+
 1. Build new Docker image
 2. Push to Artifact Registry
 3. Deploy to Cloud Run (staging → production)
@@ -462,6 +470,7 @@ If MCP toolbox fails to start locally:
 ### Deployment Issues
 
 **Error: Service account not found**
+
 ```bash
 # Ensure APIs are enabled
 gcloud services enable iam.googleapis.com --project=<PROJECT_ID>
@@ -469,6 +478,7 @@ terraform apply
 ```
 
 **Error: Permission denied**
+
 ```bash
 # Grant yourself necessary roles
 gcloud projects add-iam-policy-binding <PROJECT_ID> \
@@ -477,6 +487,7 @@ gcloud projects add-iam-policy-binding <PROJECT_ID> \
 ```
 
 **Service Not Starting**
+
 ```bash
 # Check Cloud Run logs
 gcloud run services logs read careflow-mcp-toolbox \
@@ -486,6 +497,7 @@ gcloud run services logs read careflow-mcp-toolbox \
 ```
 
 Common issues:
+
 - Firestore database doesn't exist → Create it in GCP Console
 - tools.yaml syntax error → Validate YAML syntax
 - Binary download failed → Check network/proxy settings
