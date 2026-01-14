@@ -44,7 +44,7 @@ from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 
 # Local imports
-from .config import NGROK_URL, PORT
+from .config import NGROK_URL, PUBLIC_URL, PORT
 from .app_utils.conversation_relay import SessionData, ConversationMessage
 from .app_utils.websocket_handlers import MessageHandler, connection_manager
 from .app_utils.telemetry import setup_telemetry
@@ -179,7 +179,12 @@ async def twiml_endpoint(request: Request) -> Response:
         TwiML response configuring ConversationRelay with ElevenLabs TTS
     """
     # Determine host for WebSocket URL
-    host = NGROK_URL or str(request.headers.get('host')) or f"localhost:{server_port}"
+    # Priority: PUBLIC_URL > NGROK_URL > Host Header > Localhost
+    host = PUBLIC_URL or NGROK_URL or str(request.headers.get('host')) or f"localhost:{server_port}"
+    
+    # Strip protocol if present in PUBLIC_URL/NGROK_URL for correct WebSocket URL construction
+    if "://" in host:
+        host = host.split("://")[1]
     
     # Extract call parameters (present for outbound calls, absent for inbound)
     params = request.query_params
