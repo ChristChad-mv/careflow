@@ -37,11 +37,15 @@ destroy: ## Destroy all Cloud Scheduler resources
 	@sleep 5
 	cd $(TERRAFORM_DIR) && terraform destroy -var-file=$(VAR_FILE)
 
-test: ## Manually trigger morning rounds (for testing)
+test: ## Manually trigger morning rounds (GCP Environment)
 	@echo "🧪 Manually triggering morning rounds..."
 	gcloud scheduler jobs run careflow-morning-rounds --location=$(REGION)
 	@echo ""
 	@echo "✅ Job triggered! Check logs with: make logs"
+
+local-test: ## Trigger rounds locally on port 8080
+	@echo "🧪 Triggering rounds locally on port 8080..."
+	python3 run_daily_round.py --hour 8
 
 pause: ## Pause all scheduler jobs
 	@echo "⏸️  Pausing all scheduler jobs..."
