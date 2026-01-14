@@ -76,7 +76,7 @@ resource "google_project_service" "scheduler_apis" {
 resource "google_service_account" "scheduler_sa" {
   for_each = local.deploy_project_ids
 
-  account_id   = "${var.project_name}-scheduler"
+  account_id   = "${var.project_name}-${each.key}-scheduler"
   display_name = "CareFlow Cloud Scheduler Service Account"
   description  = "Service account used by Cloud Scheduler to trigger CareFlow agent endpoints"
   project      = each.value
@@ -104,7 +104,7 @@ resource "google_cloud_run_v2_service_iam_member" "pulse_agent_invoker" {
 resource "google_cloud_scheduler_job" "morning_rounds" {
   for_each = local.deploy_project_ids
 
-  name             = "${var.project_name}-morning-rounds"
+  name             = "${var.project_name}-${each.key}-morning-rounds"
   description      = "CareFlow Pulse - Morning patient rounds for medication adherence"
   schedule         = "15 8 * * *"
   time_zone        = "America/New_York"
@@ -144,7 +144,7 @@ resource "google_cloud_scheduler_job" "morning_rounds" {
   depends_on = [
     google_project_service.scheduler_apis,
     google_service_account.scheduler_sa,
-    google_cloud_run_v2_service_iam_member.pulse_agent_invoker
+    # google_cloud_run_v2_service_iam_member.pulse_agent_invoker
   ]
 }
 
@@ -155,7 +155,7 @@ resource "google_cloud_scheduler_job" "morning_rounds" {
 resource "google_cloud_scheduler_job" "noon_rounds" {
   for_each = local.deploy_project_ids
 
-  name             = "${var.project_name}-noon-rounds"
+  name             = "${var.project_name}-${each.key}-noon-rounds"
   description      = "CareFlow Pulse - Noon patient rounds for medication adherence"
   schedule         = "15 12 * * *"
   time_zone        = "America/New_York"
@@ -195,7 +195,7 @@ resource "google_cloud_scheduler_job" "noon_rounds" {
   depends_on = [
     google_project_service.scheduler_apis,
     google_service_account.scheduler_sa,
-    google_cloud_run_v2_service_iam_member.pulse_agent_invoker
+    # google_cloud_run_v2_service_iam_member.pulse_agent_invoker
   ]
 }
 
@@ -206,7 +206,7 @@ resource "google_cloud_scheduler_job" "noon_rounds" {
 resource "google_cloud_scheduler_job" "evening_rounds" {
   for_each = local.deploy_project_ids
 
-  name             = "${var.project_name}-evening-rounds"
+  name             = "${var.project_name}-${each.key}-evening-rounds"
   description      = "CareFlow Pulse - Evening patient rounds for medication adherence"
   schedule         = "15 20 * * *"
   time_zone        = "America/New_York"
@@ -246,6 +246,6 @@ resource "google_cloud_scheduler_job" "evening_rounds" {
   depends_on = [
     google_project_service.scheduler_apis,
     google_service_account.scheduler_sa,
-    google_cloud_run_v2_service_iam_member.pulse_agent_invoker
+    # google_cloud_run_v2_service_iam_member.pulse_agent_invoker
   ]
 }
