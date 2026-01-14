@@ -1,22 +1,20 @@
-import { getAlert, getPatient, getInteractions } from "@/lib/db";
-import { formatDistanceToNow, format } from "date-fns";
+import { getAlert, getPatient } from "@/lib/db";
+import { formatDistanceToNow } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ManageAlertDialog } from "@/components/alerts/ManageAlertDialog";
-import { ArrowLeft, User, FileText, Activity, AlertTriangle, Pill, Clock, Bot } from "lucide-react";
+import { ArrowLeft, User, FileText, Activity, AlertTriangle, Pill, Bot } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ModernAudioPlayer } from "@/components/alerts/ModernAudioPlayer";
 
 export default async function AlertDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const alert = await getAlert(id);
     if (!alert) return notFound();
 
-    const [patient, interactions] = await Promise.all([
-        getPatient(alert.patientId),
-        getInteractions(alert.patientId)
-    ]);
+    const patient = await getPatient(alert.patientId);
 
     const getPriorityColor = (priority: string) => {
         switch (priority) {
@@ -163,14 +161,6 @@ export default async function AlertDetailPage({ params }: { params: Promise<{ id
                                     <span className="font-medium capitalize">{alert.priority}</span>
                                 </div>
                             </div>
-                            {alert.resolutionNote && (
-                                <div className="mt-4 pt-4 border-t">
-                                    <span className="text-sm font-semibold block mb-2">Resolution Notes</span>
-                                    <div className="bg-yellow-50 p-3 rounded-md text-sm border border-yellow-100 dark:bg-yellow-900/10 dark:border-yellow-900/50">
-                                        {alert.resolutionNote}
-                                    </div>
-                                </div>
-                            )}
 
                             <div className="pt-6 flex justify-end">
                                 <ManageAlertDialog alert={alert} />
@@ -178,49 +168,25 @@ export default async function AlertDetailPage({ params }: { params: Promise<{ id
                         </CardContent>
                     </Card>
 
-                    {/* Interaction Timeline */}
+                    {/* Audio Recording (Replaces Interaction Context) */}
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
-                                <Clock className="h-5 w-5 text-muted-foreground" />
-                                Correct Context: Interaction History
+                                <Bot className="h-5 w-5 text-primary" />
+                                Audio Context
                             </CardTitle>
+                            <CardDescription>
+                                Original call recording used for this analysis.
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="space-y-4 max-h-[400px] overflow-y-auto">
-                                {interactions.map((interaction) => (
-                                    <div
-                                        key={interaction.id}
-                                        className={`p-4 rounded-lg ${interaction.sender === 'ai'
-                                            ? 'bg-primary/10 border-l-4 border-primary'
-                                            : interaction.sender === 'patient'
-                                                ? 'bg-secondary border-l-4 border-accent'
-                                                : 'bg-muted border-l-4 border-muted-foreground'
-                                            }`}
-                                    >
-                                        <div className="flex items-center gap-2 mb-2">
-                                            {interaction.sender === 'ai' && <Bot className="h-4 w-4 text-primary" />}
-                                            {interaction.sender === 'patient' && <User className="h-4 w-4 text-accent" />}
-                                            {interaction.sender === 'system' && <Clock className="h-4 w-4 text-muted-foreground" />}
-
-                                            <span className="text-xs font-semibold uppercase">
-                                                {interaction.sender}
-                                            </span>
-                                            <span className="text-xs text-muted-foreground ml-auto">
-                                                {format(interaction.timestamp, 'MMM d, HH:mm')}
-                                            </span>
-                                        </div>
-                                        <p className={`text-sm ${interaction.type === 'event' ? 'font-semibold italic' : ''}`}>
-                                            {interaction.content}
-                                        </p>
-                                    </div>
-                                ))}
-                                {interactions.length === 0 && (
-                                    <div className="text-center text-muted-foreground py-4">
-                                        No interactions recorded yet.
-                                    </div>
-                                )}
-                            </div>
+                            {alert.callSid ? (
+                                <ModernAudioPlayer src={`/api/audio/${alert.callSid}`} />
+                            ) : (
+                                <div className="text-muted-foreground italic text-sm">
+                                    No output audio available for this alert.
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 

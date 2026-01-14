@@ -60,7 +60,7 @@ export default async function PatientProfile({ params }: { params: Promise<{ pat
                 <span className="text-sm font-medium text-muted-foreground">Date of Birth / Age</span>
                 <div className="font-medium">{formatDate(patient.dateOfBirth)}</div>
               </div>
-              <Separator />
+
               <div>
                 <span className="text-sm font-medium text-muted-foreground">Contact Information</span>
                 <div className="flex items-center gap-2 mt-2">
