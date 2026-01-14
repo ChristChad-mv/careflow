@@ -40,40 +40,6 @@ async def list_remote_agents() -> str:
     return "Available remote agents:\n" + "\n".join(formatted_cards)
 
 
-@task(name="save_patient_report")
-async def save_patient_report(patient_id: str, report_data: str) -> str:
-    """
-    Save the patient report to a CSV file.
-    """
-    import csv
-    from pathlib import Path
-    import datetime
-
-    # Adjust path to be relative to the project root
-    project_root = Path(__file__).resolve().parent.parent.parent.parent
-    data_dir = project_root / 'data'
-    data_dir.mkdir(parents=True, exist_ok=True) 
-    file_path = data_dir / 'daily_rounds_report.csv'
-    
-    file_exists = file_path.exists()
-    
-    try:
-        with open(file_path, 'a', newline='', encoding='utf-8') as csvfile:
-            fieldnames = ['patient_id', 'report', 'timestamp']
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
-            if not file_exists:
-                writer.writeheader()
-
-            writer.writerow({
-                'patient_id': patient_id,
-                'report': report_data,
-                'timestamp': datetime.datetime.now().isoformat()
-            })
-        return f"Saved report for {patient_id} to {file_path}"
-    except Exception as e:
-        return f"Failed to save report for {patient_id}: {str(e)}"
-
 @workflow(name="send_remote_agent_task")
 async def send_remote_agent_task(task: str, server_url: str = None) -> str:
     """
@@ -83,8 +49,8 @@ async def send_remote_agent_task(task: str, server_url: str = None) -> str:
     """
     try:
         if not server_url:
-            careflow_url = os.getenv("CAREFLOW_PULSE_URL", "http://localhost:8080")
-            server_url = careflow_url # Assign to server_url for subsequent use
+            # Use the imported CAREFLOW_CALLER_URL which correctly points to localhost:8000
+            server_url = CAREFLOW_CALLER_URL
 
         # Generate IDs
         request_id = int(uuid.uuid1().int >> 64)
@@ -148,4 +114,4 @@ async def send_remote_agent_task(task: str, server_url: str = None) -> str:
     except Exception as e:
         return f"ERROR: Connection Failed - {str(e)}"
 
-a2a_tools = [list_remote_agents, send_remote_agent_task, save_patient_report]
+a2a_tools = [list_remote_agents, send_remote_agent_task]
