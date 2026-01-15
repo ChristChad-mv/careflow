@@ -19,3 +19,5 @@ def init_mcp_tools():
     except Exception as e:
         logger.warning(f"⚠️ Warning: Could not load MCP tools from {MCP_TOOLBOX_URL}. Is toolbox running? Error: {e}")
         logger.warning("Agent will run with internal tools only.")
+    except BaseException as e: # Catch EVERYTHING just in case
+        print(f"CRITICAL ERROR IN MCP LOADER: {e}", flush=True)
