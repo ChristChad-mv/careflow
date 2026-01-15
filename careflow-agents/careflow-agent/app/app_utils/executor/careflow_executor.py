@@ -4,6 +4,7 @@ CareFlow Pulse A2A Executor
 Handles execution requests from remote agents via A2A protocol.
 """
 import logging
+import base64
 from datetime import datetime
 from typing import Optional, Set
 
@@ -132,28 +133,46 @@ class CareFlowAgentExecutor(AgentExecutor):
                     state={}
                 )
 
-            # 4. Extract user text and run the agent
-            user_text = "".join([part.root.text + "\n" for part in user_message.parts if part.root.kind == "text" and hasattr(part.root, "text")])
-            if not user_text.strip():
-                user_text = "Please check the patient status."
+            # 4. Extract all parts (text and multimodal) and run the agent
+            gemini_parts = []
+            for part in user_message.parts:
+                if part.root.kind == "text" and hasattr(part.root, "text"):
+                    gemini_parts.append(genai_types.Part.from_text(text=part.root.text))
+                elif part.root.kind == "file":
+                    file_data = part.root.file
+                    if hasattr(file_data, "bytes"):
+                        # Inline data (base64)
+                        gemini_parts.append(genai_types.Part.from_bytes(
+                            data=base64.b64decode(file_data.bytes),
+                            mime_type=file_data.mime_type or "application/octet-stream"
+                        ))
+            
+            if not gemini_parts:
+                gemini_parts = [genai_types.Part.from_text(text="Please check the patient status.")]
 
             input_content = genai_types.Content(
                 role="user",
-                parts=[genai_types.Part.from_text(text=user_text)]
+                parts=gemini_parts
             )
             
             response_text = ""
+            thought_text = ""
+            
             async for event in self.runner.run_async(
                 user_id="a2a_caller",
                 session_id=session.id,
                 new_message=input_content
             ):
                 if event.is_final_response() and event.content and event.content.parts:
-                    response_text = "\n".join([p.text for p in event.content.parts if p.text])
+                    # Collect regular text
+                    response_text = "\n".join([p.text for p in event.content.parts if p.text and not getattr(p, 'thought', False)])
+                    # Collect thinking/reflection
+                    thought_text = "\n".join([p.text for p in event.content.parts if p.text and getattr(p, 'thought', False)])
 
             final_text = response_text or "Task completed (no text response)."
 
             # 5. Publish final success status
+            # We include thoughts in metadata for transparency/evals
             final_message = Message(
                 kind="message",
                 role=Role.agent,
@@ -161,6 +180,10 @@ class CareFlowAgentExecutor(AgentExecutor):
                 parts=[Part(root=TextPart(kind="text", text=final_text.strip()))],
                 taskId=taskId,
                 contextId=contextId,
+                metadata={
+                    "reflection": thought_text.strip(),
+                    "has_thoughts": bool(thought_text.strip())
+                }
             )
             
             final_update = TaskStatusUpdateEvent(
