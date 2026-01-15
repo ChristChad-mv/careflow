@@ -1,11 +1,12 @@
 # CareFlow Pulse Monitoring Agent
 
-Medical monitoring and analysis agent powered by **Gemini 3.0 Pro**. Analyzes patient data, manages wellness reports, and coordinates with the Caller Agent via A2A protocol to maintain patient health loops.
+Medical monitoring and analysis agent powered by **Gemini 3 Pro**. Analyzes patient data via audio-first reporting, manages wellness reports, and coordinates with the Caller Agent via A2A protocol to maintain patient health loops.
 
 ## ✨ Features
 
 - 🏥 **Data Analysis**: Processes complex patient records and hospitalization data.
-- 🚨 **Alert Management**: Detects critical health triggers and initiates follow-up loops.
+- 🎙️ **Audio-First Analysis**: Fetches raw call audio from Twilio and uses Gemini 3's native multimodal capabilities to "listen" and analyze patient conversations—detecting emotion, distress, and clinical signals.
+- 🚨 **Alert Management**: Detects critical health triggers and initiates follow-up loops. Alerts include `callSid` for nurse audio playback.
 - 🔄 **A2A Protocol**: Standards-based communication with the Caller Agent for patient outreach.
 - 🛡️ **HIPAA Alignment**: Integrated with Model Armor and DLP for secure medical data handling.
 - 📝 **Report Generation**: Automatically generates structured patient wellness summaries.
@@ -119,7 +120,8 @@ The Pulse Agent acts as the analytical brain:
 1. Receives task from Caller Agent (e.g., "Review patient symptoms")
 2. Executes analysis and accesses hospitalization history
 3. Returns status or delegatable tasks back to the Caller Agent
-4. Maintains full observability spans for inter-agent calls
+4. Analyzes raw call audio for distress signals
+5. Maintains full observability spans for inter-agent calls
 
 ## 🎨 Code Quality
 
