@@ -26,6 +26,8 @@ from .app_utils.config_loader import (
 from .app_utils.prompts.system_prompts import CAREFLOW_SYSTEM_PROMPT
 from .tools import mcp__tool_loader
 from .tools.a2a_tools import a2a_tools
+from .tools.twilio_audio import fetch_call_audio
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -55,7 +57,7 @@ class CareFlowAgent(BaseAgent):
                 thinking_config=genai_types.ThinkingConfig(include_thoughts=True)
             ),
             instruction=CAREFLOW_SYSTEM_PROMPT,
-            tools=mcp__tool_loader.all_tools + a2a_tools,
+            tools=a2a_tools + [fetch_call_audio],
             output_key="patient_monitoring"
         )
         
