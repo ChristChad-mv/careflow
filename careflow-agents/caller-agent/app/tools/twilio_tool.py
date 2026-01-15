@@ -17,6 +17,7 @@ from urllib.parse import quote
 
 from langchain_core.tools import tool
 
+from ..config import PUBLIC_URL
 from ..schemas.tool_schemas import CallPatientInput
 
 logger = logging.getLogger(__name__)
@@ -63,14 +64,16 @@ async def call_patient(
         Status message indicating call result
     """
     try:
-        from twilio.rest import Client
+        from twilio.rest import AsyncClient
         
         # Get Twilio credentials
         account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
         auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
         from_number = os.environ.get("TWILIO_PHONE_NUMBER")
         to_number = patient_phone or os.environ.get("TEST_PATIENT_PHONE")
-        ngrok_url = os.environ.get("NGROK_URL")
+        
+        # Use unified PUBLIC_URL from config
+        public_url = PUBLIC_URL
         
         # Validate configuration
         missing = []
@@ -80,8 +83,8 @@ async def call_patient(
             missing.append("TWILIO_AUTH_TOKEN")
         if not from_number:
             missing.append("TWILIO_PHONE_NUMBER")
-        if not ngrok_url:
-            missing.append("NGROK_URL")
+        if not public_url:
+            missing.append("PUBLIC_URL/NGROK_URL")
         if not to_number:
             missing.append("patient_phone/TEST_PATIENT_PHONE")
         
@@ -108,23 +111,28 @@ async def call_patient(
         # Create Twilio call
         logger.info(f"Initiating call to {patient_name} ({to_number})")
         
-        client = Client(account_sid, auth_token)
+        # Build TwiML URL. Note: we ensure it starts with https:// if not present
+        base_url = public_url if public_url.startswith("http") else f"https://{public_url}"
         
-        # Build TwiML webhook URL with patient context
         twiml_url = (
-            f"https://{ngrok_url}/twiml"
+            f"{base_url}/twiml"
             f"?patient_name={quote(patient_name)}"
             f"&patient_id={quote(patient_id)}"
             f"&context={quote(message)}"
         )
         
-        call = client.calls.create(
-            to=to_number,
-            from_=from_number,
-            url=twiml_url
-        )
+        # Initialize and use the AsyncClient
+        async with AsyncClient(account_sid, auth_token) as client:
+            call = await client.calls.create_async(
+                to=to_number,
+                from_=from_number,
+                url=twiml_url,
+                record=True, # Enable Recording for Audio-First Reporting
+                status_callback=f"{base_url}/call-status",
+                status_callback_event=['completed']
+            )
         
-        logger.info(f"Call created - SID: {call.sid}")
+        logger.info(f"Call created asynchronously - SID: {call.sid} (Recording: Enabled)")
         
         return (
             f"SYSTEM: Call initiated (SID: {call.sid}). "
@@ -133,7 +141,7 @@ async def call_patient(
         )
         
     except Exception as e:
-        logger.error(f"Twilio call error: {e}")
+        logger.error(f"Twilio async call error: {e}")
         return f"Failed to initiate call: {str(e)}"
 
 
