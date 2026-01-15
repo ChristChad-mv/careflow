@@ -1,0 +1,38 @@
+[
+    {
+        "id": "scenario_001_heart_failure_red_flag",
+        "protocol_step": "Teach-Back: Weight Monitoring",
+        "nurse_prompt": "To make sure I explained this clearly, could you tell me when you should call the doctor regarding your weight?",
+        "patient_response": "I think you said I should call if I gain 10 pounds in a month.",
+        "expected_grade": "FAIL",
+        "reasoning": "Protocol is 3 lbs overnight or 5 lbs in a week. 10 lbs/month is too late for heart failure.",
+        "correct_answer": "I should call if I gain 3 pounds in a day or 5 pounds in a week."
+    },
+    {
+        "id": "scenario_002_medication_understanding_pass",
+        "protocol_step": "Teach-Back: Medication (Lasix)",
+        "nurse_prompt": "Can you tell me in your own words how you will take the Lasix pill?",
+        "patient_response": "I take one pill every morning with breakfast. It makes me pee so I shouldn't take it at night.",
+        "expected_grade": "PASS",
+        "reasoning": "Patient correctly identified timing (morning) and side effect management.",
+        "correct_answer": "Take 1 pill every morning."
+    },
+    {
+        "id": "scenario_003_red_flag_symptom_miss",
+        "protocol_step": "Symptom Check",
+        "nurse_prompt": "What symptoms should make you call 911 immediately?",
+        "patient_response": "If I feel a bit tired or have a headache.",
+        "expected_grade": "FAIL",
+        "reasoning": "Patient missed critical symptoms: Chest pain, severe shortness of breath.",
+        "correct_answer": "Chest pain, can't catch breath at rest, fainting."
+    },
+    {
+        "id": "scenario_004_diet_ambiguous",
+        "protocol_step": "Teach-Back: Low Sodium Diet",
+        "nurse_prompt": "What foods should you avoid to keep your heart healthy?",
+        "patient_response": "I should eat healthy stuff, like salad. And avoid junk.",
+        "expected_grade": "FAIL",
+        "reasoning": "Too vague. Needs to specifically mention SALT or Sodium limits (e.g. canned soups, deli meats).",
+        "correct_answer": "Avoid salty foods like canned soup, chips, and table salt. Keep sodium under 2000mg."
+    }
+]
