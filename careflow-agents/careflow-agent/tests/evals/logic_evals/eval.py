@@ -1,0 +1,126 @@
+
+import asyncio
+import os
+import sys
+import uuid
+import json
+import logging
+import glob
+from datetime import datetime
+
+# Standard ADK/A2A Evaluation imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
+
+from dotenv import load_dotenv
+from a2a.types import Message, Role, Part, TextPart, MessageSendParams
+from a2a.server.agent_execution import RequestContext
+from a2a.server.events import EventQueue
+
+from app.agent import root_agent 
+from app.app_utils.executor.careflow_executor import CareFlowAgentExecutor
+
+load_dotenv()
+logging.basicConfig(level=logging.ERROR)
+
+DATASET_DIR = os.path.join(os.path.dirname(__file__), "datasets")
+REPORT_DIR = os.path.join(os.path.dirname(__file__), "reports")
+
+class MockEventQueue(EventQueue):
+    def __init__(self):
+        self.events = []
+    async def enqueue_event(self, event) -> None:
+        self.events.append(event)
+
+async def run_logic_eval():
+    os.makedirs(REPORT_DIR, exist_ok=True)
+    
+    print(f"🧩  CareFlow Pulse - Logic & Protocol Evaluation")
+    print(f"─" * 60)
+    
+    dataset_files = sorted(glob.glob(os.path.join(DATASET_DIR, "*.json")))
+    if not dataset_files:
+        print(f"⚠️  No .json datasets found in {DATASET_DIR}")
+        return
+
+    executor = CareFlowAgentExecutor(root_agent)
+
+    for ds_path in dataset_files:
+        print(f"\n📂 Loading Dataset: {os.path.basename(ds_path)}")
+        with open(ds_path, "r") as f:
+            scenarios = json.load(f)
+
+        for i, scenario in enumerate(scenarios):
+            scenario_id = scenario.get("id", f"Scenario-{i+1}")
+            print(f"  ▶️  SCENARIO: {scenario_id}")
+            
+            # Construct a realistic trigger for the agent
+            nurse_q = scenario.get("nurse_prompt", "")
+            patient_a = scenario.get("patient_response", "")
+            
+            prompt_text = (
+                f"Interview Summary for Teach-Back Protocol:\n"
+                f"Protocol Step: {scenario.get('protocol_step', 'Unknown')}\n"
+                f"Nurse asked: \"{nurse_q}\"\n"
+                f"Patient answered: \"{patient_a}\"\n\n"
+                f"Please analyze if the patient understands the medical instructions correctly and take necessary clinical actions (Risk assessment, alerts, etc.)."
+            )
+            
+            message = Message(
+                messageId=str(uuid.uuid4()),
+                kind="message",
+                role=Role.user,
+                parts=[Part(root=TextPart(kind="text", text=prompt_text))]
+            )
+            
+            context = RequestContext(
+                request=MessageSendParams(message=message),
+                context_id=f"eval-logic-{uuid.uuid4().hex[:6]}",
+                task_id=str(uuid.uuid4())
+            )
+            mock_queue = MockEventQueue()
+            
+            print(f"    ⌛ Processing...", end="", flush=True)
+            
+            agent_report = ""
+            agent_reflection = ""
+            
+            try:
+                await executor.execute(context, mock_queue)
+                
+                for event in mock_queue.events:
+                    if getattr(event, 'kind', '') == 'status-update' and getattr(event, 'final', False):
+                        status = getattr(event, 'status', None)
+                        if status and status.message:
+                            if status.message.parts:
+                                agent_report = "".join([p.root.text for p in status.message.parts if hasattr(p.root, 'text')])
+                            metadata = getattr(status.message, 'metadata', {})
+                            if metadata:
+                                agent_reflection = metadata.get("reflection", "")
+            except Exception as e:
+                print(f" ❌ ERROR: {e}")
+                continue
+
+            print(" ✅")
+            
+            # Save Report
+            report_name = f"logic-{scenario_id.lower().replace(' ', '-')}-report.md"
+            report_path = os.path.join(REPORT_DIR, report_name)
+            
+            with open(report_path, "w", encoding="utf-8") as rf:
+                rf.write(f"# CareFlow Pulse - Logic Evaluation Report\n\n")
+                rf.write(f"**Scenario ID:** `{scenario_id}`\n")
+                rf.write(f"**Interview Context:**\n> {nurse_q}\n> {patient_a}\n\n")
+                rf.write(f"**Date:** `{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`\n\n")
+                
+                rf.write(f"## 🧠 Agent Reflection (Thinking Signature)\n")
+                rf.write(f"```text\n{agent_reflection if agent_reflection else 'No internal reflection captured.'}\n```\n\n")
+                
+                rf.write(f"## 📋 Final Clinical Assessment\n")
+                rf.write(f"{agent_report if agent_report else 'No assessment generated.'}\n\n")
+                rf.write(f"---\n*Generated by CareFlow Logic Eval v3.4*\n")
+
+            print(f"    📄 Report saved: reports/{report_name}")
+    print("─" * 60)
+
+if __name__ == "__main__":
+    asyncio.run(run_logic_eval())
