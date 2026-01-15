@@ -1,9 +1,9 @@
-# **CareFlow Pulse: Technical Specifications (v3.3)**
+# **CareFlow Pulse: Technical Specifications (v3.4)**
 
 | | |
 | :--- | :--- |
-| **Document Version:** | 3.3 |
-| **Date:** | 2026-01-10 |
+| **Document Version:** | 3.4 |
+| **Date:** | 2026-01-14 |
 | **Status:** | **Current** |
 | **Author:** | Christ |
 
@@ -19,24 +19,29 @@
 | 3.1 | 2025-12-26 | Christ | Major architecture update: Dual-agent system (CareFlow Pulse + Caller), MCP protocol integration, A2A inter-agent communication, Twilio ConversationRelay, Cloud Run deployment (v2) |
 | 3.2 | 2026-01-02 | Christ | Cloud Scheduler Infrastructure as Code: Terraform configuration with multi-environment deployment (staging/prod), OIDC authentication, automated retry logic, comprehensive monitoring setup |
 | 3.3 | 2026-01-10 | Christ | Advanced AI Security: Integrated Google Model Armor (v0.3.0) with Fail-Closed architecture, synchronized regional endpoints across dual-agent system, and established comprehensive Security & Compliance specs. |
+| 3.4 | 2026-01-14 | Christ | Audio-First Reporting Architecture: Pivoted from transcript-based to audio-based analysis. Caller Agent records calls; Pulse Agent fetches raw audio and leverages Gemini 3's native multimodal analysis. |
 
 ---
 
 ## **Table of Contents**
 
 ### 1. Introduction
+
 - 1.1. Purpose of this Document
 - 1.2. Intended Audience
 - 1.3. Document Scope
 - 1.4. References & Dependencies
 
 ### 2. System Architecture Overview
+
 - 2.1. High-Level Architecture Diagram
 - 2.2. Technology Stack
 - 2.3. Component Interaction Flow
 - 2.4. Deployment Architecture
+- 2.5. Audio-First Reporting Architecture (NEW v3.4)
 
 ### 3. Database Design (Firestore)
+
 - 3.1. Overview & Design Principles
 - 3.2. Collection: `/patients`
 - 3.3. Sub-Collection: `/patients/{patientId}/interactions`
@@ -48,6 +53,7 @@
 - 3.9. Data Migration & Seeding
 
 ### 4. Backend: AI Agent System (Google ADK)
+
 - 4.1. Agent Architecture Overview
 - 4.2. Pulse Agent (Orchestrator & Intelligence)
 - 4.3. Caller Agent (Voice & Messaging Interface)
@@ -58,6 +64,7 @@
 - 4.8. Error Handling & Fallback Logic
 
 ### 5. Backend: API Endpoints
+
 - 5.1. Endpoint Overview
 - 5.2. `POST /api/careflow/trigger-scheduled-calls`
 - 5.3. `POST /api/careflow/twilio-sms`
@@ -66,19 +73,23 @@
 - 5.6. Rate Limiting & Security
 
 ### 6. External Integrations
+
 - 6.1. Twilio ConversationRelay
 - 6.2. ElevenLabs TTS
 - 6.3. Google Cloud Platform (GCP)
 
 ### 7. Frontend: Next.js Application
+
 - 7.1. Technology Stack
 - 7.2. Architecture Principles
 
 ### 8. Data Flow & User Journeys
+
 - 8.1. Journey: Automated Morning Rounds
 - 8.2. Journey: Critical Symptom Triage
 
 ### 9. Security & Compliance
+
 - 9.1. Data Encryption & Integrity
 - 9.2. Multi-Tenant Isolation
 - 9.3. AI Safety & Model Armor
@@ -87,27 +98,38 @@
 - 9.6. Reference Documentation
 
 ### 10. Configuration & Environment Variables
+
 - 10.1. Backend Environment Variables (The Fleet)
 
 ### 11. Deployment Guide
+
 - 11.2. Infrastructure as Code (Terraform)
 - 11.2. Cloud Scheduler Deployment (Terraform)
 - 11.3. Frontend Deployment (Vercel)
 
-### 12. Testing Strategy
-- 12.1. Agent Evaluation (`adk eval`)
-- 12.2. Automated Unit & Integration Tests
-- 12.3. Manual Voice Testing
+### 12. Testing Strategy & Benchmarks
+
+- 12.1. Benchmark-Driven Architecture
+  - 12.1.1. Model Latency Benchmark
+  - 12.1.2. Security Latency Benchmark (Model Armor)
+- 12.2. Protocol Verification ("Teach-Back" Evaluation)
+- 12.3. Audio Handoff Testing (v3.4)
+- 12.4. Load Testing (Locust)
+- 12.5. Unit & Integration Testing
+- 12.6. Manual Voice Testing
 
 ### 13. Performance Optimization
+
 - 13.1. Voice Latency Hierarchy
 - 13.2. Database Performance
 
 ### 14. Error Handling & Monitoring
+
 - 14.1. Clinical Safety Handover
 - 14.2. Operational Monitoring
 
 ### 15. Future Enhancements & Roadmap
+
 - 15.1. Vision-Based Adherence (v3.5)
 - 15.2. EHR Integration (v4.0)
 - 15.3. Multi-Language Support
@@ -324,8 +346,8 @@ CareFlow Pulse is built on a **modern dual-agent architecture** using cutting-ed
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
-│                         CAREFLOW PULSE ARCHITECTURE v3.0                    │
-│                  Dual-Agent System with MCP & A2A Protocols                 │
+│                         CAREFLOW PULSE ARCHITECTURE v3.4                    │
+│           Dual-Agent System with MCP, A2A & Audio-First Reporting          │
 │                     MULTI-TENANT FLEET (1 Agent / Hospital)                │
 └────────────────────────────────────────────────────────────────────────────┘
 
@@ -414,10 +436,11 @@ Cloud Scheduler (Daily) --> [Dispatcher Function] --> Loops Active Hospitals -->
 1. **Dual-Agent Specialization**: Separate agents for voice interaction (Caller) and medical intelligence (Pulse)
 2. **MCP Protocol**: Standardized toolbox integration for Firestore database access
 3. **A2A Protocol**: Inter-agent communication using JSON-RPC + SSE streaming
-4. **Voice-First Interface**: Natural phone conversations via Twilio ConversationRelay + ElevenLabs
-5. **Real-Time Sync**: Firestore acts as the single source of truth with live updates to frontend
-6. **Containerized Deployment**: Both agents run as separate Cloud Run services
-7. **Cloud-Native**: Leverages managed Google Cloud services for scalability and reliability
+4. **Audio-First Reporting (v3.4)**: Raw audio analysis via Gemini 3 multimodal instead of transcripts
+5. **Voice-First Interface**: Natural phone conversations via Twilio ConversationRelay + ElevenLabs
+6. **Real-Time Sync**: Firestore acts as the single source of truth with live updates to frontend
+7. **Containerized Deployment**: Both agents run as separate Cloud Run services
+8. **Cloud-Native**: Leverages managed Google Cloud services for scalability and reliability
 
 ---
 
@@ -452,6 +475,7 @@ Cloud Scheduler (Daily) --> [Dispatcher Function] --> Loops Active Hospitals -->
 | **MCP Protocol** | toolbox-core | Latest | Model Context Protocol for Firestore database access |
 | **A2A Protocol** | a2a-sdk | Latest | Agent-to-Agent communication (JSON-RPC + SSE) |
 | **Voice Interface** | Twilio ConversationRelay | Latest | Real-time voice streaming with WebSocket |
+| **Call Recording (v3.4)** | Twilio Recordings API | Latest | MP3 recordings for Gemini 3 audio analysis |
 | **Text-to-Speech** | ElevenLabs | Latest | Natural-sounding voice synthesis (voice: UgBBYS2sOqTuMpoF3BR0) |
 | **LangChain Integration** | langchain-google-genai | 2.0.7+ | LangChain + Gemini for caller agent |
 | **Deployment** | Google Cloud Run | N/A | Containerized deployment (2 separate services) |
@@ -672,8 +696,9 @@ CareFlow Pulse is deployed across multiple Google Cloud and Vercel environments.
       ┌──────────────────┐         ┌──────────────────┐
     │  Twilio          │         │  ElevenLabs      │
     │  • Voice calls   │         │  • TTS synthesis │
-    │  • SMS gateway   │         │  • Ultra-low     │
-    │  • Conv. Relay   │         │    latency       │
+    │  • Call record.  │         │  • Ultra-low     │
+    │  • SMS gateway   │         │    latency       │
+    │  • Conv. Relay   │         │                  │
     └──────────────────┘         └──────────────────┘
        │
     └────────────────────────────────────────────────────────────┘
@@ -692,6 +717,55 @@ CareFlow Pulse is deployed across multiple Google Cloud and Vercel environments.
 2. **Backend**: `make deploy` → ADK packages and deploys to Vertex AI Agent Engine
 3. **Database**: Firestore rules deployed via Firebase CLI or console
 4. **Scheduler**: Configured via Google Cloud Console or Terraform
+
+---
+
+### **2.5. Audio-First Reporting Architecture (NEW v3.4)**
+
+> **Key Architectural Shift:** In v3.4, the system pivots from transcript-based analysis to audio-based analysis, leveraging Gemini 3's native multimodal capabilities for richer, more accurate clinical assessments.
+
+#### **Rationale**
+
+Previous versions relied on text transcripts from Twilio ConversationRelay. While functional, this approach had significant clinical limitations:
+
+| Limitation | Clinical Impact |
+| :--- | :--- |
+| **Lost Vocal Cues** | Transcripts cannot convey distress, confusion, or pain in the patient's voice |
+| **ASR Accuracy** | Automatic speech recognition can misinterpret medical terminology |
+| **Processing Latency** | Transcription adds delay before clinical analysis |
+
+#### **Architecture Overview**
+
+With Gemini 3's multimodal capabilities, the Pulse Agent directly "listens" to raw audio recordings, enabling:
+
+- **Emotional Detection:** Identify distress, confusion, or pain from vocal tone
+- **Subtle Clinical Cues:** Breathing patterns, hesitations, urgency in speech
+- **Verbatim Context:** Hear exactly what the patient said, eliminating ASR errors
+
+#### **Data Flow**
+
+1. **Caller Agent** initiates patient call with Twilio recording enabled
+2. **Twilio** stores call recording (MP3 format) upon completion
+3. **Caller Agent** sends `CallSid` reference to Pulse Agent via A2A protocol
+4. **Pulse Agent** fetches audio recording using dedicated tooling
+5. **Gemini 3** performs native multimodal analysis on audio content
+6. **Alert Creation** includes `callSid` field for frontend audio playback
+7. **Nurse Dashboard** displays alert with embedded audio player (lazy-loaded)
+
+#### **Component Responsibilities**
+
+| Component | v3.3 Behavior | v3.4 Behavior |
+| :--- | :--- | :--- |
+| **Caller Agent** | Streamed transcripts in real-time | Records calls; sends only `CallSid` on completion |
+| **Pulse Agent** | Analyzed transcript text | Fetches raw audio; performs multimodal analysis |
+| **Alert Schema** | Text-only trigger/brief | Includes `callSid` for audio playback |
+| **Frontend** | N/A | Audio player with secure proxy route |
+
+#### **Security Considerations**
+
+- Audio recordings remain on Twilio infrastructure until fetched
+- Frontend accesses audio via secure server-side proxy (credentials never exposed to client)
+- Audio playback follows HIPAA audit requirements for call recordings
 
 ---
 
@@ -1113,6 +1187,7 @@ type MedicationStatus =
 | `createdAt` | `Timestamp` | ✅ | When alert was generated | `Timestamp(2025-11-15 08:20)` | Sort key for dashboard |
 | `resolvedAt` | `Timestamp` | ❌ | When alert was resolved | `Timestamp(2025-11-15 09:45)` | Null if still active |
 | `resolutionNote` | `string` | ❌ | How alert was resolved | `"Patient called, advised to visit ER"` | Free text |
+| `callSid` | `string` | ❌ | Twilio Call SID for audio playback (v3.4) | `"CA123abc456..."` | Links to Twilio recording |
 | `patientRef` | `DocumentReference` | ✅ | Link to full patient record | `ref('/patients/{id}')` | For deep linking |
 
 #### **Nested Object: `assignedTo`**
@@ -1322,75 +1397,6 @@ service cloud.firestore {
 
 ---
 
-### **3.9. Data Migration & Seeding**
-
-For development and testing, you'll need to seed the database with mock data.
-
-#### **Seed Script (TypeScript)**
-
-```typescript
-// scripts/seedFirestore.ts
-import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, doc, setDoc, Timestamp } from 'firebase/firestore';
-
-const seedPatients = async () => {
-  const db = getFirestore();
-  
-  const patientData = {
-    patientId: "550e8400-e29b-41d4-a716-446655440000",
-    name: "Sarah Mitchell",
-    dateOfBirth: Timestamp.fromDate(new Date('1978-03-15')),
-    contact: {
-      phone: "+15551234567",
-      email: "sarah.mitchell@email.com",
-      preferredMethod: "voice"
-    },
-    dischargePlan: {
-      dischargeDate: Timestamp.fromDate(new Date('2025-11-10')),
-      diagnosis: "Post-operative cardiac surgery (CABG)",
-      dischargingPhysician: "Dr. Emily Rodriguez",
-      hospitalId: "HOSP001",
-      medications: [
-        {
-          name: "Aspirin",
-          dosage: "81mg",
-          frequency: "Once daily at 8:00 AM",
-          scheduleHour: 8,
-          startDate: Timestamp.now()
-        }
-      ],
-      criticalSymptoms: ["chest pain", "shortness of breath"],
-      warningSymptoms: ["swelling", "fatigue"]
-    },
-    riskLevel: "GREEN",
-    lastAssessmentDate: Timestamp.now(),
-    alert: null,
-    assignedNurse: {
-      userId: "user_nurse_sarah_123",
-      name: "Sarah Johnson, RN",
-      phone: "+15559876543",
-      email: "sarah.johnson@hospital.com"
-    },
-    createdAt: Timestamp.now(),
-    updatedAt: Timestamp.now(),
-    status: "active"
-  };
-  
-  await setDoc(doc(db, 'patients', patientData.patientId), patientData);
-  console.log('✅ Seeded patient:', patientData.name);
-};
-
-seedPatients().catch(console.error);
-```
-
-**Run with:**
-
-```bash
-npx tsx scripts/seedFirestore.ts
-```
-
----
-
 ## **4. Backend: AI Agent System (Google ADK)**
 
 ### **4.1. Agent Architecture Overview**
@@ -1463,7 +1469,8 @@ This strategy ensures that `HOSP001` agent **physically cannot** access `HOSP002
 | :--- | :--- | :--- |
 | **Webhook Handling** | Receives POST requests from Twilio, and Cloud Scheduler | N/A (HTTP endpoint) |
 | **Request Routing** | Determines which specialized agent should handle the request | ADK planner |
-| **Firestore Sync** | All database reads/writes go through this agent | `firestore_tool` |
+| **Audio Analysis (v3.4)** | Fetches raw call audio from Twilio and performs multimodal analysis via Gemini 3 | `fetch_call_audio` |
+| **Firestore Sync** | All database reads/writes go through this agent | MCP Toolbox |
 | **Workflow Coordination** | Manages multi-step processes (e.g., call → analyze → update → alert nurse) | ADK session management |
 | **Error Recovery** | Handles failures and retries | Try/catch + logging |
 
@@ -1536,7 +1543,7 @@ for patient in patients:
 
 ### **4.3. Caller Agent (Voice & Messaging Interface)**
 
-**Role:** The Caller Agent (LangGraph-based) serves as the "voice" of the system. It connects to Twilio ConversationRelay to maintain natural, real-time conversations with patients.
+**Role:** The Caller Agent (LangGraph-based) serves as the "voice" of the system. It connects to Twilio ConversationRelay to maintain natural, real-time conversations with patients. In v3.4, the agent records all calls and sends only the `CallSid` to the Pulse Agent for audio-based analysis.
 
 **File:** `app/agent.py` (specialized agent, invoked by orchestrator)
 
@@ -1547,7 +1554,8 @@ for patient in patients:
 | **Dynamic Prompt Generation** | Creates a unique system prompt for each patient call | String (prompt) |
 | **Patient Context Injection** | Includes patient name, diagnosis, medications, critical symptoms | Part of prompt |
 | **Safety Rules Encoding** | Embeds "Safe Handover Protocol" and critical keyword detection | Part of prompt |
-| **Call Initiation** | Triggers Twilio Voice API to call patient | Twilio Call SID |
+| **Call Initiation** | Triggers Twilio Voice API to call patient with `record=true` | Twilio Call SID |
+| **Call Recording (v3.4)** | All calls recorded by Twilio; `CallSid` sent to Pulse Agent on completion | `CallSid` reference |
 | **SMS Sending** | Sends text messages when voice is unavailable | Twilio Message SID |
 
 #### **Dynamic Prompt Template**
@@ -2771,34 +2779,198 @@ The Next.js frontend is deployed as a single application.
 
 ---
 
-## **12. Testing Strategy**
+## **12. Testing Strategy & Benchmarks**
 
-CareFlow Pulse follows a multi-layered testing strategy to ensure clinical safety and technical reliability.
+CareFlow Pulse follows a multi-layered testing strategy to ensure clinical safety and technical reliability. Crucially, our benchmarks directly inform architectural decisions, ensuring that trade-offs between latency, security, and intelligence are data-driven.
 
-### 12.1. Agent Evaluation (`adk eval`)
+---
 
-We use the ADK Evaluation framework to measure agent performance against clinical scenarios.
+### **12.1. Benchmark-Driven Architecture**
 
-- **Dataset:** `tests/evaluation/clinical_scenarios.json`
-- **Metrics:**
-  - **Relevance:** Does the agent ask the right symptom questions?
-  - **Tool Accuracy:** Does it call `create_alert` correctly for RED scenarios?
-  - **Tone:** Is the persona empathetic and professional?
+#### **12.1.1. Model Latency Benchmark**
 
-- **CI/CD Integration:** Eval runs automatically on every PR to `main`.
+**Goal:** Evaluate Gemini model variants for real-time voice suitability.
 
-### 12.2. Automated Unit & Integration Tests
+| Model | Avg TTFT (ms) | Stability | Suitability for Voice |
+| :--- | :--- | :--- | :--- |
+| **gemini-2.0-flash** | **~527 ms** | High | 🟢 **Ideal** |
+| gemini-2.5-flash | ~1,228 ms | Moderate | 🟡 Acceptable (barely) |
+| gemini-3.0-flash | ~1,550 ms | Moderate | 🔴 Too Slow for Real-time |
+| gemini-3.0-pro | ~4,200 ms | Low | ❌ Reasoning Only |
 
-- **Backend:** `pytest` for tool logic, Firestore interactions, and Model Armor plugin behavior.
-- **Frontend:** `Vitest` and `React Testing Library` for dashboard components.
-- **API:** `Playwright` for E2E testing of the full round-triggering flow.
+*TTFT = Time To First Token.*
 
-### 12.3. Manual Voice Testing
+**Architectural Decision → Hybrid Model Strategy:**
+
+1. **Caller Agent (Voice):** `gemini-2.0-flash` for speed (~527ms TTFT).
+   - *Reasoning:* Voice requires sub-800ms response to avoid "dead air."
+   - *Mitigation:* Complex decisions are delegated to the Pulse Agent.
+
+2. **Pulse Agent (Medical Brain):** `gemini-3-pro-preview` for intelligence.
+   - *Reasoning:* Asynchronous processing; latency irrelevant, correctness critical.
+
+**Run Benchmark:**
+
+```bash
+cd careflow-agents/caller-agent
+python benchmarking/latency_benchmark.py
+```
+
+---
+
+#### **12.1.2. Security Latency Benchmark (Model Armor)**
+
+**Goal:** Measure latency overhead of Google Cloud Model Armor for different security tiers.
+
+| Tier | Description | Protection | Latency Overhead |
+| :--- | :--- | :--- | :--- |
+| **Tier 1** | Prompt Scanning Only | Jailbreak/Injection Prevention | **~264 ms** |
+| **Tier 2** | Full Bidirectional | Tier 1 + PII/PHI Redaction | **~510 ms** (Cumulative) |
+
+**Architectural Decision → Tiered Security Model:**
+
+1. **Caller Agent (Voice) → TIER 1 ONLY**
+   - *Context:* Real-time voice requires <800ms total latency.
+   - *Implementation:* ENABLE `scan_prompt`, DISABLE `sanitize_response`.
+   - *Reasoning:* Trusts Gemini 2.0 Flash output; redaction adds ~250ms degrading voice UX.
+
+2. **Pulse Agent (Background) → TIER 2 (FULL)**
+   - *Context:* Asynchronous analysis of patient data.
+   - *Implementation:* ENABLE both `scan_prompt` and `sanitize_response`.
+   - *Reasoning:* Latency not critical; maximum PHI protection required.
+
+**Run Benchmark:**
+
+```bash
+cd careflow-agents/careflow-agent
+python benchmarks/security/benchmark_tiered_security.py
+```
+
+---
+
+### **12.2. Protocol Verification ("Teach-Back" Evaluation)**
+
+**Goal:** Ensure the agent correctly identifies when a patient understands or misunderstands clinical instructions.
+
+#### **Evaluation Tiers:**
+
+| Tier | Method | Use Case |
+| :--- | :--- | :--- |
+| **Tier 1** | Regex-Based (Fast) | CI/CD quick checks |
+| **Tier 2** | LLM-as-a-Judge (Gemini 3 Pro) | Deep clinical safety verification |
+
+#### **LLM-as-a-Judge Results:**
+
+| Scenario | Protocol | Patient Response | Expected | Agent | Judge |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **001** | Weight Monitoring | "Call if +10lbs/month" | **FAIL** | **FAIL** | ✅ |
+| **002** | Medication (Lasix) | "Morning with breakfast" | **PASS** | **PASS** | ✅ |
+| **003** | Red Flag Symptoms | "Tired or headache" | **FAIL** | **FAIL** | ✅ |
+| **004** | Sodium Diet | "Eat salad, avoid junk" | **FAIL** | **FAIL** | ✅ |
+
+**Total Accuracy: 100%**
+
+**Example Scenario (Heart Failure Red Flag):**
+
+- **Nurse:** "When should you call the doctor regarding your weight?"
+- **Patient:** "I think you said I should call if I gain 10 pounds in a month."
+- **Correct Answer:** "I should call if I gain 3 pounds in a day or 5 pounds in a week."
+- **Expected:** FAIL (Protocol is 3 lbs overnight or 5 lbs/week; 10 lbs/month is too late)
+
+**Run Evaluation:**
+
+```bash
+cd careflow-agents/careflow-agent
+python tests/protocol_evals/llm_as_judge/test_teach_back_judge.py
+```
+
+---
+
+### **12.3. Audio Handoff Testing (v3.4)**
+
+**Goal:** Verify the Audio-First Reporting flow between Caller Agent and Pulse Agent.
+
+**Test Flow:**
+
+1. Simulates a "Call Finished" message from Caller Agent with `callSid`.
+2. Verifies that Pulse Agent calls `fetch_call_audio` tool.
+3. Mocks Twilio Recordings API and Gemini multimodal analysis.
+4. Asserts that clinical report is generated from audio content.
+
+**Run Test:**
+
+```bash
+cd careflow-agents/careflow-agent
+python tests/audio_handoff/test_audio_flow.py
+```
+
+---
+
+### **12.4. Load Testing (Locust)**
+
+**Goal:** Stress test the agent under concurrent request loads.
+
+**Configuration:**
+
+- Framework: Locust
+- Duration: 30 seconds
+- Users: Up to 60 concurrent (spawn rate: 2/sec)
+
+**Local Testing:**
+
+```bash
+# Terminal 1: Start Server
+uv run uvicorn app.fast_api_app:app --host 0.0.0.0 --port 8000
+
+# Terminal 2: Run Load Test
+python3 -m venv .locust_env && source .locust_env/bin/activate && pip install locust==2.31.1 a2a-sdk~=0.3.9
+
+locust -f tests/load_test/load_test.py \
+  -H http://127.0.0.1:8000 \
+  --headless -t 30s -u 60 -r 2 \
+  --csv=tests/load_test/.results/results \
+  --html=tests/load_test/.results/report.html
+```
+
+**Remote Testing (Cloud Run):**
+
+```bash
+export RUN_SERVICE_URL=https://your-cloud-run-service-url.run.app
+export _ID_TOKEN=$(gcloud auth print-identity-token -q)
+
+locust -f tests/load_test/load_test.py \
+  -H $RUN_SERVICE_URL \
+  --headless -t 30s -u 60 -r 2 \
+  --csv=tests/load_test/.results/results \
+  --html=tests/load_test/.results/report.html
+```
+
+---
+
+### **12.5. Unit & Integration Testing**
+
+| Layer | Framework | Coverage |
+| :--- | :--- | :--- |
+| **Backend (Python)** | `pytest` | Tool logic, Firestore interactions, Model Armor plugin |
+| **Frontend (Next.js)** | `Vitest`, `React Testing Library` | Dashboard components, form validation |
+| **API E2E** | `Playwright` | Full round-triggering flow |
+
+**Run Backend Tests:**
+
+```bash
+cd careflow-agents/careflow-agent
+uv run pytest tests/
+```
+
+---
+
+### **12.6. Manual Voice Testing**
 
 Given the voice nature of the Caller Agent, manual "Golden Path" call sessions are conducted weekly to verify:
 
 - ElevenLabs voice latency and emotional resonance.
 - Twilio ConversationRelay barge-in sensitivity.
+- Patient distress detection accuracy (Audio-First v3.4).
 
 ---
 
