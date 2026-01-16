@@ -22,7 +22,7 @@ async def list_remote_agents() -> str:
     async with aiohttp.ClientSession() as session:
         for server_url in a2a_servers:
             try:
-                agent_card_url = f"{server_url}/.well-known/agent.json"
+                agent_card_url = f"{server_url}/.well-known/agent-card.json"
                 async with session.get(agent_card_url, headers={"Accept": "application/json"}) as response:
                     if response.ok:
                         card_data = await response.json()
