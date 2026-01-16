@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { callSid: string } }
+    context: { params: Promise<{ callSid: string }> }
 ) {
-    const callSid = params.callSid;
+    const { callSid } = await context.params;
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
 
