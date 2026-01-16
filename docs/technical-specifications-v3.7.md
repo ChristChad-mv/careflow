@@ -22,6 +22,7 @@
 | 3.4 | 2026-01-14 | Christ | Audio-First Reporting Architecture: Pivoted from transcript-based to audio-based analysis. Caller Agent records calls; Pulse Agent fetches raw audio and leverages Gemini 3's native multimodal analysis. |
 | 3.5 | 2026-01-16 | Christ | Real-Time Dashboard Alerts: Implemented Firestore `onSnapshot` listeners for instant alert propagation. Added `useAlerts` hook, `AlertsRealtime` component, and real-time sidebar badge updates. |
 | 3.6 | 2026-01-16 | Christ | Caller Agent Documentation: Added AHRQ RED 5-phase interview protocol, Dual Mode (Outbound/Inbound), Model Armor security reference. Removed code examples per documentation standards. |
+| 3.7 | 2026-01-16 | Christ | Pulse Agent Documentation: Added 5 Core Workflows, CareFlowAgent architecture pattern, expanded Tools section (MCP/A2A/Audio). Removed code examples per documentation standards. |
 
 ---
 
@@ -1463,85 +1464,53 @@ This strategy ensures that `HOSP001` agent **physically cannot** access `HOSP002
 
 ### **4.2. Pulse Agent (Orchestrator & Intelligence)**
 
-**Role:** The Pulse Agent is the "brain" of CareFlow. It is built with Google ADK and handles high-level medical reasoning, risk classification, and database orchestration via MCP.
+**Role:** The Pulse Agent is the "brain" of CareFlow. Built with Google ADK, it orchestrates patient rounds, performs clinical analysis, and manages all Firestore operations via MCP protocol.
 
-**File:** `app/agent.py` (root_agent)
+**File:** `careflow-agents/careflow-agent/app/agent.py`
+
+#### **Agent Architecture**
+
+The Pulse Agent uses a **BaseAgent wrapper pattern** for enhanced control:
+
+| Component | Implementation | Purpose |
+| :--- | :--- | :--- |
+| **CareFlowAgent** | Extends `BaseAgent` | Custom wrapper for execution control |
+| **Internal LlmAgent** | `assistant` field | Handles LLM-based reasoning |
+| **BuiltInPlanner** | With `include_thoughts=True` | Multi-step reasoning with thinking enabled |
+| **audio_handoff_callback** | `after_tool_callback` | Injects audio into Gemini multimodal context |
+
+#### **5 Core Workflows**
+
+The Pulse Agent responds to different message types with distinct workflows:
+
+| # | Workflow | Trigger | Actions |
+| :--- | :--- | :--- | :--- |
+| **1** | **Trigger Rounds** | "start daily rounds for [TIME]" | Query patients via MCP, send Rich Patient Brief to Caller Agent via A2A |
+| **2** | **Audio-First Analysis** | "CALL_COMPLETE: [CallSid]" | Fetch audio via `fetch_call_audio`, analyze with Gemini multimodal, classify risk |
+| **3** | **Text Summary Processing** | "Interview Summary" message | Parse text report, apply risk classification, create alerts if needed |
+| **4** | **Answer Caller Questions** | Questions from Caller Agent | Look up patient data in Firestore, provide clinical context |
+| **5** | **Inbound Call Handling** | Patient lookup request | Search patient by name, return full context to Caller Agent |
+
+> **Critical Rule:** The agent only modifies the database on receipt of actionable triggers (Workflows 1-3). All other messages are handled as informational queries to prevent duplicate alerts.
+
+#### **Tools & Integrations**
+
+| Category | Tools | Purpose |
+| :--- | :--- | :--- |
+| **MCP Toolbox** | `get_patients_for_schedule`, `create_alert`, `update_patient_risk`, `log_patient_interaction` | Firestore CRUD operations via MCP protocol |
+| **A2A Protocol** | `list_remote_agents`, `send_remote_agent_task` | Inter-agent communication with Caller Agent |
+| **Audio Fetch** | `fetch_call_audio` | Retrieve Twilio call recordings for multimodal analysis |
 
 #### **Responsibilities**
 
-| Responsibility | Description | Tools Used |
-| :--- | :--- | :--- |
-| **Webhook Handling** | Receives POST requests from Twilio, and Cloud Scheduler | N/A (HTTP endpoint) |
-| **Request Routing** | Determines which specialized agent should handle the request | ADK planner |
-| **Audio Analysis (v3.4)** | Fetches raw call audio from Twilio and performs multimodal analysis via Gemini 3 | `fetch_call_audio` |
-| **Firestore Sync** | All database reads/writes go through this agent | MCP Toolbox |
-| **Workflow Coordination** | Manages multi-step processes (e.g., call → analyze → update → alert nurse) | ADK session management |
-| **Error Recovery** | Handles failures and retries | Try/catch + logging |
-
-#### **Key Configuration**
-
-```python
-# app/agent.py
-from google.adk.agents import LlmAgent
-from google.adk.planners import BuiltInPlanner
-from app.config import config
-
-root_agent = LlmAgent(
-    name=config.internal_agent_name,  # "careflow_pulse_agent"
-    model=config.model,                 # "gemini-3-flash-preview"
-    description="AI agent that monitors post-hospitalization patients",
-    planner=BuiltInPlanner(
-        thinking_config=genai_types.ThinkingConfig(include_thoughts=True)
-    ),
-    instruction=f"""
-    You are CareFlow Pulse, the medical intelligence agent for post-hospitalization patient monitoring.
-    
-    1. **Scope**: You serve **ONLY** Hospital `{os.environ.get("HOSPITAL_ID")}`.
-       - You must NEVER access or process data for any other hospital.
-       - All your Firestore queries matches `hospitalId='{os.environ.get("HOSPITAL_ID")}'`.
-    
-    Your job is to:
-    1. Receive triggers from external systems (scheduler, Twilio webhooks)
-    2. Route work to specialized agents (Connect, Analyze, Brief)
-    3. Synchronize all state changes to Firestore
-    4. Ensure no patient interaction is lost
-    
-    Always prioritize patient safety. When in doubt, escalate to human nurses.
-    """,
-    output_key="patient_monitoring",
-)
-```
-
-#### **Example Workflow**
-
-**Scenario:** Cloud Scheduler triggers morning calls at 8:15 AM
-
-```python
-# Orchestrator receives webhook
-POST /api/careflow/trigger-scheduled-calls
-Body: { "timeSlot": "morning", "hour": 8 }
-
-# 1. Query Firestore for patients
-patients = firestore_tool.query(
-    collection='patients',
-    where=[
-        ('status', '==', 'active'),
-        ('dischargePlan.medications', 'array-contains', {'scheduleHour': 8})
-    ]
-)
-
-# 2. For each patient, delegate to Caller Agent via A2A
-for patient in patients:
-    caller_agent.initiate_voice_session(
-        patient_id=patient['patientId'],
-        patient_name=patient['name'],
-        clinical_context=patient['dischargePlan']
-    )
-
-# 3. Handle call completion events (SSE/Webhook)
-# 4. Perform Medical Risk Analysis (RED/ORANGE/GREEN)
-# 5. Update Firestore and trigger alerts
-```
+| Responsibility | Description |
+| :--- | :--- |
+| **Webhook Handling** | Receives POST requests from Cloud Scheduler and Twilio |
+| **Request Routing** | Determines which workflow to execute based on message content |
+| **Audio Analysis (v3.4)** | Fetches raw call audio and performs Gemini 3 multimodal analysis |
+| **Firestore Sync** | All database reads/writes via MCP Toolbox |
+| **Alert Generation** | Creates alerts for Yellow/Red risk classifications |
+| **Hospital Scoping** | All queries filtered by `HOSPITAL_ID` for multi-tenant isolation |
 
 ---
 
