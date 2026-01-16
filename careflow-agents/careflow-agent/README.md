@@ -1,109 +1,106 @@
-# CareFlow Pulse Monitoring Agent
+# CareFlow Pulse Agent
 
-Medical monitoring and analysis agent powered by **Gemini 3 Pro**. Analyzes patient data via audio-first reporting, manages wellness reports, and coordinates with the Caller Agent via A2A protocol to maintain patient health loops.
+> **Medical Intelligence Orchestrator powered by Gemini 3 Pro**
 
-## ✨ Features
+The **CareFlow Pulse Agent** is the analytical brain of the platform. Built with the Google Agent Development Kit (ADK), it orchestrates patient monitoring, performs advanced clinical reasoning, and manages database operations via the Model Context Protocol (MCP).
 
-- 🏥 **Data Analysis**: Processes complex patient records and hospitalization data.
-- 🎙️ **Audio-First Analysis**: Fetches raw call audio from Twilio and uses Gemini 3's native multimodal capabilities to "listen" and analyze patient conversations—detecting emotion, distress, and clinical signals.
-- 🚨 **Alert Management**: Detects critical health triggers and initiates follow-up loops. Alerts include `callSid` for nurse audio playback.
-- 🔄 **A2A Protocol**: Standards-based communication with the Caller Agent for patient outreach.
-- 🛡️ **HIPAA Alignment**: Integrated with Model Armor and DLP for secure medical data handling.
-- 📝 **Report Generation**: Automatically generates structured patient wellness summaries.
+## ✨ Key Capabilities
+
+- **🧠 Advanced Medical Reasoning**: Leveraging **Gemini 3 Pro** to analyze complex clinical data, identify risk factors, and generate evidence-based recommendations.
+- **🎙️ Audio-First Analysis**: Fetches raw call recordings from Twilio and uses Gemini 3's **native multimodal capabilities** to analyze tone, sentiment, and distress signals directly from audio.
+- **🔄 A2A Orchestration**: Coordinates with the **Caller Agent** via the Agent-to-Agent (A2A) protocol. It delegates patient interview tasks ("outbound rounds") and handles inbound queries.
+- **🏥 Hospital-Scoped Security**: Enforces strict data isolation by `hospitalId`.
+- **🔌 MCP Integration**: Uses the **Model Context Protocol Toolbox for Databases** to interact safely with the Firestore database (CRUD operations, logging, alerts).
 
 ## 🏗️ Architecture
 
+The agent is built using a **BaseAgent wrapper pattern** for fine-grained control over execution and tool callbacks.
+
 ```
 careflow-agent/
-├── app/                          # Core application code
-│   ├── agent.py                  # ADK Orchestration layer (Gemini 2.0 Flash)
-│   ├── server.py                 # FastAPI server (A2A Protocol)
-│   ├── app_utils/                # Utilities and helpers
-│   │   ├── config_loader.py      # Environment configuration
-│   │   ├── telemetry.py          # OpenTelemetry instrumentation
-│   │   └── executor/
-│   │       └── careflow_executor.py # A2A protocol executor
-│   ├── schemas/                  # Versioned A2A metadata
-│   │   └── agent_card/v1/        # A2A Discovery documents
-│   ├── tools/                    # Specialized agent toolsets
-│   │   ├── a2a_tools.py          # Inter-agent communication tools
-│   │   └── mcp__tool_loader.py   # MCP Toolbox integration
-│   └── callbacks/                # Agent lifecycle hooks
-├── deployment/                    # Terraform infrastructure
-├── tests/                         # Unit and integration tests
-├── Makefile                       # Development & Ops commands
-└── pyproject.toml                 # Dependencies (uv)
+├── app/
+│   ├── agent.py                  # CareFlowAgent class & Gemini 3 config
+│   ├── server.py                 # FastAPI server (A2A Protocol endpoints)
+│   ├── tools/
+│   │   ├── mcp__tool_loader.py   # Loads tools from MCP Toolbox
+│   │   ├── a2a_tools.py          # Tools to talk to Caller Agent
+│   │   └── twilio_audio.py       # Tool to fetch audio for multimodal analysis
+│   ├── callbacks/
+│   │   └── multimodal_handoff.py # Injects audio into LLM context
+│   └── app_utils/                # Config, Prompts, Telemetry
+├── deployment/                   # Terraform infrastructure
+├── tests/                        # Unit, evals and integration tests
+└── Makefile                      # Dev commands
 ```
 
-## 🚀 Technology Stack
+## 🚀 5 Core Workflows
 
-- **LLM**: Gemini 2.0 Flash
-- **Framework**: Google Agent Development Kit (ADK)
-- **Server**: FastAPI + uvicorn
-- **Security**: Model Armor + DLP
-- **Protocol**: A2A (Agent-to-Agent)
-- **Dependency Management**: uv
-- **Observability**: OpenTelemetry + Traceloop
+The agent implements 5 distinct workflows to handle different triggers:
 
-## 📋 Prerequisites
+1. **Trigger Rounds**: Starts daily check-ins -> Delegates to Caller Agent.
+2. **Audio-First Analysis**: Receives "Call Complete" -> Fetches Audio -> Analyzes Risk -> Updates DB.
+3. **Text Summary Processing**: Fallback analysis of text transcripts.
+4. **Answer Questions**: Responds to clinical questions from the Caller Agent.
+5. **Inbound Call Support**: identifies patients calling in.
 
-- **Python 3.10-3.13**
-- **uv** package manager ([installation](https://docs.astral.sh/uv/getting-started/installation/))
-- **Google Cloud Project** with Vertex AI, DLP, and Model Armor enabled.
+## 🛠️ Technology Stack
 
-## 🔧 Setup
+- **Model**: Gemini 3 Pro (Preview)
+- **Framework**: Google ADK 1.6+ (Python)
+- **Protocols**: A2A (JSON-RPC), MCP (Toolbox)
+- **Database**: Firestore (via MCP)
+- **Observability**: OpenTelemetry + Cloud Logging
 
-### 1. Install Dependencies
+## 🔧 Getting Started
+
+### Prerequisites
+
+- Python 3.10+
+- `uv` package manager
+- Google Cloud Credentials (Application Default)
+
+### Installation
 
 ```bash
-# Install project dependencies
 make install
 ```
 
-### 2. Configure Environment Variables
+### Running Locally
 
-The agent uses a `.env` file for local development. Standardize your ports for unique communication:
-
-```bash
-# Server Configuration
-PORT=8080
-
-# A2A Loopback - Caller Agent URL
-CAREFLOW_CALLER_URL=http://localhost:8000
-```
-
-## 🎯 Running the Agent
-
-### Development Mode (with hot-reload)
+To start the agent server (typically on port **8080**):
 
 ```bash
 make local-backend
 ```
 
-The agent will be accessible at **<http://localhost:8080>** with:
+- **Agent Endpoint**: `http://localhost:8080`
+- **Agent Card**: `http://localhost:8080/.well-known/agent.json`
 
-- 🤖 Agent Card: `http://localhost:8080/.well-known/agent.json`
+### Environment Variables
 
-## 🧪 Development Commands
+Create a `.env` file:
 
-| Command              | Description                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------- |
-| `make install`       | Install all required dependencies using uv                                                  |
-| `make local-backend` | Launch local development server on port 8080                                                |
-| `make inspector`     | Launch A2A Protocol Inspector                                                               |
-| `make test`          | Run unit and integration tests                                                              |
-| `make lint`          | Run code quality checks (ruff, mypy)                                                       |
+```env
+PORT=8080
+GOOGLE_CLOUD_PROJECT=careflow-478811
+MODEL=gemini-3-flash-preview
+CAREFLOW_CALLER_URL=http://localhost:8080
+MCP_TOOLBOX_URL=http://localhost:5000
+```
 
-## 🔍 A2A Protocol Testing
+## 🧪 Testing
 
-Launch the A2A inspector to test agent interactions:
+Run unit and integration tests:
+
+```bash
+make test
+```
+
+Launch the A2A Inspector to debug agent interactions:
 
 ```bash
 make inspector
 ```
-
-Inspector UI: **<http://localhost:5001>**
-Connect to: `http://localhost:8080/.well-known/agent.json`
 
 ## 🚢 Deployment
 
@@ -112,20 +109,3 @@ Deploy to Google Cloud Run:
 ```bash
 make deploy
 ```
-
-## 🤝 Integration with Caller Agent
-
-The Pulse Agent acts as the analytical brain:
-
-1. Receives task from Caller Agent (e.g., "Review patient symptoms")
-2. Executes analysis and accesses hospitalization history
-3. Returns status or delegatable tasks back to the Caller Agent
-4. Analyzes raw call audio for distress signals
-5. Maintains full observability spans for inter-agent calls
-
-## 🎨 Code Quality
-
-The codebase utilizes professional headers and follows strict typing:
-
-- **Python Headers**: Every core module contains a descriptive docstring.
-- **Versioning**: Agent schemas are versioned in `app/schemas/agent_card/v1/`.
