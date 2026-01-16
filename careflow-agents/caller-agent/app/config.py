@@ -103,8 +103,14 @@ def get_env_json(key: str, default: Optional[Any] = None) -> Any:
 # =============================================================================
 
 # Server Configuration
-NGROK_URL: Optional[str] = get_env_var('NGROK_URL')
-PUBLIC_URL: Optional[str] = get_env_var('PUBLIC_URL')
+_NGROK_URL = get_env_var('NGROK_URL')
+_PUBLIC_URL = get_env_var('PUBLIC_URL')
+
+# Final Public URL (Priority: PUBLIC_URL > NGROK_URL)
+# Used for TwiML webhooks, WebSocket endpoints, and public assets
+PUBLIC_URL: Optional[str] = _PUBLIC_URL or _NGROK_URL
+NGROK_URL: Optional[str] = _NGROK_URL # Maintain backward compatibility if needed
+
 PORT: str = get_env_var('PORT', '3000')
 
 # API Keys
