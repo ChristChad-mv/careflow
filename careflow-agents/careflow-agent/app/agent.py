@@ -5,7 +5,7 @@ Entry point for the ADK-powered orchestration layer.
 import sys
 import os
 import logging
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Any
 
 from pydantic import Field
 from google.adk.agents import BaseAgent, LlmAgent
@@ -13,27 +13,27 @@ from google.adk.events import Event
 from google.adk.agents.invocation_context import InvocationContext
 from a2a.types import Message
 from a2a.server.agent_execution import RequestContext
-from .schemas.agent_card.v1.careflow_card import get_pulse_agent_card
+from app.schemas.agent_card.v1.careflow_card import get_pulse_agent_card
 import google.genai.types as genai_types
 from google.adk.planners import BuiltInPlanner
 
 # Modularized Imports
-from .app_utils.config_loader import (
+from app.app_utils.config_loader import (
     AGENT_NAME, 
     AGENT_MODEL, 
     HOSPITAL_ID
 )
-from .app_utils.prompts.system_prompts import CAREFLOW_SYSTEM_PROMPT
-from .tools import mcp__tool_loader
-from .tools.a2a_tools import a2a_tools
-from .tools.twilio_audio import fetch_call_audio
+from app.app_utils.prompts.system_prompts import CAREFLOW_SYSTEM_PROMPT
+from app.tools import mcp__tool_loader
+from app.tools.a2a_tools import a2a_tools
+from app.tools.twilio_audio import fetch_call_audio
+from app.callbacks.multimodal_handoff import audio_handoff_callback
 
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Initialize MCP tools immediately
 # Initialize MCP tools immediately
 mcp__tool_loader.init_mcp_tools()
 
@@ -57,7 +57,9 @@ class CareFlowAgent(BaseAgent):
                 thinking_config=genai_types.ThinkingConfig(include_thoughts=True)
             ),
             instruction=CAREFLOW_SYSTEM_PROMPT,
-            tools=a2a_tools + [fetch_call_audio],
+            # PASSING ALL TOOLS: A2A + MCP (Database) + Audio Fetching
+            tools=a2a_tools + mcp__tool_loader.all_tools + [fetch_call_audio],
+            after_tool_callback=audio_handoff_callback,
             output_key="patient_monitoring"
         )
         
