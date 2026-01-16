@@ -15,8 +15,8 @@ if os.environ.get("USE_CONSOLE_TOOL", "false").lower() == "true":
     from .console_call_tool import call_patient
     print("⚠️  Using CONSOLE_MOCK for call_patient tool")
 else:
-    from .twilio_tool import call_patient
+    from .twilio_tool import call_patient, end_call
 
 from .a2a_tools import create_a2a_tools
 
-__all__ = ['call_patient', 'create_a2a_tools']
+__all__ = ['call_patient', 'end_call', 'create_a2a_tools']

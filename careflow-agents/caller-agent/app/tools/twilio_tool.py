@@ -64,7 +64,7 @@ async def call_patient(
         Status message indicating call result
     """
     try:
-        from twilio.rest import AsyncClient
+        from twilio.rest import Client
         
         # Get Twilio credentials
         account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
@@ -121,16 +121,19 @@ async def call_patient(
             f"&context={quote(message)}"
         )
         
-        # Initialize and use the AsyncClient
-        async with AsyncClient(account_sid, auth_token) as client:
-            call = await client.calls.create_async(
-                to=to_number,
-                from_=from_number,
-                url=twiml_url,
-                record=True, # Enable Recording for Audio-First Reporting
-                status_callback=f"{base_url}/call-status",
-                status_callback_event=['completed']
-            )
+        # Initialize the Client (using synchronous client as in reference for stability)
+        client = Client(account_sid, auth_token)
+        
+        # Execute the synchronous call in a separate thread to avoid blocking the event loop
+        call = await asyncio.to_thread(
+            client.calls.create,
+            to=to_number,
+            from_=from_number,
+            url=twiml_url,
+            record=True, # Enable Recording for Audio-First Reporting
+            status_callback=f"{base_url}/call-status",
+            status_callback_event=['completed']
+        )
         
         logger.info(f"Call created asynchronously - SID: {call.sid} (Recording: Enabled)")
         
@@ -144,9 +147,43 @@ async def call_patient(
         logger.error(f"Twilio async call error: {e}")
         return f"Failed to initiate call: {str(e)}"
 
+@tool("end_call")
+def end_call(call_sid: str) -> str:
+    """
+    Terminates an active Twilio call.
+    Use this tool when the conversation is finished and you have said goodbye and the patient say goodbye back to you.
+    
+    Args:
+        call_sid: The unique identifier of the call to end (available in session context).
+        
+    Returns:
+        Status message indicating success or failure.
+    """
+    try:
+        # Import inside for lazy loading
+        from twilio.rest import Client
+        
+        account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
+        auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
+        
+        if not account_sid or not auth_token:
+            return "Error: Missing Twilio credentials."
+            
+        client = Client(account_sid, auth_token)
+        
+        # Update call status to 'completed' to hang up
+        call = client.calls(call_sid).update(status='completed')
+        
+        logger.info(f"📞 Ending call {call_sid}")
+        return f"Call {call_sid} ended successfully."
+        
+    except Exception as e:
+        logger.error(f"Error ending call: {e}")
+        return f"Failed to end call: {e}"
+
 
 # =============================================================================
 # EXPORTS
 # =============================================================================
 
-__all__ = ['call_patient']
+__all__ = ['call_patient', 'end_call']
