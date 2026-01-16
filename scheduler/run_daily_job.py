@@ -37,7 +37,7 @@ import argparse
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-CAREFLOW_AGENT_URL = "http://localhost:8001"  # Local development only
+CAREFLOW_AGENT_URL = "http://localhost:8080"  # Local development only
 
 async def trigger_and_disconnect(schedule_hour: int = 8):
     """
