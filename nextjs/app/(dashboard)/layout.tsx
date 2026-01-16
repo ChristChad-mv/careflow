@@ -5,18 +5,11 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 
-import { getAlerts } from "@/lib/db";
-
-export const dynamic = 'force-dynamic';
-
-export default async function AppLayout({ children }: { children: ReactNode }) {
-  const alerts = await getAlerts();
-  const criticalCount = alerts.filter(a => ['critical', 'warning'].includes(a.priority)).length;
-
+export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar alertCount={criticalCount} />
+        <AppSidebar />
         <main className="flex-1">
           <header className="h-16 border-b border-border flex items-center px-6 bg-card">
             <SidebarTrigger className="mr-4" />
@@ -36,3 +29,4 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     </SidebarProvider>
   );
 }
+
