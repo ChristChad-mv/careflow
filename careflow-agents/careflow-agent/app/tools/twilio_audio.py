@@ -71,24 +71,27 @@ def fetch_call_audio(call_sid: str) -> dict:
         audio_response = requests.get(
             audio_url,
             auth=HTTPBasicAuth(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN),
-            timeout=120  # Larger timeout for audio download
+            timeout=120
         )
         audio_response.raise_for_status()
         
-        # Step 3: Encode to base64 for LLM consumption
-        import base64
-        audio_base64 = base64.b64encode(audio_response.content).decode('utf-8')
+        # Save to temporary file
+        import tempfile
+        temp_file = os.path.join(tempfile.gettempdir(), f"{call_sid}.mp3")
+        with open(temp_file, "wb") as f:
+            f.write(audio_response.content)
+            
+        logger.info(f"Successfully downloaded audio to {temp_file}")
         
-        logger.info(f"Successfully fetched audio for Call SID {call_sid}: {duration}s, {len(audio_response.content)} bytes")
-        
+        # Return a special marker that the Agent Callback can intercept
         return {
             "success": True,
             "call_sid": call_sid,
             "recording_sid": recording_sid,
-            "audio_data": audio_base64,
+            "local_file_path": temp_file,  # Critical for callback injection
             "mime_type": "audio/mpeg",
             "duration_seconds": duration,
-            "message": f"Audio fetched successfully. Duration: {duration} seconds. Please analyze this recording to assess the patient's condition, emotional state, and any concerning symptoms mentioned."
+            "message": f"Audio file downloaded to {temp_file}. The system will now inject this audio for analysis."
         }
         
     except requests.exceptions.Timeout:
