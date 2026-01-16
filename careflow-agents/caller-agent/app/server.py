@@ -26,6 +26,7 @@ import os
 import json
 import argparse
 import logging
+import aiohttp
 from datetime import datetime
 from typing import Optional
 from urllib.parse import quote
@@ -44,7 +45,7 @@ from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 
 # Local imports
-from .config import NGROK_URL, PUBLIC_URL, PORT
+from .config import PUBLIC_URL, PORT
 from .app_utils.conversation_relay import SessionData, ConversationMessage
 from .app_utils.websocket_handlers import MessageHandler, connection_manager
 from .app_utils.telemetry import setup_telemetry
@@ -179,8 +180,8 @@ async def twiml_endpoint(request: Request) -> Response:
         TwiML response configuring ConversationRelay with ElevenLabs TTS
     """
     # Determine host for WebSocket URL
-    # Priority: PUBLIC_URL > NGROK_URL > Host Header > Localhost
-    host = PUBLIC_URL or NGROK_URL or str(request.headers.get('host')) or f"localhost:{server_port}"
+    # Priority: PUBLIC_URL > Host Header > Localhost
+    host = PUBLIC_URL or str(request.headers.get('host')) or f"localhost:{server_port}"
     
     # Strip protocol if present in PUBLIC_URL/NGROK_URL for correct WebSocket URL construction
     if "://" in host:
@@ -223,6 +224,86 @@ async def twiml_endpoint(request: Request) -> Response:
 </Response>"""
     
     return Response(content=twiml, media_type="text/xml")
+
+
+@app.post("/call-status")
+async def call_status_endpoint(request: Request):
+    """
+    Twilio Status Callback.
+    Triggered when the call ends (completed).
+    Sends A2A message to CareFlow Agent (Pulse) to analyze the audio.
+    """
+    data = await request.form()
+    call_sid = data.get("CallSid")
+    call_status = data.get("CallStatus")
+    
+    logger.info(f"📞 Call Status Update: {call_sid} -> {call_status}")
+    
+    # We only care when the call is finished and was answered (so recording likely exists)
+    if call_status == "completed":
+        # Check if recording exists? 
+        # Twilio sends 'RecordingUrl' if recording is ready, but it might be async.
+        # However, we rely on the rule: If call completed, we ask Pulse to fetch audio.
+        
+        # Construct A2A Message
+        # We need to send this to the CareFlow Pulse Agent.
+        # We use the agent's internal A2A client or just construct a request.
+        # Since this is the Server, we can use the 'agent' instance if it has A2A capabilities.
+        # The 'agent' (CallerAgent) has 'agent_cards' but relies on 'tools' for sending.
+        # Here we manually send an A2A notification.
+        
+        try:
+            import uuid
+            msg_id = str(uuid.uuid4())
+            
+            # Prepare payload matching strict A2A schema
+            payload = {
+                "jsonrpc": "2.0",
+                "method": "message/stream",
+                "params": {
+                    "message": {
+                        "messageId": msg_id,
+                        "role": "user",
+                        "parts": [
+                            {
+                                "text": f"CALL_COMPLETE: Interview finished. Call SID: {call_sid}",
+                                "kind": "text"
+                            }
+                        ],
+                        "metadata": {
+                            "task": "analyze_call_audio",
+                            "call_sid": call_sid,
+                            "source": "telephony_webhook"
+                        }
+                    }
+                },
+                "id": f"evt-{call_sid}"
+            }
+            
+            # Send to Pulse Agent (assuming locahost:8080 or config)
+            pulse_url = os.environ.get("CAREFLOW_AGENT_URL", "http://localhost:8080")
+            
+            # Remove /rpc suffix if present, as ADK listens on root for this config
+            if pulse_url.endswith("/rpc"):
+                 pulse_url = pulse_url[:-4]
+
+            target_url = pulse_url
+            
+            logger.info(f"➡️ Sending Audio Analysis Request to {target_url} for {call_sid}")
+            
+            async with aiohttp.ClientSession() as session:
+                # Add headers required for correct content negotiation
+                headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
+                async with session.post(target_url, json=payload, headers=headers) as resp:
+                    if resp.status == 200:
+                        logger.info("✅ Audio Analysis Request sent successfully.")
+                    else:
+                        logger.error(f"❌ Failed to send request: {resp.status} {await resp.text()}")
+                        
+        except Exception as e:
+            logger.error(f"❌ Error sending A2A handoff: {e}")
+            
+    return Response(status_code=200)
 
 
 # =============================================================================
@@ -374,12 +455,12 @@ def start_server() -> None:
     logger.info(f"📞 TwiML endpoint: http://localhost:{server_port}/twiml")
     logger.info(f"🔌 WebSocket endpoint: ws://localhost:{server_port}/ws")
     
-    if NGROK_URL:
-        logger.info(f"🌐 Public URL: https://{NGROK_URL}")
-        logger.info(f"📞 Public TwiML: https://{NGROK_URL}/twiml")
-        logger.info(f"🤖 A2A endpoint: https://{NGROK_URL}/.well-known/agent.json")
+    if PUBLIC_URL:
+        logger.info(f"🌐 Public URL: https://{PUBLIC_URL}")
+        logger.info(f"📞 Public TwiML: https://{PUBLIC_URL}/twiml")
+        logger.info(f"🤖 A2A endpoint: https://{PUBLIC_URL}/.well-known/agent.json")
     else:
-        logger.info("💡 Tip: Set NGROK_URL for public access")
+        logger.info("💡 Tip: Set PUBLIC_URL or NGROK_URL for public access")
     
     logger.info("=" * 60)
     
