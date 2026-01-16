@@ -12,7 +12,7 @@ tools:
   get_patients_for_schedule:
     kind: firestore-query
     source: careflow-firestore
-    description: "Retrieve all active patients for the hospital"
+    description: "Retrieve all active patients for the hospital filtered by their call schedule hour (8, 12, or 20)."
     collectionPath: "patients"
     filters: |
       {
@@ -32,40 +32,12 @@ tools:
                 "op": "==",
                 "value": {"stringValue": "active"}
               }
-            }
-          ]
-        }
-      }
-    limit: 100
-    parameters:
-      - name: hospitalId
-        type: string
-        description: "The Hospital ID to filter by"
-        required: true
-  
-  # Get specific patient by ID using query
-  get_patient_by_id:
-    kind: firestore-query
-    source: careflow-firestore
-    description: "Retrieve detailed information for a specific patient by their ID"
-    collectionPath: "patients"
-    filters: |
-      {
-        "compositeFilter": {
-          "op": "AND",
-          "filters": [
-            {
-              "fieldFilter": {
-                "field": "hospitalId",
-                "op": "==",
-                "value": {"stringValue": "{{.hospitalId}}"}
-              }
             },
             {
               "fieldFilter": {
-                "field": "id",
+                "field": "scheduleHour",
                 "op": "==",
-                "value": {"stringValue": "{{.patientId}}"}
+                "value": {"integerValue": {{.scheduleHour}}}
               }
             }
           ]
@@ -76,9 +48,9 @@ tools:
         type: string
         description: "The Hospital ID to filter by"
         required: true
-      - name: patientId
-        type: string
-        description: "The unique identifier of the patient"
+      - name: scheduleHour
+        type: integer
+        description: "The hour of the day (8, 12, 20) the patient is scheduled for rounds"
         required: true
   
   # Query patient by phone number
@@ -118,7 +90,7 @@ tools:
         type: string
         description: "Patient's phone number"
         required: true
-
+  
   # Query patient by name (for inbound calls)
   get_patient_by_name:
     kind: firestore-query
@@ -156,6 +128,12 @@ tools:
         type: string
         description: "Patient's full name as stored in the database"
         required: true
+  
+  # List all collections (for discovery)
+  list_collections:
+     kind: firestore-list-collections
+     source: careflow-firestore
+     description: "List all available top-level collections in the Firestore database."
 
   # Create a new clinical alert
   create_alert:
@@ -212,9 +190,9 @@ tools:
 toolsets:
   patient_tools:
     - get_patients_for_schedule
-    - get_patient_by_id
     - get_patient_by_phone
     - get_patient_by_name
+    - list_collections
     - create_alert
     - update_patient_risk
     - log_patient_interaction
