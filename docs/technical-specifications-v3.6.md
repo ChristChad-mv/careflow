@@ -20,6 +20,8 @@
 | 3.2 | 2026-01-02 | Christ | Cloud Scheduler Infrastructure as Code: Terraform configuration with multi-environment deployment (staging/prod), OIDC authentication, automated retry logic, comprehensive monitoring setup |
 | 3.3 | 2026-01-10 | Christ | Advanced AI Security: Integrated Google Model Armor (v0.3.0) with Fail-Closed architecture, synchronized regional endpoints across dual-agent system, and established comprehensive Security & Compliance specs. |
 | 3.4 | 2026-01-14 | Christ | Audio-First Reporting Architecture: Pivoted from transcript-based to audio-based analysis. Caller Agent records calls; Pulse Agent fetches raw audio and leverages Gemini 3's native multimodal analysis. |
+| 3.5 | 2026-01-16 | Christ | Real-Time Dashboard Alerts: Implemented Firestore `onSnapshot` listeners for instant alert propagation. Added `useAlerts` hook, `AlertsRealtime` component, and real-time sidebar badge updates. |
+| 3.6 | 2026-01-16 | Christ | Caller Agent Documentation: Added AHRQ RED 5-phase interview protocol, Dual Mode (Outbound/Inbound), Model Armor security reference. Removed code examples per documentation standards. |
 
 ---
 
@@ -82,6 +84,8 @@
 
 - 7.1. Technology Stack
 - 7.2. Architecture Principles
+- 7.3. Real-Time Data Patterns (NEW v3.5)
+- 7.4. Key Components & Pages
 
 ### 8. Data Flow & User Journeys
 
@@ -1543,46 +1547,52 @@ for patient in patients:
 
 ### **4.3. Caller Agent (Voice & Messaging Interface)**
 
-**Role:** The Caller Agent (LangGraph-based) serves as the "voice" of the system. It connects to Twilio ConversationRelay to maintain natural, real-time conversations with patients. In v3.4, the agent records all calls and sends only the `CallSid` to the Pulse Agent for audio-based analysis.
+**Role:** The Caller Agent (LangGraph-based) serves as the "voice" of the system, handling both outbound wellness check-ins and inbound patient calls. It connects to Twilio ConversationRelay for natural, real-time voice conversations with patients.
 
-**File:** `app/agent.py` (specialized agent, invoked by orchestrator)
+**File:** `careflow-agents/caller-agent/app/agent.py`
+
+#### **Dual Mode Operation**
+
+The Caller Agent operates in two distinct modes:
+
+| Mode | Trigger | Workflow |
+| :--- | :--- | :--- |
+| **Outbound** | A2A task from Pulse Agent with "Rich Patient Brief" | Conducts structured AHRQ RED interview |
+| **Inbound** | Patient calls the CareFlow number directly | Identifies patient, retrieves context, assists |
+
+#### **AHRQ RED Interview Protocol (Outbound)**
+
+For outbound calls, the Caller Agent follows the **AHRQ RED Tool 5 Post-Discharge Call** protocol with five structured phases. (See Functional Specs Section 1.4 for full AHRQ RED documentation.)
+
+| Phase | Objective | Key Actions |
+| :--- | :--- | :--- |
+| **1. Cognitive Alignment** | Verify patient understands their diagnosis | Teach-back methodology |
+| **2. Medication Audit** | Confirm safe medication management | Verify name, dose, purpose of each high-alert med |
+| **3. Barrier Identification** | Detect obstacles to follow-up care | Transportation, financial, caregiver availability |
+| **4. Home Services Validation** | Confirm equipment delivery and setup | Verify patient comfort with home services |
+| **5. Safety Net Stress Test** | Validate emergency response plan | Quiz patient on red flag symptoms |
 
 #### **Responsibilities**
 
 | Responsibility | Description | Output |
 | :--- | :--- | :--- |
-| **Dynamic Prompt Generation** | Creates a unique system prompt for each patient call | String (prompt) |
-| **Patient Context Injection** | Includes patient name, diagnosis, medications, critical symptoms | Part of prompt |
-| **Safety Rules Encoding** | Embeds "Safe Handover Protocol" and critical keyword detection | Part of prompt |
-| **Call Initiation** | Triggers Twilio Voice API to call patient with `record=true` | Twilio Call SID |
-| **Call Recording (v3.4)** | All calls recorded by Twilio; `CallSid` sent to Pulse Agent on completion | `CallSid` reference |
-| **SMS Sending** | Sends text messages when voice is unavailable | Twilio Message SID |
+| **Dynamic Prompt Generation** | Creates context-rich prompt for each patient from "Rich Patient Brief" | Conversation context |
+| **Call Initiation** | Triggers Twilio Voice API with `record=true` | Twilio Call SID |
+| **Call Recording (v3.4)** | All calls recorded; `CallSid` sent to Pulse Agent on completion | Audio reference |
+| **Patient Lookup (Inbound)** | Queries Pulse Agent via A2A to identify caller | Patient context |
+| **SMS Fallback** | Sends text messages when voice is unavailable | Twilio Message SID |
 
-#### **Dynamic Prompt Template**
+#### **Security Integration**
 
-The CareFlow-Connect agent must generate a unique prompt for each patient call that includes:
+All agent inputs and outputs pass through **Model Armor** for security validation. See Section 9.3 for details on prompt injection defense and PHI redaction.
 
-**Required Elements in Prompt:**
+#### **External Integrations**
 
-1. **Patient Identification**: Name, diagnosis, discharge date
-2. **Medication List**: All medications scheduled for this time slot with dosages and frequencies
-3. **Critical Symptoms**: List from `dischargePlan.criticalSymptoms` that trigger immediate escalation
-4. **Safe Handover Protocol**: Exact script to use if patient mentions critical symptoms or asks for medical advice
-5. **Conversation Goals**: Check medication adherence, assess symptoms, provide reassurance
-6. **Conversation Style Guidelines**: Warm, empathetic, simple language, avoid medical jargon
-
-**Prompt Structure:**
-
-- Role definition: "You are CareFlow, a friendly AI assistant..."
-- Patient context section with medical history
-- Today's medication checklist
-- Critical alert keywords (dynamically inserted from Firestore)
-- Handover script: "Thank you for telling me that... I'm alerting your nurse now..."
-- Example opening greeting
-
-- `Twilio ConversationRelay`: Streams voice audio to/from the patient.
-- `ElevenLabs TTS`: Synthesizes ultra-realistc medical persona voice.
-- `A2A Client`: Receives clinical context and returns session results to Pulse Agent.
+| Integration | Purpose |
+| :--- | :--- |
+| **Twilio ConversationRelay** | Real-time voice streaming with WebSocket |
+| **ElevenLabs TTS** | Ultra-realistic medical persona voice synthesis |
+| **A2A Protocol** | Inter-agent communication with Pulse Agent |
 
 ---
 
@@ -2361,6 +2371,104 @@ The CareFlow Dashboard is a modern, real-time interface designed for nurse effic
 - **Optimistic Updates:** UI reflects actions immediately while syncing to Firestore in the background.
 - **Role-Based Views:** Nurses see only their assigned patients and active hospital branch.
 - **Component isolation:** Atomic design pattern for high reusability of charts, logs, and alert cards.
+
+### **7.3. Real-Time Data Patterns (NEW v3.5)**
+
+The dashboard implements **real-time Firestore listeners** using the `onSnapshot` API, enabling instant propagation of alerts created by the AI agents.
+
+#### **7.3.1. useAlerts Hook**
+
+A custom React hook that subscribes to the `alerts` collection with live updates:
+
+```typescript
+// src/hooks/useAlerts.ts
+export function useAlerts(hospitalId: string = "HOSP001") {
+    const [alerts, setAlerts] = useState<Alert[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const alertsRef = collection(db, "alerts");
+        const q = query(
+            alertsRef,
+            where("hospitalId", "==", hospitalId),
+            orderBy("createdAt", "desc")
+        );
+
+        // Real-time subscription
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const allAlerts = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            // Client-side filter for active status
+            const activeAlerts = allAlerts.filter(
+                a => a.status === "active" || a.status === "in_progress"
+            );
+            setAlerts(activeAlerts);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [hospitalId]);
+
+    const criticalCount = alerts.filter(
+        a => a.priority === "critical" || a.priority === "warning"
+    ).length;
+
+    return { alerts, loading, criticalCount };
+}
+```
+
+**Key Features:**
+
+- Auto-cleanup on unmount
+- Hospital-scoped queries (multi-tenant)
+- Client-side status filtering (avoids composite index)
+- Returns `criticalCount` for sidebar badge
+
+#### **7.3.2. Real-Time Components**
+
+| Component | File | Purpose |
+| :--- | :--- | :--- |
+| `AlertsRealtime` | `src/components/alerts/AlertsRealtime.tsx` | Renders live-updating alert list with loading skeleton |
+| `AppSidebar` | `src/components/layout/AppSidebar.tsx` | Displays real-time badge with critical alert count |
+
+**Alert Flow:**
+
+```
+Agent creates alert → Firestore write → onSnapshot fires → UI updates instantly
+```
+
+### **7.4. Key Components & Pages**
+
+#### **Dashboard Layout** (`app/(dashboard)/layout.tsx`)
+
+The main layout wraps all authenticated pages with:
+
+- `SidebarProvider` for collapsible navigation
+- `AppSidebar` with real-time alert badge
+- Header with sign-out button
+
+#### **Pages Overview**
+
+| Route | Component | Data Source |
+| :--- | :--- | :--- |
+| `/dashboard` | KPI cards, risk chart | Server-side via `getDashboardStats()` |
+| `/alerts` | `AlertsRealtime` | **Real-time** via `useAlerts()` |
+| `/patients` | Patient list | Server-side via `getPatients()` |
+| `/patient/[id]` | Patient profile (3-column) | Server-side via `getPatient()` |
+| `/config` | System settings | Server-side |
+
+#### **Database Layer** (`src/lib/db.ts`)
+
+Server-side utility functions for Next.js Server Components:
+
+| Function | Returns |
+| :--- | :--- |
+| `getPatients()` | All patients for current hospital |
+| `getPatient(id)` | Single patient with full details |
+| `getAlerts()` | Active alerts (used for initial page load) |
+| `getDashboardStats()` | Aggregated KPIs and status counts |
 
 ---
 
