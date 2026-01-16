@@ -53,9 +53,10 @@ async def run_audio_eval():
             audio_b64 = base64.b64encode(f.read()).decode('utf-8')
         # Direct prompt to the agent (bypassing auto-workflow for intelligence testing)
         prompt_text = (
-            "Listen to this audio, analyze it carefully and tell us what you understand. "
-            "What clinical steps would you take (database, alerts, etc.) "
-            "based on the results of your analysis?"
+            "Your job is to listen to the audio and then tell us what you understand. "
+            "What clinical steps would you take? Explain your reasoning. "
+            "IMPORTANT: DO NOT CALL ANY TOOLS like 'create_alert' or 'update_patient'. "
+            "Just describe the actions you would take in text."
         )
         
         message = Message(
