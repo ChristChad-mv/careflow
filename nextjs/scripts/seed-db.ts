@@ -204,25 +204,26 @@ const seedPatients = async () => {
         {
             id: "p_h1_001",
             hospitalId: "HOSP001",
-            name: "James Wilson (HOSP1)",
-            email: "james.wilson@email.com",
-            dateOfBirth: "1955-03-15",
+            name: "Christ Chadrak MVOUNGOU",
+            email: "christ.mvoungou@email.com",
+            dateOfBirth: "1990-06-25",
             contact: { phone: "+33744533386", preferredMethod: "phone" },
             assignedNurse: { name: "Sarah Johnson, RN", email: "sarah@hosp1.com", phone: "+15559876543" },
             dischargePlan: {
-                diagnosis: "Post-CABG",
+                diagnosis: "Type 2 Diabetes",
                 dischargeDate: Timestamp.now(),
                 hospitalId: "HOSP001",
                 dischargingPhysician: "Dr. A. Carter",
                 medications: [
-                    { name: "Metoprolol", dosage: "50mg", frequency: "Twice daily", instructions: "Take with food", scheduleHour: 8, startDate: Timestamp.now() }
+                    { name: "Metformin", dosage: "500mg", frequency: "Twice daily", instructions: "Take with meals", scheduleHour: 8, startDate: Timestamp.now() },
+                    { name: "Glipizide", dosage: "5mg", frequency: "Once daily", instructions: "Take before breakfast", scheduleHour: 7, startDate: Timestamp.now() }
                 ],
-                criticalSymptoms: ["Chest pain > 5/10", "Shortness of breath at rest"],
-                warningSymptoms: ["Leg swelling", "Fatigue"]
+                criticalSymptoms: ["Blood sugar > 300 mg/dL", "Confusion or dizziness", "Severe thirst"],
+                warningSymptoms: ["Frequent urination", "Fatigue", "Blurred vision"]
             },
-            nextAppointment: { date: "2025-12-10T09:00:00Z", type: "Follow-up", location: "Cardiology Center" },
+            nextAppointment: { date: "2026-02-15T10:00:00Z", type: "Follow-up", location: "Diabetes Care Center" },
             riskLevel: "safe", // Green
-            aiBrief: "Patient stable. Incision clean.",
+            aiBrief: "Patient stable. Blood sugar levels well controlled. Following diet plan.",
             status: "active"
         }
     ];
