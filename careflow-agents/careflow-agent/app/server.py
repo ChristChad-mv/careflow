@@ -18,11 +18,11 @@ from a2a.server.tasks.base_push_notification_sender import BasePushNotificationS
 from a2a.types import Message, Role, Part, TextPart
 
 # Modularized Imports
-from .app_utils.config_loader import PORT, AGENT_NAME
-from .app_utils.telemetry import setup_telemetry
-from .agent import root_agent
-from .app_utils.executor.careflow_executor import CareFlowAgentExecutor
-from .schemas.agent_card.v1.careflow_card import get_pulse_agent_card
+from app.app_utils.config_loader import PORT, AGENT_NAME
+from app.app_utils.telemetry import setup_telemetry
+from app.agent import root_agent
+from app.app_utils.executor.careflow_executor import CareFlowAgentExecutor
+from app.schemas.agent_card.v1.careflow_card import get_pulse_agent_card
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -122,4 +122,4 @@ if __name__ == "__main__":
     run_port = args.port or int(PORT)
     
     logger.info(f"Starting CareFlow Server (FastAPI + A2A) on port {run_port}")
-    uvicorn.run(app, host="0.0.0.0", port=run_port, reload=args.reload)
+    uvicorn.run(app, host="0.0.0.0", port=run_port, reload=False)
