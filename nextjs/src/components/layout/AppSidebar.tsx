@@ -14,27 +14,24 @@ import {
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useAlerts } from "@/hooks/useAlerts";
 
 import Image from "next/image";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
-  { title: "Critical Alerts", url: "/alerts", icon: AlertTriangle, badge: 3 },
+  { title: "Critical Alerts", url: "/alerts", icon: AlertTriangle, hasBadge: true },
   { title: "Patient List", url: "/patients", icon: Users },
   { title: "Profile", url: "/profile", icon: User },
   { title: "Configuration", url: "/config", icon: Settings },
 ];
 
-
-
-export function AppSidebar({ alertCount = 0 }: { alertCount?: number }) {
+export function AppSidebar() {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
 
-  const items = navItems.map(item => ({
-    ...item,
-    badge: item.url === "/alerts" ? alertCount : undefined
-  }));
+  // Real-time alert count from Firestore
+  const { criticalCount } = useAlerts();
 
   return (
     <Sidebar className="border-r border-white/5 bg-sidebar/95 backdrop-blur-xl">
@@ -66,7 +63,7 @@ export function AppSidebar({ alertCount = 0 }: { alertCount?: number }) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
+              {navItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink
@@ -79,12 +76,12 @@ export function AppSidebar({ alertCount = 0 }: { alertCount?: number }) {
                       {!isCollapsed && (
                         <span className="flex-1">{item.title}</span>
                       )}
-                      {!isCollapsed && item.badge !== undefined && (
+                      {!isCollapsed && item.hasBadge && criticalCount > 0 && (
                         <Badge
                           variant="destructive"
                           className="ml-auto animate-critical-pulse shadow-lg shadow-destructive/20"
                         >
-                          {item.badge}
+                          {criticalCount}
                         </Badge>
                       )}
                     </NavLink>
@@ -94,9 +91,6 @@ export function AppSidebar({ alertCount = 0 }: { alertCount?: number }) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-
-
 
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
@@ -114,3 +108,4 @@ export function AppSidebar({ alertCount = 0 }: { alertCount?: number }) {
     </Sidebar>
   );
 }
+

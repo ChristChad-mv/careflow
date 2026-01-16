@@ -45,7 +45,7 @@ export function ModernAudioPlayer({ src, className }: ModernAudioPlayerProps) {
                 audio.addEventListener('error', onError);
             });
 
-            setDuration(audio.duration);
+            setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
             setIsLoaded(true);
             setIsLoading(false);
         }
@@ -60,12 +60,10 @@ export function ModernAudioPlayer({ src, className }: ModernAudioPlayerProps) {
         if (!audio) return;
 
         if (!isLoaded) {
-            // First click -> load and play
             handleLoadAndPlay();
             return;
         }
 
-        // Already loaded -> just toggle
         if (isPlaying) {
             audio.pause();
             setIsPlaying(false);
@@ -77,7 +75,14 @@ export function ModernAudioPlayer({ src, className }: ModernAudioPlayerProps) {
 
     const handleTimeUpdate = () => {
         if (audioRef.current) {
-            setCurrentTime(audioRef.current.currentTime);
+            const currentTime = audioRef.current.currentTime;
+            const duration = audioRef.current.duration;
+
+            setCurrentTime(currentTime);
+            // Update duration continuously in case it changes from Infinity to Finite during stream loading
+            if (Number.isFinite(duration) && duration > 0) {
+                setDuration(duration);
+            }
         }
     };
 
@@ -93,7 +98,7 @@ export function ModernAudioPlayer({ src, className }: ModernAudioPlayerProps) {
     };
 
     const formatTime = (time: number) => {
-        if (isNaN(time) || time === 0) return "--:--";
+        if (!Number.isFinite(time) || isNaN(time) || time === 0) return "--:--";
         const minutes = Math.floor(time / 60);
         const seconds = Math.floor(time % 60);
         return `${minutes}:${seconds.toString().padStart(2, "0")}`;
