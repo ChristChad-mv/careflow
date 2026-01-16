@@ -37,13 +37,13 @@ from langgraph.checkpoint.memory import MemorySaver
 from a2a.types import AgentCard
 
 # Internal imports - modular structure
-from .config import NGROK_URL
+from .config import PUBLIC_URL
 from .app_utils.config_loader import load_config, get_a2a_server_urls
 from .app_utils.conversation_relay import SessionData
 from .app_utils.llm import ModelConfig, get_model
 from .app_utils.prompts.system_prompts import CALLER_SYSTEM_PROMPT
 from .core.security.model_armor import ModelArmorClient
-from .tools import call_patient, create_a2a_tools
+from .tools import call_patient, end_call, create_a2a_tools
 
 
 # =============================================================================
@@ -109,7 +109,7 @@ class CallerAgent:
         
         self.agent = create_react_agent(
             model=self.model,
-            tools=a2a_tools + [call_patient],
+            tools=a2a_tools + [call_patient, end_call],
             checkpointer=self.memory
         )
     
@@ -142,7 +142,7 @@ class CallerAgent:
         async def fetch_card(server_url: str) -> Optional[dict]:
             try:
                 from urllib.parse import urljoin
-                url = urljoin(server_url, "/.well-known/agent.json")
+                url = urljoin(server_url, "/.well-known/agent-card.json")
                 async with aiohttp.ClientSession() as session:
                     async with session.get(url, headers={"Accept": "application/json"}) as resp:
                         if resp.ok:
@@ -311,10 +311,10 @@ class CallerAgent:
                 else:
                     messages.append(AIMessage(content=msg.content))
             
-            # Play typing indicator sound
-            await self.send_ws_message(
-                source=f"https://{NGROK_URL}/public/keyboard-typing.mp3"
-            )
+            # Play typing indicator sound (Disabled to avoid Media Not Found errors)
+            # await self.send_ws_message(
+            #     source=f"https://{PUBLIC_URL}/public/keyboard-typing.mp3"
+            # )
             
             # --- MODEL ARMOR INPUT SCAN ---
             logger.info(f"🔍 Model Armor scanning patient message: '{user_message[:50]}...'")
@@ -362,19 +362,19 @@ class CallerAgent:
                         yield content
             
             # --- MODEL ARMOR OUTPUT SCAN (Audit & Sanitize) ---
-            logger.info("🔍 Model Armor auditing caller response for PII/PHI...")
-            sanitization_result = await model_armor_client.sanitize_response(full_response)
-            
-            if sanitization_result.get("is_blocked"):
-                logger.error("🚨 Model Armor BLOCKED entire response - critical safety issue detected")
-                # Log for audit but don't return blocked content
-            elif sanitization_result.get("redactions_applied"):
-                redacted = sanitization_result.get("redactions_applied", [])
-                logger.warning(f"🔒 Model Armor applied redactions: {', '.join(redacted)}")
-                # In production: consider if we should return sanitized_text instead
-                # For now, we audit but allow original (since it's voice - hard to redact mid-stream)
-            else:
-                logger.debug("✅ Model Armor output scan passed (no PHI detected)")
+            # NOTE: DISABLED for Caller Agent (Tier 1 Security) to optimize latency for voice.
+            # We trust the Gemini 2.0 Flash generation for outgoing messages.
+            #
+            # logger.info("🔍 Model Armor auditing caller response for PII/PHI...")
+            # sanitization_result = await model_armor_client.sanitize_response(full_response)
+            #
+            # if sanitization_result.get("is_blocked"):
+            #     logger.error("🚨 Model Armor BLOCKED entire response - critical safety issue detected")
+            # elif sanitization_result.get("redactions_applied"):
+            #     redacted = sanitization_result.get("redactions_applied", [])
+            #     logger.warning(f"🔒 Model Armor applied redactions: {', '.join(redacted)}")
+            # else:
+            #     logger.debug("✅ Model Armor output scan passed (no PHI detected)")
             # --------------------------------------------------
 
             logger.info(f"Agent response for session {session_id}: {full_response[:100]}...")
@@ -405,4 +405,4 @@ agent = CallerAgent(
 # EXPORTS
 # =============================================================================
 
-__all__ = ['agent', 'CallerAgent', 'call_patient']
+__all__ = ['agent', 'CallerAgent', 'call_patient', 'end_call']
