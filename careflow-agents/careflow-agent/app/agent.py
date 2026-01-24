@@ -27,6 +27,8 @@ from app.app_utils.prompts.system_prompts import CAREFLOW_SYSTEM_PROMPT
 from app.tools import mcp__tool_loader
 from app.tools.a2a_tools import a2a_tools
 from app.tools.twilio_audio import fetch_call_audio
+from app.tools.retry_tools import retry_tools
+from app.tools.interaction_logger import interaction_tools
 from app.callbacks.multimodal_handoff import audio_handoff_callback
 
 
@@ -57,8 +59,8 @@ class CareFlowAgent(BaseAgent):
                 thinking_config=genai_types.ThinkingConfig(include_thoughts=True)
             ),
             instruction=CAREFLOW_SYSTEM_PROMPT,
-            # PASSING ALL TOOLS: A2A + MCP (Database) + Audio Fetching
-            tools=a2a_tools + mcp__tool_loader.all_tools + [fetch_call_audio],
+            # PASSING ALL TOOLS: A2A + MCP (Database) + Audio + Retry + Interaction Logger
+            tools=a2a_tools + mcp__tool_loader.all_tools + [fetch_call_audio] + retry_tools + interaction_tools,
             after_tool_callback=audio_handoff_callback,
             output_key="patient_monitoring"
         )

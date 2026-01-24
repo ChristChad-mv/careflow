@@ -45,13 +45,13 @@ from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 
 # Local imports
-from .config import PUBLIC_URL, PORT
-from .app_utils.conversation_relay import SessionData, ConversationMessage
-from .app_utils.websocket_handlers import MessageHandler, connection_manager
-from .app_utils.telemetry import setup_telemetry
-from .agent import agent
-from .app_utils.executor.caller_executor import CallerAgentExecutor
-from .schemas.agent_card.v1.caller_card import caller_card
+from app.config import PUBLIC_URL, PORT
+from app.app_utils.conversation_relay import SessionData, ConversationMessage
+from app.app_utils.websocket_handlers import MessageHandler, connection_manager
+from app.app_utils.telemetry import setup_telemetry
+from app.agent import agent
+from app.app_utils.executor.caller_executor import CallerAgentExecutor
+from app.schemas.agent_card.v1.caller_card import caller_card
 
 
 # =============================================================================
@@ -221,6 +221,7 @@ async def twiml_endpoint(request: Request) -> Response:
             voice="UgBBYS2sOqTuMpoF3BR0" 
         />
     </Connect>
+    <Hangup/>
 </Response>"""
     
     return Response(content=twiml, media_type="text/xml")
@@ -236,27 +237,35 @@ async def call_status_endpoint(request: Request):
     data = await request.form()
     call_sid = data.get("CallSid")
     call_status = data.get("CallStatus")
+    answered_by = data.get("AnsweredBy") # human, machine, fax, unknown
     
-    logger.info(f"📞 Call Status Update: {call_sid} -> {call_status}")
+    # Extract patient context from query params
+    patient_id = request.query_params.get("patient_id", "UNKNOWN_ID")
+    patient_name = request.query_params.get("patient_name", "Unknown Patient")
     
-    # We only care when the call is finished and was answered (so recording likely exists)
-    if call_status == "completed":
-        # Check if recording exists? 
-        # Twilio sends 'RecordingUrl' if recording is ready, but it might be async.
-        # However, we rely on the rule: If call completed, we ask Pulse to fetch audio.
-        
-        # Construct A2A Message
-        # We need to send this to the CareFlow Pulse Agent.
-        # We use the agent's internal A2A client or just construct a request.
-        # Since this is the Server, we can use the 'agent' instance if it has A2A capabilities.
-        # The 'agent' (CallerAgent) has 'agent_cards' but relies on 'tools' for sending.
-        # Here we manually send an A2A notification.
-        
+    log_msg = f"📞 Call Status: {call_sid} -> {call_status} (Patient: {patient_name})"
+    if answered_by:
+        log_msg += f" [AnsweredBy: {answered_by}]"
+    logger.info(log_msg)
+    
+    # 1. Handle "Answered" event (Status: in-progress)
+    if call_status == "in-progress":
+        if answered_by == "machine":
+            logger.warning(f"🤖 Call answered by MACHINE for {patient_name}. Agent will likely speak to voicemail.")
+        else:
+            logger.info(f"👤 Call answered by HUMAN for {patient_name}. Conversation starting...")
+
+    # 2. Handle "Completed" event (Successful call finished)
+    elif call_status == "completed":
         try:
             import uuid
             msg_id = str(uuid.uuid4())
             
-            # Prepare payload matching strict A2A schema
+            instruction_text = (
+                f"CALL_COMPLETE: Interview with patient {patient_name} (ID: {patient_id}) finished. "
+                f"Call SID: {call_sid}. Analyze the audio."
+            )
+            
             payload = {
                 "jsonrpc": "2.0",
                 "method": "message/stream",
@@ -264,12 +273,7 @@ async def call_status_endpoint(request: Request):
                     "message": {
                         "messageId": msg_id,
                         "role": "user",
-                        "parts": [
-                            {
-                                "text": f"CALL_COMPLETE: Interview finished. Call SID: {call_sid}",
-                                "kind": "text"
-                            }
-                        ],
+                        "parts": [{"text": instruction_text, "kind": "text"}],
                         "metadata": {
                             "task": "analyze_call_audio",
                             "call_sid": call_sid,
@@ -280,28 +284,85 @@ async def call_status_endpoint(request: Request):
                 "id": f"evt-{call_sid}"
             }
             
-            # Send to Pulse Agent (assuming locahost:8080 or config)
             pulse_url = os.environ.get("CAREFLOW_AGENT_URL", "http://localhost:8080")
-            
-            # Remove /rpc suffix if present, as ADK listens on root for this config
-            if pulse_url.endswith("/rpc"):
-                 pulse_url = pulse_url[:-4]
-
-            target_url = pulse_url
-            
-            logger.info(f"➡️ Sending Audio Analysis Request to {target_url} for {call_sid}")
+            if pulse_url.endswith("/rpc"): pulse_url = pulse_url[:-4]
             
             async with aiohttp.ClientSession() as session:
-                # Add headers required for correct content negotiation
                 headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
-                async with session.post(target_url, json=payload, headers=headers) as resp:
-                    if resp.status == 200:
-                        logger.info("✅ Audio Analysis Request sent successfully.")
-                    else:
-                        logger.error(f"❌ Failed to send request: {resp.status} {await resp.text()}")
+                async with session.post(pulse_url, json=payload, headers=headers) as resp:
+                    # Consume response to properly close connection
+                    await resp.read()
                         
         except Exception as e:
-            logger.error(f"❌ Error sending A2A handoff: {e}")
+            logger.error(f"❌ Error sending A2A record analysis: {e}")
+    
+    # 3. Handle Failed States (busy, no-answer, failed)
+    elif call_status in ["busy", "no-answer", "failed"]:
+        logger.warning(f"⚠️ Call {call_status} for patient {patient_name} ({patient_id})")
+        
+        try:
+            from datetime import datetime as dt, timezone
+            from app.app_utils.retry_utils import get_schedule_slot_key, schedule_patient_retry
+            import uuid
+            
+            # Infer schedule hour from current time
+            current_hour = dt.now(timezone.utc).hour
+            schedule_hour = 8 if current_hour < 10 else (12 if current_hour < 16 else 20)
+            schedule_slot = get_schedule_slot_key(schedule_hour)
+            
+            logger.info(f"🔄 Reporting failure to Pulse Agent for {patient_name} ({call_status})")
+            
+            # Construct A2A Message for Pulse Agent (include CallSid for logging)
+            failure_instruction = (
+                f"CALL_FAILED: Patient {patient_name} (ID: {patient_id}) was unreachable. "
+                f"Call SID: {call_sid}. Status: {call_status}. Slot: {schedule_slot}. "
+                "Log this failed attempt and wait for scheduled retry."
+            )
+            
+            payload = {
+                "jsonrpc": "2.0",
+                "method": "message/stream",
+                "params": {
+                    "message": {
+                        "messageId": str(uuid.uuid4()),
+                        "role": "user",
+                        "parts": [{"text": failure_instruction, "kind": "text"}],
+                        "metadata": {
+                            "task": "log_call_failure",
+                            "call_sid": call_sid,
+                            "patient_id": patient_id,
+                            "status": call_status
+                        }
+                    }
+                },
+                "id": f"fail-{call_sid}"
+            }
+            
+            pulse_url = os.environ.get("CAREFLOW_AGENT_URL", "http://localhost:8080")
+            if pulse_url.endswith("/rpc"): pulse_url = pulse_url[:-4]
+            
+            # 1. Notify Pulse Agent first (fire-and-forget, but consume response)
+            async with aiohttp.ClientSession() as session:
+                headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
+                async with session.post(pulse_url, json=payload, headers=headers) as resp:
+                    # Consume response to properly close connection
+                    await resp.read()
+            
+            # 2. Schedule the background retry
+            success = await schedule_patient_retry(
+                patient_id=patient_id,
+                reason=call_status,
+                schedule_slot=schedule_slot,
+                delay_seconds=900  # 15 minutes
+            )
+            
+            if success:
+                logger.info(f"✅ Retry scheduled for patient {patient_id} in 15 minutes")
+            else:
+                logger.warning(f"⚠️ Failed to schedule retry for {patient_id}")
+                
+        except Exception as e:
+            logger.error(f"❌ Error during failure handling: {e}", exc_info=True)
             
     return Response(status_code=200)
 

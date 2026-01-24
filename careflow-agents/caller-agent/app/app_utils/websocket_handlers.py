@@ -119,7 +119,9 @@ class MessageHandler:
                 logger.info(f"Injecting context for patient: {patient_name} ({patient_id})")
                 system_instruction = (
                     f"URGENT CONTEXT: You are now connected with patient {patient_name} "
-                    f"(ID: {patient_id})."
+                    f"(ID: {patient_id}).\n"
+                    f"ACTIVE CALL SID: {setup_msg.call_sid}\n"
+                    f"IMPORTANT: If you need to use the 'end_call' tool, you MUST use the Call SID: {setup_msg.call_sid}."
                 )
                 if context:
                     system_instruction += f"\nSpecific Instructions:\n{context}"
@@ -178,9 +180,9 @@ class MessageHandler:
                     continue
                 
                 # Check for hangup signal
-                if "[HANGUP]" in chunk:
-                    logger.info("Agent requested call termination")
-                    clean_chunk = chunk.replace("[HANGUP]", "").strip()
+                if "[HANGUP]" in chunk or "[[END_CALL_SIGNAL]]" in chunk:
+                    logger.info("Agent requested call termination via signal")
+                    clean_chunk = chunk.replace("[HANGUP]", "").replace("[[END_CALL_SIGNAL]]", "").strip()
                     if clean_chunk and self.websocket.client_state.name == "CONNECTED":
                         await self.send_text_token(clean_chunk, last=False)
                         accumulated_response += clean_chunk

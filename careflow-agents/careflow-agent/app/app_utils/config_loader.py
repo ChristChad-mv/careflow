@@ -27,7 +27,7 @@ SERVICE_URL: str = get_env_var('SERVICE_URL', 'http://localhost:8000/')
 
 # Agent Configuration
 AGENT_NAME: str = "careflow_pulse_agent"
-AGENT_MODEL: str = get_env_var('AGENT_MODEL', 'gemini-3-pro-preview')
+AGENT_MODEL: str = get_env_var('AGENT_MODEL', 'gemini-3-flash-preview')
 HOSPITAL_ID: str = get_env_var('HOSPITAL_ID', 'HOSP001')
 
 # External Services

@@ -83,6 +83,16 @@ class WebhookInput(BaseModel):
     )
 
 
+class EndCallInput(BaseModel):
+    """Input schema for the end_call tool."""
+    
+    reason: Optional[str] = Field(
+        default="Conversation finished",
+        description="Reason for ending the call."
+    )
+
+
+
 # =============================================================================
 # EXPORTS
 # =============================================================================

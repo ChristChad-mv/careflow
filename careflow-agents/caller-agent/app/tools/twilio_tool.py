@@ -18,7 +18,7 @@ from urllib.parse import quote
 from langchain_core.tools import tool
 
 from ..config import PUBLIC_URL
-from ..schemas.tool_schemas import CallPatientInput
+from ..schemas.tool_schemas import CallPatientInput, EndCallInput
 
 logger = logging.getLogger(__name__)
 
@@ -131,8 +131,11 @@ async def call_patient(
             from_=from_number,
             url=twiml_url,
             record=True, # Enable Recording for Audio-First Reporting
-            status_callback=f"{base_url}/call-status",
-            status_callback_event=['completed']
+            status_callback=f"{base_url}/call-status?patient_id={quote(patient_id)}&patient_name={quote(patient_name)}",
+            status_callback_event=['initiated', 'ringing', 'answered', 'completed'],
+            machine_detection='Enable', # Detect if it's a human or a machine
+            async_amd='true', # Don't block call creation for AMD
+            timeout=20 # Faster no-answer detection
         )
         
         logger.info(f"Call created asynchronously - SID: {call.sid} (Recording: Enabled)")
@@ -147,39 +150,21 @@ async def call_patient(
         logger.error(f"Twilio async call error: {e}")
         return f"Failed to initiate call: {str(e)}"
 
-@tool("end_call")
-def end_call(call_sid: str) -> str:
+@tool("end_call", args_schema=EndCallInput)
+def end_call(reason: Optional[str] = "Conversation finished") -> str:
     """
-    Terminates an active Twilio call.
-    Use this tool when the conversation is finished and you have said goodbye and the patient say goodbye back to you.
+    Terminates the active call. 
+    Use this tool ONLY after saying goodbye and when the patient has finished speaking.
     
     Args:
-        call_sid: The unique identifier of the call to end (available in session context).
+        reason: Optional reason for ending the call.
         
     Returns:
-        Status message indicating success or failure.
+        A signal to the system to terminate the call.
     """
-    try:
-        # Import inside for lazy loading
-        from twilio.rest import Client
-        
-        account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
-        auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
-        
-        if not account_sid or not auth_token:
-            return "Error: Missing Twilio credentials."
-            
-        client = Client(account_sid, auth_token)
-        
-        # Update call status to 'completed' to hang up
-        call = client.calls(call_sid).update(status='completed')
-        
-        logger.info(f"📞 Ending call {call_sid}")
-        return f"Call {call_sid} ended successfully."
-        
-    except Exception as e:
-        logger.error(f"Error ending call: {e}")
-        return f"Failed to end call: {e}"
+    logger.info(f"🛑 Agent requested call termination. Reason: {reason}")
+    # We return a special token that the WebSocket handler will intercept
+    return "[[END_CALL_SIGNAL]]"
 
 
 # =============================================================================
