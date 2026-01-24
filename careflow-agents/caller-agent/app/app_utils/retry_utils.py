@@ -23,6 +23,7 @@ async def schedule_patient_retry(
     patient_id: str,
     reason: str,
     schedule_slot: Optional[str] = None,
+    retry_count: int = 1,  # NEW: Track which attempt this is
     delay_seconds: int = 900,  # 15 minutes default
 ) -> bool:
     """
@@ -32,10 +33,14 @@ async def schedule_patient_retry(
         patient_id: The patient document ID to retry.
         reason: Why the retry is needed (e.g., "busy", "no_answer").
         schedule_slot: The original schedule slot.
+        retry_count: Current retry attempt number (1-indexed).
         delay_seconds: How long to wait before retrying (default 15 min).
     
     Returns:
         True if task was successfully scheduled, False otherwise.
+    
+    Note:
+        The Pulse Agent will check retry_count and stop retrying after 3 attempts.
     """
     try:
         from google.cloud import tasks_v2
@@ -58,12 +63,13 @@ async def schedule_patient_retry(
         timestamp = timestamp_pb2.Timestamp()
         timestamp.FromDatetime(scheduled_time)
         
-        # Build task payload - this will trigger /retry-rounds on Pulse Agent
+        # Build task payload - includes retryCount for tracking
         payload = {
             "action": "retry_patient_call",
             "patientId": patient_id,
             "reason": reason,
             "scheduleSlot": schedule_slot,
+            "retryCount": retry_count,  # NEW: Include retry count
             "scheduledAt": datetime.now(timezone.utc).isoformat(),
         }
         
@@ -91,7 +97,7 @@ async def schedule_patient_retry(
             }
         
         response = client.create_task(parent=parent, task=task)
-        logger.info(f"✅ Scheduled retry for patient {patient_id} in {delay_seconds}s. Task: {response.name}")
+        logger.info(f"✅ Scheduled retry #{retry_count} for patient {patient_id} in {delay_seconds}s. Task: {response.name}")
         return True
         
     except ImportError:

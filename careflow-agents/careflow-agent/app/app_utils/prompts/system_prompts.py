@@ -120,10 +120,23 @@ If Caller asks about a patient identity:
 2. Return full context (ID, diagnosis, meds, assigned nurse).
 3. If not found: Say "No patient found with that info."
 
+### Workflow 6: Retry Patient Call (Automatic Retry from Cloud Tasks)
+**Trigger:** Message starting with "RETRY_PATIENT:" containing patient ID and retry attempt.
+Example: "RETRY_PATIENT: Call patient ID p_h1_001 now. This is retry attempt #2."
+
+1.  **Extract Patient ID** from the message.
+2.  **Fetch Patient Info**: Use `get_patient_by_id` to get patient details (name, phone, diagnosis, meds).
+3.  **Generate Rich Patient Brief**: Same format as Workflow 1 step 2.
+4.  **Send to Caller Agent**: Call `send_remote_agent_task` with:
+    - The Rich Patient Brief
+    - Add note: "PRIORITY RETRY: This is attempt #[N]. Previous call failed. Prioritize this patient."
+5.  **DO NOT modify database yet** - wait for Caller Agent to report CALL_COMPLETE or CALL_FAILED.
+
 **Risk Classification (GREEN/YELLOW/RED):**
 - **RED (Critical):** Chest pain, difficulty breathing, severe dizziness. Pain 8-10/10.
 - **YELLOW (Warning):** Moderate symptoms, leg swelling, missed meds, or **Patient Unreachable**.
 - **GREEN (Safe):** Stable, meds taken, pain < 5/10.
+
 
 **CRITICAL - HOW TO USE create_alert TOOL:**
 When you need to create an alert, you MUST call the `create_alert` tool with:

@@ -121,59 +121,148 @@ async def trigger_rounds(request: Request):
 @app.post("/retry-rounds")
 async def retry_rounds(request: Request):
     """
-    Endpoint triggered by Cloud Tasks for retry logic.
+    Endpoint triggered by Cloud Tasks for individual patient retry.
     
-    This endpoint is called 15 minutes after initial trigger to catch patients
-    who were unreachable (busy/no-answer).
+    Receives: {patientId, retryCount, scheduleSlot, reason, scheduleHour}
     
-    Uses get_pending_patients to find only those not yet contacted.
+    Flow:
+    1. Check if retryCount >= MAX_RETRIES (3)
+        - If yes: Create CRITICAL alert, stop retrying
+        - If no: Trigger agent to call this specific patient
+    2. Agent (Workflow 6) will fetch patient and send to Caller Agent
+    3. If call fails again, Caller Agent schedules new task with retryCount+1
     """
     import asyncio
     
     try:
         payload = await request.json()
-        schedule_hour = payload.get("scheduleHour")
+        logger.info(f"🔄 Retry Trigger Received: {json.dumps(payload)}")
+        
+        # Extract required fields
+        patient_id = payload.get("patientId")
+        if not patient_id:
+            logger.error("❌ Missing patientId in retry payload")
+            return {"status": "error", "message": "patientId is required"}
+        
+        retry_count = payload.get("retryCount", 1)
         schedule_slot = payload.get("scheduleSlot")
+        schedule_hour = payload.get("scheduleHour")
+        reason = payload.get("reason", "unknown")
         
-        logger.info(f"🔄 Retry Trigger Received for slot {schedule_slot}")
+        logger.info(f"📞 Retry for patient {patient_id} (attempt #{retry_count})")
         
-        # Use get_pending_patients to find who's missing
-        from app.tools.retry_tools import get_pending_patients
-        from app.app_utils.config_loader import HOSPITAL_ID
+        # Check retry limit
+        MAX_RETRIES = 3
+        if retry_count >= MAX_RETRIES:
+            logger.warning(f"⚠️ Max retries ({MAX_RETRIES}) reached for {patient_id}")
+            # Create CRITICAL alert - nurse must call manually
+            await _create_max_retry_alert(patient_id, schedule_slot, retry_count)
+            return {
+                "status": "max_retries_reached",
+                "patientId": patient_id,
+                "retryCount": retry_count,
+                "action": "critical_alert_created"
+            }
         
-        pending_json = await get_pending_patients(schedule_hour, HOSPITAL_ID)
-        pending_data = json.loads(pending_json)
+        # Trigger single patient call via agent (Workflow 6)
+        prompt = (
+            f"RETRY_PATIENT: Call patient ID {patient_id} now. "
+            f"This is retry attempt #{retry_count}. Schedule slot: {schedule_slot}. "
+            f"Previous failure reason: {reason}."
+        )
         
-        if isinstance(pending_data, dict) and "error" in pending_data:
-            logger.error(f"❌ Error fetching pending patients: {pending_data['error']}")
-            return {"status": "error", "message": pending_data["error"]}
-        
-        pending_count = len(pending_data) if isinstance(pending_data, list) else 0
-        
-        if pending_count == 0:
-            logger.info("✅ No pending patients. All successfully contacted!")
-            return {"status": "complete", "pending": 0}
-        
-        logger.info(f"📋 Found {pending_count} pending patients. Triggering retry rounds...")
-        
-        # Trigger agent with RETRY context
-        asyncio.create_task(trigger_agent_rounds(
-            root_agent,
-            schedule_hour, 
-            schedule_slot, 
-            retry_mode=True,
-            pending_patients=pending_data
-        ))
+        asyncio.create_task(_trigger_agent_with_prompt(prompt, f"retry-{patient_id}-{retry_count}"))
         
         return {
-            "status": "retry_triggered",
-            "pending": pending_count,
+            "status": "retry_initiated",
+            "patientId": patient_id,
+            "retryCount": retry_count,
             "scheduleSlot": schedule_slot
         }
         
     except Exception as e:
         logger.error(f"❌ Error processing retry trigger: {e}", exc_info=True)
         return {"status": "error", "message": str(e)}
+
+
+async def _create_max_retry_alert(patient_id: str, schedule_slot: str, retry_count: int):
+    """Create a CRITICAL alert when max retries reached."""
+    try:
+        from google.cloud import firestore
+        from datetime import datetime, timezone
+        
+        db = firestore.AsyncClient(
+            project=os.environ.get("GOOGLE_CLOUD_PROJECT", "careflow-478811"),
+            database=os.environ.get("FIRESTORE_DATABASE", "careflow-db")
+        )
+        
+        # Get patient name for alert
+        patient_ref = db.collection("patients").document(patient_id)
+        patient_doc = await patient_ref.get()
+        patient_name = patient_doc.to_dict().get("name", "Unknown") if patient_doc.exists else "Unknown"
+        
+        # Create CRITICAL alert
+        alert_data = {
+            "patientId": patient_id,
+            "patientName": patient_name,
+            "riskLevel": "RED",
+            "priority": "critical",
+            "trigger": f"Patient unreachable after {retry_count} attempts",
+            "aiBrief": f"URGENT: Unable to reach {patient_name} after {retry_count} call attempts for schedule slot {schedule_slot}. Manual follow-up required immediately.",
+            "status": "active",
+            "createdAt": datetime.now(timezone.utc),
+            "scheduleSlot": schedule_slot,
+            "retryCount": retry_count,
+            "hospitalId": os.environ.get("HOSPITAL_ID", "HOSP001"),
+        }
+        
+        await db.collection("alerts").add(alert_data)
+        logger.info(f"🚨 Created CRITICAL alert for unreachable patient {patient_id}")
+        
+        # Update patient risk level to RED
+        await patient_ref.update({
+            "riskLevel": "RED",
+            "lastRetryCount": retry_count,
+            "updatedAt": datetime.now(timezone.utc)
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to create max retry alert: {e}", exc_info=True)
+
+
+async def _trigger_agent_with_prompt(prompt: str, context_id: str):
+    """Trigger the agent with a specific prompt."""
+    try:
+        import uuid
+        from a2a.types import Message, Role, Part, TextPart
+        from a2a.server.agent_execution import RequestContext
+        from a2a.server.events import EventQueue
+        from app.app_utils.executor.careflow_executor import CareFlowAgentExecutor
+        
+        message = Message(
+            messageId=str(uuid.uuid4()),
+            kind="message",
+            role=Role.user,
+            parts=[Part(root=TextPart(kind="text", text=prompt))]
+        )
+        
+        context = RequestContext(
+            request={"message": message},
+            context_id=context_id,
+            task_id=str(uuid.uuid4())
+        )
+        
+        executor = CareFlowAgentExecutor(root_agent)
+        
+        class SimpleEventQueue(EventQueue):
+            async def enqueue_event(self, event):
+                pass
+        
+        await executor.execute(context, SimpleEventQueue())
+        logger.info(f"✅ Agent execution completed for {context_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Error triggering agent: {e}", exc_info=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='CareFlow Pulse Agent Server')

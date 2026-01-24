@@ -1,9 +1,9 @@
-# **CareFlow Pulse: Technical Specifications (v3.4)**
+# **CareFlow Pulse: Technical Specifications (v3.8)**
 
 | | |
 | :--- | :--- |
-| **Document Version:** | 3.4 |
-| **Date:** | 2026-01-14 |
+| **Document Version:** | 3.8 |
+| **Date:** | 2026-01-24 |
 | **Status:** | **Current** |
 | **Author:** | Christ |
 
@@ -23,6 +23,7 @@
 | 3.5 | 2026-01-16 | Christ | Real-Time Dashboard Alerts: Implemented Firestore `onSnapshot` listeners for instant alert propagation. Added `useAlerts` hook, `AlertsRealtime` component, and real-time sidebar badge updates. |
 | 3.6 | 2026-01-16 | Christ | Caller Agent Documentation: Added AHRQ RED 5-phase interview protocol, Dual Mode (Outbound/Inbound), Model Armor security reference. Removed code examples per documentation standards. |
 | 3.7 | 2026-01-16 | Christ | Pulse Agent Documentation: Added 5 Core Workflows, CareFlowAgent architecture pattern, expanded Tools section (MCP/A2A/Audio). Removed code examples per documentation standards. |
+| 3.8 | 2026-01-24 | Christ | **Missed Call Detection & Retry System**: Comprehensive Twilio status tracking (no-answer/busy/failed), A2A CALL_FAILED messaging, Firestore interaction subcollection logging, Cloud Tasks retry scheduling with exponential backoff, retry limits (max 3 attempts). |
 
 ---
 
@@ -41,7 +42,8 @@
 - 2.2. Technology Stack
 - 2.3. Component Interaction Flow
 - 2.4. Deployment Architecture
-- 2.5. Audio-First Reporting Architecture (NEW v3.4)
+- 2.5. Audio-First Reporting Architecture
+- 2.6. Missed Call Detection & Retry System (NEW v3.8)
 
 ### 3. Database Design (Firestore)
 
@@ -85,7 +87,7 @@
 
 - 7.1. Technology Stack
 - 7.2. Architecture Principles
-- 7.3. Real-Time Data Patterns (NEW v3.5)
+- 7.3. Real-Time Data Patterns 
 - 7.4. Key Components & Pages
 
 ### 8. Data Flow & User Journeys
@@ -725,7 +727,7 @@ CareFlow Pulse is deployed across multiple Google Cloud and Vercel environments.
 
 ---
 
-### **2.5. Audio-First Reporting Architecture (NEW v3.4)**
+### **2.5. Audio-First Reporting Architecture**
 
 > **Key Architectural Shift:** In v3.4, the system pivots from transcript-based analysis to audio-based analysis, leveraging Gemini 3's native multimodal capabilities for richer, more accurate clinical assessments.
 
@@ -771,6 +773,276 @@ With Gemini 3's multimodal capabilities, the Pulse Agent directly "listens" to r
 - Audio recordings remain on Twilio infrastructure until fetched
 - Frontend accesses audio via secure server-side proxy (credentials never exposed to client)
 - Audio playback follows HIPAA audit requirements for call recordings
+
+---
+
+### **2.6. Missed Call Detection & Retry System (NEW v3.8)**
+
+> **Key Feature:** v3.8 introduces a comprehensive system for detecting missed calls (no-answer, busy, failed), logging these events for audit compliance, alerting nurses, and automatically scheduling retry attempts via Google Cloud Tasks.
+
+#### **Problem Statement**
+
+When patients don't answer scheduled wellness calls, the previous system would silently fail, potentially missing critical health check-ins. This created:
+
+- **Clinical Risk**: Unreachable patients might be experiencing emergencies
+- **Audit Gaps**: No record of failed contact attempts for HIPAA compliance
+- **Manual Burden**: Nurses had no visibility into which patients couldn't be reached
+
+#### **Architecture Overview**
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    MISSED CALL DETECTION & RETRY SYSTEM v3.8                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   ┌───────────────────────────────────────────────────────────────────────────┐
+   │                           INITIAL CALL FLOW                               │
+   └───────────────────────────────────────────────────────────────────────────┘
+
+   ┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+   │  Pulse Agent    │  A2A    │  Caller Agent   │  Twilio │    Patient      │
+   │  (Orchestrator) │────────►│  (Voice)        │────────►│    Phone        │
+   └─────────────────┘         └────────┬────────┘         └─────────────────┘
+                                        │
+                                        │ Status Callback
+                                        │ (no-answer/busy/failed)
+                                        ▼
+   ┌───────────────────────────────────────────────────────────────────────────┐
+   │                        FAILURE DETECTION FLOW                             │
+   └───────────────────────────────────────────────────────────────────────────┘
+
+                               ┌─────────────────┐
+                               │     Twilio      │
+                               │ status_callback │
+                               └────────┬────────┘
+                                        │ POST /call-status
+                                        ▼
+                               ┌─────────────────┐
+                               │  Caller Agent   │
+                               │                 │
+                               │  1. Parse status│
+                               │  2. Send A2A ───┼────────────┐
+                               │  3. Schedule    │            │
+                               │     Cloud Task  │            │
+                               └────────┬────────┘            │
+                                        │                     │ A2A: CALL_FAILED
+            ┌───────────────────────────┘                     │
+            │ Schedule Task (15 min delay)                    ▼
+            ▼                                        ┌─────────────────┐
+   ┌─────────────────┐                               │  Pulse Agent    │
+   │   Cloud Tasks   │                               │                 │
+   │   Queue:        │                               │ • Update risk   │
+   │ patient-retries │                               │   → "warning"   │
+   └────────┬────────┘                               │ • Log to        │
+            │                                        │   /interactions │
+            │ POST /retry-rounds (after 15 min)      │ • Create alert  │
+            │                                        └────────┬────────┘
+            ▼                                                 │
+   ┌─────────────────┐                                        │ Write
+   │  Pulse Agent    │                                        ▼
+   │  /retry-rounds  │                               ┌─────────────────┐
+   │                 │                               │   Firestore     │
+   │ Check retryCount│                               │   Database      │
+   │ If < 3:         │                               └─────────────────┘
+   │  Send A2A to ───┼──► Caller Agent (new call)
+   │  Caller Agent   │
+   │ If >= 3:        │
+   │  Create CRITICAL│
+   │  alert          │
+   └─────────────────┘
+
+   ┌───────────────────────────────────────────────────────────────────────────┐
+   │                           DASHBOARD UPDATE                                │
+   └───────────────────────────────────────────────────────────────────────────┘
+
+   Firestore ──────► onSnapshot listeners ──────► Next.js Dashboard
+   (alerts/patients)                              • Warning badge
+                                                  • Unreachable patient card
+                                                  • Retry history
+```
+
+#### **Data Flow: Failed Call Handling**
+
+```text
+Step 1: Caller Agent initiates call via Twilio
+        └──► Twilio calls patient phone
+
+Step 2: Call fails (no-answer after 20s timeout)
+        └──► Twilio sends POST to /call-status webhook
+
+Step 3: Caller Agent receives status "no-answer"
+        ├──► Sends A2A CALL_FAILED to Pulse Agent
+        └──► Schedules Cloud Task (15 min delay)
+
+Step 4: Pulse Agent processes CALL_FAILED message
+        ├──► Updates patient riskLevel to "warning"
+        ├──► Logs interaction in /patients/{id}/interactions
+        └──► Creates alert with priority "warning"
+
+Step 5: Dashboard updates in real-time
+        └──► Nurse sees unreachable patient
+
+Step 6: After 15 minutes, Cloud Tasks triggers /retry-rounds
+        └──► Pulse Agent checks retryCount
+
+Step 7: If retryCount < 3:
+        ├──► Pulse Agent sends A2A to Caller Agent
+        └──► Flow restarts at Step 1
+
+Step 8: If retryCount >= 3:
+        └──► Create CRITICAL alert, nurse must call manually
+```
+
+#### **Twilio Call Status Events**
+
+The Caller Agent subscribes to all terminal Twilio call states:
+
+| Event | Meaning | Action |
+| :--- | :--- | :--- |
+| `initiated` | Call request sent to carrier | Log start time |
+| `ringing` | Phone is ringing | Monitor timeout |
+| `answered` | Patient answered (human or machine) | Begin conversation |
+| `completed` | Call ended normally | Send `CALL_COMPLETE` to Pulse Agent |
+| `busy` | Line busy signal detected | Send `CALL_FAILED`, schedule retry |
+| `no-answer` | No answer within timeout | Send `CALL_FAILED`, schedule retry |
+| `failed` | Carrier/network failure | Send `CALL_FAILED`, create ORANGE alert |
+
+**Configuration in Twilio API Call:**
+
+```python
+call = client.calls.create(
+    to=patient_phone,
+    from_=twilio_number,
+    status_callback=f"{PUBLIC_URL}/call-status",
+    status_callback_event=["initiated", "ringing", "answered", "completed", "busy", "failed", "no-answer"],
+    status_callback_method="POST",
+    machine_detection="Enable",
+    async_amd="true",
+    timeout=20  # Faster no-answer detection
+)
+```
+
+#### **A2A Message Format: CALL_FAILED**
+
+When a call fails, the Caller Agent sends this structured message to the Pulse Agent:
+
+```text
+CALL_FAILED: Patient [Patient Name] (ID: [patient_id]) is unreachable.
+Call SID: [call_sid]
+Status: [no-answer|busy|failed]
+Schedule Slot: [2026-01-24_08]
+Please log this failed interaction, update the patient's risk level to "warning",
+and create an alert for the nursing staff.
+```
+
+#### **Retry Scheduling with Cloud Tasks**
+
+When a call fails, the Caller Agent schedules a delayed retry using Google Cloud Tasks. Each retry is **patient-specific** with its own Cloud Task.
+
+**How It Works:**
+
+1. Patient A doesn't answer → Caller Agent creates Cloud Task for Patient A
+2. Patient B is busy → Caller Agent creates Cloud Task for Patient B  
+3. Each task executes independently after the delay
+
+This **Individual Mode** approach ensures:
+
+- No duplicate calls (each patient has exactly one pending retry)
+- State travels with the task (no database needed for retry tracking)
+- Clear audit trail per patient
+
+**Cloud Task Configuration:**
+
+| Parameter | Value | Rationale |
+| :--- | :--- | :--- |
+| **Queue Name** | `patient-retries` | Dedicated queue for patient contact retries |
+| **Retry Delay** | 15 minutes | Balance between giving patient time and not waiting too long |
+| **Max Attempts** | 3 | Prevent infinite retry loops |
+| **Target Endpoint** | `POST /retry-rounds` | Pulse Agent handles retry orchestration |
+
+**Task Payload Structure:**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `patientId` | string | The patient document ID to retry |
+| `retryCount` | integer | Current attempt number (1, 2, or 3) |
+| `scheduleSlot` | string | Original schedule slot (e.g., "2026-01-24_08") |
+| `reason` | string | Why retry is needed (no-answer, busy, failed) |
+| `scheduleHour` | integer | Hour of the schedule (8, 12, 20) |
+
+#### **Retry Count Tracking (State in Payload)**
+
+The `retryCount` is tracked **in the Cloud Task payload itself**, not in Firestore. This design:
+
+- **Eliminates race conditions**: No concurrent writes to patient document
+- **Self-contained**: Each retry chain carries its own state
+- **Simpler queries**: No need to count failed interactions
+
+**Lifecycle of retryCount:**
+
+| Attempt | Action | Next retryCount |
+| :--- | :--- | :--- |
+| Initial call fails | Caller schedules task with `retryCount=1` | 1 |
+| Retry #1 fails | Caller schedules task with `retryCount=2` | 2 |
+| Retry #2 fails | Caller schedules task with `retryCount=3` | 3 |
+| Retry #3 received | Pulse Agent sees `retryCount >= 3` → STOP | — |
+
+#### **Max Retries Reached (retryCount >= 3)**
+
+When the Pulse Agent receives a retry request with `retryCount >= 3`:
+
+1. **No more automatic retries** are scheduled
+2. **CRITICAL alert created** with:
+   - `riskLevel: "RED"`
+   - `priority: "critical"`
+   - `trigger: "Patient unreachable after 3 attempts"`
+3. **Patient record updated** with `riskLevel: "RED"`
+4. **Nurse notification**: Alert appears immediately on dashboard
+
+The nurse must then manually contact the patient.
+
+#### **Component Responsibilities**
+
+| Component | Responsibility |
+| :--- | :--- |
+| **Caller Agent** | Detects call failures, sends A2A notifications, schedules Cloud Tasks with `retryCount` |
+| **Pulse Agent** | Receives retry triggers, checks `retryCount`, initiates patient calls or creates alerts |
+| **Cloud Tasks** | Reliable delayed execution, automatic retry on HTTP failure |
+| **Firestore** | Stores alerts and interactions (not retry state) |
+| **Dashboard** | Real-time display of unreachable patients and critical alerts |
+
+#### **New Files Introduced (v3.8)**
+
+| File | Purpose |
+| :--- | :--- |
+| `caller-agent/app/app_utils/retry_utils.py` | Cloud Tasks scheduling utilities |
+| `careflow-agent/app/tools/interaction_logger.py` | Firestore subcollection logging tool |
+| `careflow-agent/app/tools/retry_tools.py` | Retry-related Firestore queries |
+| `careflow-agent/app/app_utils/retry_utils.py` | Schedule slot key generation |
+
+#### **Environment Variables**
+
+| Variable | Example | Purpose |
+| :--- | :--- | :--- |
+| `CLOUD_TASKS_QUEUE` | `patient-retries` | Queue name for retry tasks |
+| `GOOGLE_CLOUD_LOCATION` | `us-central1` | Cloud Tasks region |
+| `CAREFLOW_AGENT_URL` | `https://pulse.careflow.run.app` | Target URL for retry callbacks |
+
+#### **Monitoring & Alerts**
+
+Cloud Logging filters for retry system monitoring:
+
+```text
+resource.type="cloud_tasks_queue"
+resource.labels.queue_id="patient-retries"
+severity>=WARNING
+```
+
+**Key Metrics:**
+
+- `cloudtasks.googleapis.com/queue/task_attempt_count` - Retry frequency
+- `cloudtasks.googleapis.com/queue/task_attempt_latency` - Retry delays
+- Custom: `careflow.patient.unreachable_count` - Patients with max retries
 
 ---
 
@@ -2341,7 +2613,7 @@ The CareFlow Dashboard is a modern, real-time interface designed for nurse effic
 - **Role-Based Views:** Nurses see only their assigned patients and active hospital branch.
 - **Component isolation:** Atomic design pattern for high reusability of charts, logs, and alert cards.
 
-### **7.3. Real-Time Data Patterns (NEW v3.5)**
+### **7.3. Real-Time Data Patterns**
 
 The dashboard implements **real-time Firestore listeners** using the `onSnapshot` API, enabling instant propagation of alerts created by the AI agents.
 
