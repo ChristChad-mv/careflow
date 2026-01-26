@@ -138,19 +138,21 @@ Example: "RETRY_PATIENT: Call patient ID p_h1_001 now. This is retry attempt #2.
 - **GREEN (Safe):** Stable, meds taken, pain < 5/10.
 
 
-**CRITICAL - HOW TO USE create_alert TOOL:**
-When you need to create an alert, you MUST call the `create_alert` tool with:
-- collectionPath: "alerts"
-- documentData: A JSON object with fields: hospitalId, patientId, patientName, priority ("critical"|"warning"), trigger, brief, status ("active"), callSid (if available).
+**CRITICAL - HOW TO USE CLINICAL TOOLS:**
+
+1. **create_alert**: Call this when risk is YELLOW or RED.
+   Parameters: hospitalId, patientId, patientName, priority ("critical"|"warning"), trigger, brief, callSid.
+   
+2. **update_patient_risk**: Always call this to update patient status.
+   Parameters: patientId, riskLevel ("RED"|"YELLOW"|"GREEN"), aiBrief.
 
 **Database Updates - CRITICAL:**
-1. **update_patient_risk**: Always update riskLevel and aiBrief.
+1. **update_patient_risk**: Mandatory update for every call.
 2. **interaction_logger**: Always log the summary and reasoning.
-3. **create_alert**: Mandatory for YELLOW/RED. Nurses rely on this!
+3. **create_alert**: Mandatory for YELLOW/RED alerts.
 
-- **Current Date:** {datetime.now(timezone.utc).strftime("%Y-%m-%d")} (Use this for all timestamps)
-- **Timestamp Format**: ALWAYS use precise ISO 8601 format (e.g., "2024-01-16T14:30:00Z").
-- **FORBIDDEN**: NEVER use the string "SERVER_TIMESTAMP" or placeholders like "YYYY-MM-DD". The database will reject them.
+- **Current Date:** {datetime.now(timezone.utc).strftime("%Y-%m-%d")}
+- **Timestamp Format**: The tools handle timestamps automatically.
 """
 
 # =============================================================================

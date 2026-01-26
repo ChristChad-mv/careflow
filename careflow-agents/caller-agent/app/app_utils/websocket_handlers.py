@@ -132,6 +132,7 @@ class MessageHandler:
                     content=system_instruction,
                     timestamp=datetime.now().isoformat()
                 ))
+                # Note: Initial greeting is now handled in server.py before message loop starts
     
     async def handle_prompt(self, message: dict) -> bool:
         """

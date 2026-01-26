@@ -11,6 +11,7 @@ Version: 1.0.0
 import asyncio
 import logging
 import os
+import re
 import time
 from typing import Dict, Optional
 from urllib.parse import quote
@@ -33,6 +34,24 @@ _CALL_LOCK = asyncio.Lock()
 
 # Deduplication window in seconds (configurable via env)
 CALL_DEDUP_WINDOW = int(os.environ.get("CALL_DEDUP_WINDOW_SECONDS", "60"))
+
+
+def _extract_retry_count(message: str) -> int:
+    """
+    Extract retry count from message if it contains "attempt #N" or "retry attempt #N".
+    Returns 0 for initial calls, 1+ for retries.
+    """
+    # Look for patterns like "attempt #2" or "retry attempt #1"
+    match = re.search(r'attempt\s*#(\d+)', message, re.IGNORECASE)
+    if match:
+        return int(match.group(1))
+    
+    # Also check for "This is retry #N"
+    match = re.search(r'retry\s*#(\d+)', message, re.IGNORECASE)
+    if match:
+        return int(match.group(1))
+    
+    return 0  # Initial call, not a retry
 
 
 # =============================================================================
@@ -91,6 +110,11 @@ async def call_patient(
         if missing:
             return f"Error: Missing configuration: {', '.join(missing)}"
         
+        # Extract retry count from message context
+        retry_count = _extract_retry_count(message)
+        if retry_count > 0:
+            logger.info(f"📞 This is retry attempt #{retry_count} for {patient_name}")
+        
         # Deduplication check
         async with _CALL_LOCK:
             current_time = time.time()
@@ -121,6 +145,14 @@ async def call_patient(
             f"&context={quote(message)}"
         )
         
+        # Build status callback URL with retry_count for tracking
+        status_callback_url = (
+            f"{base_url}/call-status"
+            f"?patient_id={quote(patient_id)}"
+            f"&patient_name={quote(patient_name)}"
+            f"&retry_count={retry_count}"  # Include current retry count!
+        )
+        
         # Initialize the Client (using synchronous client as in reference for stability)
         client = Client(account_sid, auth_token)
         
@@ -131,7 +163,7 @@ async def call_patient(
             from_=from_number,
             url=twiml_url,
             record=True, # Enable Recording for Audio-First Reporting
-            status_callback=f"{base_url}/call-status?patient_id={quote(patient_id)}&patient_name={quote(patient_name)}",
+            status_callback=status_callback_url,
             status_callback_event=['initiated', 'ringing', 'answered', 'completed'],
             machine_detection='Enable', # Detect if it's a human or a machine
             async_amd='true', # Don't block call creation for AMD

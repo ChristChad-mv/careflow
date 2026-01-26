@@ -135,43 +135,6 @@ tools:
      source: careflow-firestore
      description: "List all available top-level collections in the Firestore database."
 
-  # Create a new clinical alert
-  create_alert:
-    kind: firestore-add-documents
-    source: careflow-firestore
-    description: >
-      Create a new clinical alert when a patient's condition requires attention.
-      
-      REQUIRED FIELDS in documentData:
-      - hospitalId: Hospital ID for multi-tenancy
-      - patientId: Patient document ID
-      - patientName: Patient's full name (denormalized for display)
-      - priority: "critical" | "warning" | "safe"
-      - trigger: One-line event description (what triggered this alert)
-      - brief: AI clinical analysis (2-4 sentences with key observations)
-      - status: Always "active" for new alerts
-      - callSid: Twilio Call SID for audio playback on frontend
-      - createdAt: Use Firestore SERVER_TIMESTAMP
-      
-      Example documentData:
-      {
-        "hospitalId": {"stringValue": "HOSP001"},
-        "patientId": {"stringValue": "p_h1_001"},
-        "patientName": {"stringValue": "Marie Dupont"},
-        "priority": {"stringValue": "critical"},
-        "trigger": {"stringValue": "Patient reported severe chest pain during call"},
-        "brief": {"stringValue": "Patient described sudden onset chest pain radiating to left arm. Voice analysis indicates distress. Recommended immediate cardiac evaluation."},
-        "status": {"stringValue": "active"},
-        "callSid": {"stringValue": "CA123abc456def"},
-        "createdAt": {"timestampValue": "SERVER_TIMESTAMP"}
-      }
-
-  # Update patient risk level
-  update_patient_risk:
-    kind: firestore-update-document
-    source: careflow-firestore
-    description: "Update a patient's risk level. Requires full document path: patients/{patientId}"
-
   # Log call interaction
   log_patient_interaction:
     kind: firestore-add-documents
@@ -193,6 +156,4 @@ toolsets:
     - get_patient_by_phone
     - get_patient_by_name
     - list_collections
-    - create_alert
-    - update_patient_risk
     - log_patient_interaction

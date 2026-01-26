@@ -193,6 +193,8 @@ async def twiml_endpoint(request: Request) -> Response:
     patient_id = params.get("patient_id", "")
     context = params.get("context", "")
     
+    logger.info(f"⚓ Received TwiML request for {patient_name} (ID: {patient_id}) from {request.client.host}")
+    
     # Build WebSocket URL with parameters
     ws_url = f"wss://{host}/ws"
     query_parts = []
@@ -206,6 +208,8 @@ async def twiml_endpoint(request: Request) -> Response:
     
     if query_parts:
         ws_url += "?" + "&".join(query_parts)
+    
+    logger.info(f"🔗 Generated WebSocket URL: {ws_url}")
     
     # Escape XML special characters for TwiML
     ws_url_xml = ws_url.replace("&", "&amp;")
@@ -243,9 +247,14 @@ async def call_status_endpoint(request: Request):
     patient_id = request.query_params.get("patient_id", "UNKNOWN_ID")
     patient_name = request.query_params.get("patient_name", "Unknown Patient")
     
+    # Extract retry count from query params (passed from call_patient tool)
+    retry_count = int(request.query_params.get("retry_count", "0"))
+    
     log_msg = f"📞 Call Status: {call_sid} -> {call_status} (Patient: {patient_name})"
     if answered_by:
         log_msg += f" [AnsweredBy: {answered_by}]"
+    if retry_count > 0:
+        log_msg += f" [Retry #{retry_count}]"
     logger.info(log_msg)
     
     # 1. Handle "Answered" event (Status: in-progress)
@@ -348,18 +357,20 @@ async def call_status_endpoint(request: Request):
                     # Consume response to properly close connection
                     await resp.read()
             
-            # 2. Schedule the background retry
+            # 2. Schedule the background retry with INCREMENTED retry_count
+            next_retry_count = retry_count + 1
             success = await schedule_patient_retry(
                 patient_id=patient_id,
                 reason=call_status,
                 schedule_slot=schedule_slot,
+                retry_count=next_retry_count,  # Pass incremented count!
                 delay_seconds=900  # 15 minutes
             )
             
             if success:
-                logger.info(f"✅ Retry scheduled for patient {patient_id} in 15 minutes")
+                logger.info(f"✅ Retry #{next_retry_count} scheduled for patient {patient_id} in 15 minutes")
             else:
-                logger.warning(f"⚠️ Failed to schedule retry for {patient_id}")
+                logger.warning(f"⚠️ Failed to schedule retry #{next_retry_count} for {patient_id}")
                 
         except Exception as e:
             logger.error(f"❌ Error during failure handling: {e}", exc_info=True)
@@ -431,6 +442,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     agent.set_ws_channel(websocket)
     await agent.init()
     
+    # IMPORTANT: For outbound calls, generate initial greeting immediately!
+    # The agent should speak FIRST when connecting to a patient
+    if patient_name:
+        await _send_initial_greeting(agent, websocket, session_data, patient_name)
+    
     try:
         await _handle_websocket_messages(websocket, session_data)
     except websockets.exceptions.ConnectionClosed as e:
@@ -445,6 +461,55 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         if hasattr(agent, 'ws') and agent.ws == websocket:
             agent.ws = None
         logger.info(f"WebSocket connection cleaned up ({connection_manager.get_count()} active)")
+
+
+async def _send_initial_greeting(agent, websocket: WebSocket, session_data: SessionData, patient_name: str) -> None:
+    """
+    Generate and send the initial greeting when an outbound call connects.
+    
+    The agent speaks FIRST when connecting to a patient - this is critical
+    for natural conversation flow. Without this, there would be awkward silence
+    until the patient says something.
+    
+    Args:
+        agent: The LangGraph agent instance
+        websocket: Active WebSocket connection
+        session_data: Session state for this call
+        patient_name: Name of the patient for logging
+    """
+    logger.info(f"🎤 Generating initial greeting for {patient_name}...")
+    
+    try:
+        # CRITICAL: Tell the agent explicitly that this is LIVE - no tools needed!
+        greeting_prompt = (
+            f"LIVE CALL ACTIVE with {patient_name}. "
+            "The patient just picked up the phone and can hear you NOW. "
+            "DO NOT use any tools - just speak directly! "
+            "Say your greeting to confirm you're speaking with the right person."
+        )
+        
+        # Stream the agent's greeting response
+        async for chunk in agent.stream_message(greeting_prompt, session_data):
+            if not chunk:
+                continue
+            
+            # Check for hangup signal (shouldn't happen on greeting, but safety first)
+            if "[HANGUP]" in chunk or "[[END_CALL_SIGNAL]]" in chunk:
+                continue
+            
+            # Send chunk to Twilio for TTS
+            if websocket.client_state.name == "CONNECTED":
+                text_message = {
+                    "type": "text",
+                    "token": chunk,
+                    "last": False
+                }
+                await websocket.send_json(text_message)
+        
+        logger.info("✅ Initial greeting sent to patient")
+        
+    except Exception as e:
+        logger.error(f"❌ Error sending initial greeting: {e}", exc_info=True)
 
 
 async def _handle_websocket_messages(websocket: WebSocket, session_data: SessionData) -> None:
