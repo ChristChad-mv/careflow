@@ -119,7 +119,7 @@ export function AlertsRealtime() {
                                 <div className="flex items-center gap-2 text-muted-foreground">
                                     <Clock className="h-4 w-4" />
                                     <span className="text-sm font-medium">
-                                        {formatDistanceToNow(alert.createdAt, { addSuffix: true })}
+                                        {formatDistanceToNow(new Date(alert.createdAt), { addSuffix: true })}
                                     </span>
                                 </div>
                             </div>

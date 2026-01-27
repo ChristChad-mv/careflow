@@ -40,6 +40,10 @@ export function useAlerts(hospitalId: string = "HOSP001") {
             (snapshot) => {
                 const allAlerts: Alert[] = snapshot.docs.map((doc) => {
                     const data = doc.data();
+                    const createdDate = data.createdAt instanceof Timestamp
+                        ? data.createdAt.toDate()
+                        : new Date(data.createdAt || Date.now());
+
                     return {
                         id: doc.id,
                         patientId: data.patientId || "",
@@ -48,15 +52,10 @@ export function useAlerts(hospitalId: string = "HOSP001") {
                         priority: (data.priority as RiskLevel) || "safe",
                         status: data.status || "active",
                         trigger: data.trigger || "",
-                        aiBrief: data.aiBrief || "",
+                        brief: data.aiBrief || "", // Map aiBrief to brief
                         callSid: data.callSid,
                         resolutionNote: data.resolutionNote,
-                        createdAt: data.createdAt instanceof Timestamp
-                            ? data.createdAt.toDate()
-                            : new Date(data.createdAt || Date.now()),
-                        updatedAt: data.updatedAt instanceof Timestamp
-                            ? data.updatedAt.toDate()
-                            : undefined,
+                        createdAt: createdDate.toISOString(),
                     };
                 });
 

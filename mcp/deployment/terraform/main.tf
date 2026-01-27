@@ -58,12 +58,19 @@ resource "google_cloud_run_v2_service" "mcp_toolbox" {
 
   template {
     containers {
-      # Placeholder image, replaced by CI/CD pipeline
-      image = "us-docker.pkg.dev/cloudrun/container/hello"
+      # Official GENAI Toolbox image
+      image = "us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:latest"
+
+      args = [
+        "serve",
+        "--tools-file", "/etc/mcp/tools.yaml",
+        "--address", "0.0.0.0",
+        "--port", "8080"
+      ]
 
       ports {
-        container_port = 5000
-        name          = "http1"
+        container_port = 8080
+        name           = "http1"
       }
 
       env {
@@ -76,9 +83,10 @@ resource "google_cloud_run_v2_service" "mcp_toolbox" {
         value = var.firestore_database
       }
 
-      env {
-        name  = "MCP_SERVER_PORT"
-        value = "5000"
+      # Mount the tools.yaml from Secret Manager
+      volume_mounts {
+        name       = "tools-config"
+        mount_path = "/etc/mcp"
       }
 
       resources {
@@ -91,25 +99,24 @@ resource "google_cloud_run_v2_service" "mcp_toolbox" {
       }
 
       startup_probe {
-        http_get {
-          path = "/health"
-          port = 5000
+        tcp_socket {
+          port = 8080
         }
         initial_delay_seconds = 5
         timeout_seconds       = 3
         period_seconds        = 10
         failure_threshold     = 3
       }
+    }
 
-      liveness_probe {
-        http_get {
-          path = "/health"
-          port = 5000
+    volumes {
+      name = "tools-config"
+      secret {
+        secret = google_secret_manager_secret.tools_config.secret_id
+        items {
+          version = "latest"
+          path    = "tools.yaml"
         }
-        initial_delay_seconds = 10
-        timeout_seconds       = 3
-        period_seconds        = 30
-        failure_threshold     = 3
       }
     }
 

@@ -28,7 +28,7 @@ async def get_pending_patients(
     Returns:
         JSON string containing the list of pending patients
     """
-    from google.cloud.firestore import AsyncClient
+    from google.cloud.firestore import AsyncClient, Query
     from app.app_utils.retry_utils import get_schedule_slot_key
     import os
     
@@ -69,11 +69,33 @@ async def get_pending_patients(
                 skipped_count += 1
                 logger.info(f"⏭️ Skipping patient {patient_id} (already contacted in {schedule_slot})")
             else:
-                # No interaction yet - add to pending list
-                pending_patients.append({
+                # No interaction yet for THIS slot - fetch context from PAST slots
+                recent_history = []
+                try:
+                    # Fetch last 3 interactions for context continuity
+                    history_query = interactions_ref.order_by("timestamp", direction=Query.DESCENDING).limit(3)
+                    async for hist_doc in history_query.stream():
+                        h_data = hist_doc.to_dict()
+                        # Format timestamp nicely if present
+                        ts = h_data.get("timestamp")
+                        date_str = ts.isoformat() if hasattr(ts, 'isoformat') else str(ts)
+                        
+                        recent_history.append({
+                            "date": date_str,
+                            "brief": h_data.get("aiBrief", "No summary available"),
+                            "risk": h_data.get("riskLevel", "UNKNOWN")
+                        })
+                except Exception as ex:
+                    logger.warning(f"Failed to fetch history for {patient_id}: {ex}")
+
+                # Add enriched patient data to pending list
+                patient_info = {
                     "id": patient_id,
+                    "preferredLanguage": patient_data.get("preferredLanguage", "en-US"), # Default to en-US
+                    "recentHistory": recent_history,
                     **patient_data
-                })
+                }
+                pending_patients.append(patient_info)
         
         logger.info(f"📋 Found {len(pending_patients)} pending patients (skipped {skipped_count} already contacted)")
         

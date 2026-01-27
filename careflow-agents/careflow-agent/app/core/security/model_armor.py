@@ -143,6 +143,9 @@ class ModelArmorClient:
                 - invocation_result (str): Result status
                 - redactions_applied (list): List of filter names that matched
         """
+        if getattr(self, 'is_disabled', False):
+             return {"is_blocked": False, "sanitized_text": text, "invocation_result": "SKIPPED_BY_CONFIG", "redactions_applied": []}
+
         if not self.client or not self.template_name:
             logger.error("Model Armor client not available - Fail-Closed: Blocking response")
             return {"is_blocked": True, "sanitized_text": "[REDACTED]", "error": "Model Armor client not initialized"}

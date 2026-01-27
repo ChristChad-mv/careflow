@@ -36,8 +36,8 @@ resource "google_cloud_run_v2_service" "app" {
       }
       resources {
         limits = {
-          cpu    = "4"
-          memory = "8Gi"
+          cpu    = "2"
+          memory = "4Gi"
         }
       }
 
@@ -52,12 +52,12 @@ resource "google_cloud_run_v2_service" "app" {
       }
     }
 
-    service_account = google_service_account.app_sa.email
+    service_account                  = google_service_account.app_sa.email
     max_instance_request_concurrency = 40
 
     scaling {
       min_instance_count = 1
-      max_instance_count = 10
+      max_instance_count = 5
     }
 
     session_affinity = true

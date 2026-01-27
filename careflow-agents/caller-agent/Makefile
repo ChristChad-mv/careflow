@@ -105,12 +105,12 @@ deploy:
 		--memory "4Gi" \
 		--project $$PROJECT_ID \
 		--region "us-central1" \
-		--no-allow-unauthenticated \
+		--allow-unauthenticated \
 		--no-cpu-throttling \
 		--labels "" \
 		--update-build-env-vars "AGENT_VERSION=$(shell awk -F'"' '/^version = / {print $$2}' pyproject.toml || echo '0.0.0')" \
 		--update-env-vars \
-		"COMMIT_SHA=$(shell git rev-parse HEAD),APP_URL=https://caller-agent-$$PROJECT_NUMBER.us-central1.run.app" \
+		"COMMIT_SHA=$(shell git rev-parse HEAD),APP_URL=https://caller-agent-gr2rcg7pca-uc.a.run.app" \
 		$(if $(IAP),--iap) \
 		$(if $(PORT),--port=$(PORT))
 

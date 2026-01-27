@@ -61,7 +61,7 @@ deploy:
 		--labels "" \
 		--update-build-env-vars "AGENT_VERSION=$(shell awk -F'\"' '/^version = / {print $$2}' pyproject.toml || echo '0.0.0')" \
 		--update-env-vars \
-		"COMMIT_SHA=$(shell git rev-parse HEAD),APP_URL=https://careflow-agent-$$PROJECT_NUMBER.us-central1.run.app"
+		"COMMIT_SHA=$(shell git rev-parse HEAD),APP_URL=https://careflow-agent-gr2rcg7pca-uc.a.run.app"
 
 # ==============================================================================
 # Testing & Code Quality

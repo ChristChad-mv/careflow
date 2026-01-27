@@ -1,39 +1,25 @@
 # ============================================================================
-# CAREFLOW MCP TOOLBOX - DOCKERFILE
+# CAREFLOW MCP TOOLBOX - DOCKERFILE (GENAI TOOLBOX VERSION)
 # ============================================================================
-# Copyright (c) 2026 CareFlow Engineering Team
-# Author: Christ
-# Created: 2026-01-05
-# License: Proprietary - All Rights Reserved
-#
-# Description:
-#   Containerized MCP Toolbox for Cloud Run deployment with Firestore
-#   integration.
-# ============================================================================
+# Basé sur la documentation officielle :
+# https://googleapis.github.io/genai-toolbox/how-to/deploy_toolbox/
 
-FROM debian:bookworm-slim
-
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-  ca-certificates \
-  curl \
-  && rm -rf /var/lib/apt/lists/*
+FROM us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:latest
 
 WORKDIR /app
-
-# Download latest MCP toolbox binary
-RUN curl -L https://github.com/google/genai-mcp-toolbox/releases/latest/download/toolbox-linux-amd64 -o toolbox \
-  && chmod +x toolbox
 
 # Copy tools configuration
 COPY tools.yaml .
 
-# Expose MCP server port
-EXPOSE 5000
+# Cloud Run injects the PORT environment variable. 
+# The toolbox binary supports the --port flag.
+# We use 8080 as the default port for Cloud Run.
+EXPOSE 8080
 
-# Health check endpoint
+# Health check setup (the binary handles /health by default)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:5000/health || exit 1
+  CMD curl -f http://localhost:8080/health || exit 1
 
-# Run MCP toolbox server
-CMD ["./toolbox", "serve", "tools.yaml"]
+# Start the toolbox serving the local tools.yaml
+# The binary is located at /app/toolbox in the official image
+ENTRYPOINT ["/app/toolbox", "serve", "--tools-file", "tools.yaml", "--address", "0.0.0.0", "--port", "8080"]

@@ -31,6 +31,10 @@ from datetime import datetime
 from typing import Optional
 from urllib.parse import quote
 
+from google.auth.transport.requests import Request as GoogleRequest
+from google.oauth2 import id_token
+import google.auth
+
 import uvicorn
 import websockets
 from fastapi import FastAPI, Request, Response, WebSocket
@@ -222,7 +226,11 @@ async def twiml_endpoint(request: Request) -> Response:
         <ConversationRelay 
             url="{ws_url_xml}" 
             ttsProvider="ElevenLabs" 
-            voice="UgBBYS2sOqTuMpoF3BR0" 
+            voice="UgBBYS2sOqTuMpoF3BR0"
+            transcriptionProvider="Deepgram"
+            speechModel="nova-2-general"
+            language="multi"
+            interruptSensitivity="low" 
         />
     </Connect>
     <Hangup/>
@@ -296,8 +304,16 @@ async def call_status_endpoint(request: Request):
             pulse_url = os.environ.get("CAREFLOW_AGENT_URL", "http://localhost:8080")
             if pulse_url.endswith("/rpc"): pulse_url = pulse_url[:-4]
             
+            headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
+            try:
+                if "run.app" in pulse_url:
+                    auth_req = GoogleRequest()
+                    token = id_token.fetch_id_token(auth_req, pulse_url)
+                    headers["Authorization"] = f"Bearer {token}"
+            except Exception as e:
+                logger.warning(f"Failed to generate OIDC token for Pulse: {e}")
+
             async with aiohttp.ClientSession() as session:
-                headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
                 async with session.post(pulse_url, json=payload, headers=headers) as resp:
                     # Consume response to properly close connection
                     await resp.read()
@@ -350,9 +366,17 @@ async def call_status_endpoint(request: Request):
             pulse_url = os.environ.get("CAREFLOW_AGENT_URL", "http://localhost:8080")
             if pulse_url.endswith("/rpc"): pulse_url = pulse_url[:-4]
             
+            headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
+            try:
+                if "run.app" in pulse_url:
+                    auth_req = GoogleRequest()
+                    token = id_token.fetch_id_token(auth_req, pulse_url)
+                    headers["Authorization"] = f"Bearer {token}"
+            except Exception as e:
+                logger.warning(f"Failed to generate OIDC token for Pulse (failure flow): {e}")
+
             # 1. Notify Pulse Agent first (fire-and-forget, but consume response)
             async with aiohttp.ClientSession() as session:
-                headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
                 async with session.post(pulse_url, json=payload, headers=headers) as resp:
                     # Consume response to properly close connection
                     await resp.read()

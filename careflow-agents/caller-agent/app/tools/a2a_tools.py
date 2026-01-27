@@ -14,6 +14,8 @@ import uuid
 from typing import Any, Callable, Dict, List, Optional
 
 import aiohttp
+from google.auth.transport.requests import Request as GoogleRequest
+from google.oauth2 import id_token
 from a2a.types import AgentCard
 from langchain_core.tools import tool
 
@@ -134,13 +136,30 @@ def create_a2a_tools(
                 "params": {"message": message_payload}
             }
             
+            headers = {
+                "Content-Type": "application/json",
+                "Accept": "text/event-stream"
+            }
+            
+            # --- OIDC AUTHENTICATION ---
+            if "run.app" in server_url:
+                try:
+                    auth_req = GoogleRequest()
+                    # Determine audience (remove /rpc suffix if present)
+                    audience = server_url[:-4] if server_url.endswith("/rpc") else server_url
+                    # Remove trailing slash if present for cleaner audience match
+                    if audience.endswith("/"): audience = audience[:-1]
+                    
+                    token = id_token.fetch_id_token(auth_req, audience)
+                    headers["Authorization"] = f"Bearer {token}"
+                except Exception as e:
+                    logger.warning(f"Failed to generate OIDC token for {server_url}: {e}")
+            # ---------------------------
+
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     server_url,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Accept": "text/event-stream"
-                    },
+                    headers=headers,
                     json=rpc_request
                 ) as response:
                     if not response.ok:
@@ -228,10 +247,24 @@ def create_a2a_tools(
                 }
             }
             
+            headers = {"Content-Type": "application/json"}
+             
+            # --- OIDC AUTHENTICATION ---
+            if "run.app" in server_url:
+                try:
+                    auth_req = GoogleRequest()
+                    audience = server_url[:-4] if server_url.endswith("/rpc") else server_url
+                    if audience.endswith("/"): audience = audience[:-1]
+                    token = id_token.fetch_id_token(auth_req, audience)
+                    headers["Authorization"] = f"Bearer {token}"
+                except Exception as e:
+                    logger.warning(f"Failed to generate OIDC token for {server_url}: {e}")
+            # ---------------------------
+
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     server_url,
-                    headers={"Content-Type": "application/json"},
+                    headers=headers,
                     json=rpc_request
                 ) as response:
                     if not response.ok:

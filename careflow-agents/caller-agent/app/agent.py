@@ -35,6 +35,9 @@ from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
 
 from a2a.types import AgentCard
+from google.auth.transport.requests import Request as GoogleRequest
+from google.oauth2 import id_token
+import google.auth
 
 # Internal imports - modular structure
 from .config import PUBLIC_URL
@@ -143,8 +146,22 @@ class CallerAgent:
             try:
                 from urllib.parse import urljoin
                 url = urljoin(server_url, "/.well-known/agent-card.json")
+                
+                # OIDC Authentication for Cloud Run
+                headers = {"Accept": "application/json"}
+                if "run.app" in server_url:
+                    try:
+                        # Fetch ID token for the target service
+                        # We use the base server_url as audience
+                        auth_req = GoogleRequest()
+                        token = id_token.fetch_id_token(auth_req, server_url)
+                        headers["Authorization"] = f"Bearer {token}"
+                        logger.info(f"🔑 Generated OIDC token for {server_url}")
+                    except Exception as e:
+                        logger.warning(f"Failed to generate ID token for {server_url} (continuing without auth): {e}")
+
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(url, headers={"Accept": "application/json"}) as resp:
+                    async with session.get(url, headers=headers) as resp:
                         if resp.ok:
                             return await resp.json()
                         logger.error(f"Failed to fetch card from {url}: {resp.status}")

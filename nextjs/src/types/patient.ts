@@ -3,19 +3,24 @@ export type RiskLevel = 'safe' | 'warning' | 'critical';
 export interface Patient {
   id: string;
   name: string;
+  preferredLanguage: string; // Add this
   diagnosis: string;
   dischargeDate: string;
   contactNumber: string;
   email?: string;
   dateOfBirth?: string;
   contact?: {
-    preferredMethod?: 'call' | 'sms' | 'email';
+    phone?: string;
+    preferredMethod?: 'phone' | 'sms' | 'email';
   };
   medicationPlan: Medication[];
   currentStatus: RiskLevel;
   dischargePlan?: {
     hospitalId?: string;
     dischargingPhysician?: string;
+    dischargeDate?: string;
+    diagnosis?: string;
+    medications?: Medication[];
     criticalSymptoms?: string[];
     warningSymptoms?: string[];
   };
@@ -29,7 +34,8 @@ export interface Patient {
     type: string;
     location: string;
   };
-  lastCallSid?: string; // For Audio-First Reporting
+  lastCallSid?: string;
+  aiBrief?: string;
 }
 
 export interface Medication {
@@ -45,16 +51,17 @@ export interface Alert {
   patientId: string;
   patientName: string;
   priority: RiskLevel;
-  createdAt: Date;
+  createdAt: string;
   trigger: string;
   brief?: string;
   status: 'active' | 'resolved' | 'in_progress';
+  resolutionNote?: string;
   callSid?: string;
 }
 
 export interface Interaction {
   id: string;
-  timestamp: Date;
+  timestamp: string;
   sender: 'ai' | 'patient' | 'system';
   content: string;
   type?: 'message' | 'event';

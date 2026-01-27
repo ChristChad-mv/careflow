@@ -5,5 +5,5 @@
 variable "alert_email" {
   type        = string
   description = "Email address for monitoring alerts and notifications"
-  default     = "devops@careflow.com"
+  default     = "ccmvoungou@gmail.com"
 }

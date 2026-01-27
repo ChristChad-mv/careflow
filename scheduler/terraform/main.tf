@@ -46,8 +46,8 @@ terraform {
 
 locals {
   deploy_project_ids = {
-    prod    = var.prod_project_id
-    staging = var.staging_project_id
+    prod = var.prod_project_id
+    # staging = var.staging_project_id
   }
 }
 
@@ -98,7 +98,7 @@ resource "google_cloud_run_v2_service_iam_member" "pulse_agent_invoker" {
 }
 
 # ============================================================================
-# JOB 1: MORNING ROUNDS (8:15 AM EST)
+# JOB 1: MORNING ROUNDS (8:00 AM Paris)
 # ============================================================================
 
 resource "google_cloud_scheduler_job" "morning_rounds" {
@@ -106,8 +106,8 @@ resource "google_cloud_scheduler_job" "morning_rounds" {
 
   name             = "${var.project_name}-${each.key}-morning-rounds"
   description      = "CareFlow Pulse - Morning patient rounds for medication adherence"
-  schedule         = "15 8 * * *"
-  time_zone        = "America/New_York"
+  schedule         = "0 8 * * *"
+  time_zone        = "Europe/Paris"
   attempt_deadline = "600s"
   project          = each.value
   region           = var.region
@@ -128,11 +128,25 @@ resource "google_cloud_scheduler_job" "morning_rounds" {
     }
 
     body = base64encode(jsonencode({
-      scheduleHour = 8
-      timezone     = "America/New_York"
-      triggerType  = "scheduled"
-      source       = "cloud-scheduler"
-      environment  = each.key
+      jsonrpc = "2.0"
+      method  = "message/stream"
+      id      = "scheduler-job"
+      params = {
+        message = {
+          messageId = "scheduler-morning-rounds"
+          kind      = "message"
+          role      = "user"
+          parts = [{
+            kind = "text"
+            text = "start daily rounds for 8:00"
+          }]
+          metadata = {
+            source       = "cloud-scheduler"
+            scheduleHour = 8
+            environment  = each.key
+          }
+        }
+      }
     }))
 
     oidc_token {
@@ -149,103 +163,103 @@ resource "google_cloud_scheduler_job" "morning_rounds" {
 }
 
 # ============================================================================
-# JOB 2: NOON ROUNDS (12:15 PM EST)
+# JOB 2: NOON ROUNDS (DISABLED)
 # ============================================================================
 
-resource "google_cloud_scheduler_job" "noon_rounds" {
-  for_each = local.deploy_project_ids
-
-  name             = "${var.project_name}-${each.key}-noon-rounds"
-  description      = "CareFlow Pulse - Noon patient rounds for medication adherence"
-  schedule         = "15 12 * * *"
-  time_zone        = "America/New_York"
-  attempt_deadline = "600s"
-  project          = each.value
-  region           = var.region
-
-  retry_config {
-    retry_count          = 3
-    max_retry_duration   = "0s"
-    min_backoff_duration = "60s"
-    max_backoff_duration = "300s"
-  }
-
-  http_target {
-    http_method = "POST"
-    uri         = var.pulse_agent_urls[each.key]
-
-    headers = {
-      "Content-Type" = "application/json"
-    }
-
-    body = base64encode(jsonencode({
-      scheduleHour = 12
-      timezone     = "America/New_York"
-      triggerType  = "scheduled"
-      source       = "cloud-scheduler"
-      environment  = each.key
-    }))
-
-    oidc_token {
-      service_account_email = google_service_account.scheduler_sa[each.key].email
-      audience              = var.pulse_agent_urls[each.key]
-    }
-  }
-
-  depends_on = [
-    google_project_service.scheduler_apis,
-    google_service_account.scheduler_sa,
-    # google_cloud_run_v2_service_iam_member.pulse_agent_invoker
-  ]
-}
+# resource "google_cloud_scheduler_job" "noon_rounds" {
+#   for_each = local.deploy_project_ids
+# 
+#   name             = "${var.project_name}-${each.key}-noon-rounds"
+#   description      = "CareFlow Pulse - Noon patient rounds for medication adherence"
+#   schedule         = "15 12 * * *"
+#   time_zone        = "America/New_York"
+#   attempt_deadline = "600s"
+#   project          = each.value
+#   region           = var.region
+# 
+#   retry_config {
+#     retry_count          = 3
+#     max_retry_duration   = "0s"
+#     min_backoff_duration = "60s"
+#     max_backoff_duration = "300s"
+#   }
+# 
+#   http_target {
+#     http_method = "POST"
+#     uri         = var.pulse_agent_urls[each.key]
+# 
+#     headers = {
+#       "Content-Type" = "application/json"
+#     }
+# 
+#     body = base64encode(jsonencode({
+#       scheduleHour = 12
+#       timezone     = "America/New_York"
+#       triggerType  = "scheduled"
+#       source       = "cloud-scheduler"
+#       environment  = each.key
+#     }))
+# 
+#     oidc_token {
+#       service_account_email = google_service_account.scheduler_sa[each.key].email
+#       audience              = var.pulse_agent_urls[each.key]
+#     }
+#   }
+# 
+#   depends_on = [
+#     google_project_service.scheduler_apis,
+#     google_service_account.scheduler_sa,
+#     # google_cloud_run_v2_service_iam_member.pulse_agent_invoker
+#   ]
+# }
 
 # ============================================================================
-# JOB 3: EVENING ROUNDS (8:15 PM EST)
+# JOB 3: EVENING ROUNDS (DISABLED)
 # ============================================================================
 
-resource "google_cloud_scheduler_job" "evening_rounds" {
-  for_each = local.deploy_project_ids
-
-  name             = "${var.project_name}-${each.key}-evening-rounds"
-  description      = "CareFlow Pulse - Evening patient rounds for medication adherence"
-  schedule         = "15 20 * * *"
-  time_zone        = "America/New_York"
-  attempt_deadline = "600s"
-  project          = each.value
-  region           = var.region
-
-  retry_config {
-    retry_count          = 3
-    max_retry_duration   = "0s"
-    min_backoff_duration = "60s"
-    max_backoff_duration = "300s"
-  }
-
-  http_target {
-    http_method = "POST"
-    uri         = var.pulse_agent_urls[each.key]
-
-    headers = {
-      "Content-Type" = "application/json"
-    }
-
-    body = base64encode(jsonencode({
-      scheduleHour = 20
-      timezone     = "America/New_York"
-      triggerType  = "scheduled"
-      source       = "cloud-scheduler"
-      environment  = each.key
-    }))
-
-    oidc_token {
-      service_account_email = google_service_account.scheduler_sa[each.key].email
-      audience              = var.pulse_agent_urls[each.key]
-    }
-  }
-
-  depends_on = [
-    google_project_service.scheduler_apis,
-    google_service_account.scheduler_sa,
-    # google_cloud_run_v2_service_iam_member.pulse_agent_invoker
-  ]
-}
+# resource "google_cloud_scheduler_job" "evening_rounds" {
+#   for_each = local.deploy_project_ids
+# 
+#   name             = "${var.project_name}-${each.key}-evening-rounds"
+#   description      = "CareFlow Pulse - Evening patient rounds for medication adherence"
+#   schedule         = "15 20 * * *"
+#   time_zone        = "America/New_York"
+#   attempt_deadline = "600s"
+#   project          = each.value
+#   region           = var.region
+# 
+#   retry_config {
+#     retry_count          = 3
+#     max_retry_duration   = "0s"
+#     min_backoff_duration = "60s"
+#     max_backoff_duration = "300s"
+#   }
+# 
+#   http_target {
+#     http_method = "POST"
+#     uri         = var.pulse_agent_urls[each.key]
+# 
+#     headers = {
+#       "Content-Type" = "application/json"
+#     }
+# 
+#     body = base64encode(jsonencode({
+#       scheduleHour = 20
+#       timezone     = "America/New_York"
+#       triggerType  = "scheduled"
+#       source       = "cloud-scheduler"
+#       environment  = each.key
+#     }))
+# 
+#     oidc_token {
+#       service_account_email = google_service_account.scheduler_sa[each.key].email
+#       audience              = var.pulse_agent_urls[each.key]
+#     }
+#   }
+# 
+#   depends_on = [
+#     google_project_service.scheduler_apis,
+#     google_service_account.scheduler_sa,
+#     # google_cloud_run_v2_service_iam_member.pulse_agent_invoker
+#   ]
+# }

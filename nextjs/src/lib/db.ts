@@ -21,32 +21,53 @@ const convertPatient = (doc: FirebaseFirestore.DocumentSnapshot): Patient => {
     const dischargePlan = data.dischargePlan || {};
     const contact = data.contact || {};
 
-    // Format discharge date safely (it's already a Date object or string from convertTimestamps)
-    let dischargeDate = "N/A";
-    if (dischargePlan.dischargeDate) {
+    // Format discharge date safely (handle both flattened and legacy nested fields)
+    const rawDischargeDate = data.dischargeDate || dischargePlan.dischargeDate;
+    let formattedDischargeDate = "N/A";
+    if (rawDischargeDate) {
         try {
-            const date = new Date(dischargePlan.dischargeDate);
-            dischargeDate = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+            const date = new Date(rawDischargeDate);
+            formattedDischargeDate = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
         } catch (e) {
-            dischargeDate = String(dischargePlan.dischargeDate);
+            formattedDischargeDate = String(rawDischargeDate);
         }
     }
+
+    // Safe date conversion helper
+    const toIsoString = (val: any) => {
+        if (!val) return undefined;
+        if (val instanceof Date) return val.toISOString();
+        return String(val);
+    };
 
     return {
         id: doc.id,
         name: data.name || "Unknown Patient",
-        diagnosis: dischargePlan.diagnosis || "No diagnosis",
-        dischargeDate: dischargeDate,
-        contactNumber: contact.phone || "No contact",
+        preferredLanguage: data.preferredLanguage || "en-US",
+        // Prefer top-level fields (Unified), fallback to legacy dischargePlan
+        diagnosis: data.diagnosis || dischargePlan.diagnosis || "No diagnosis",
+        dischargeDate: formattedDischargeDate,
+        contactNumber: data.contactNumber || contact.phone || "No contact",
         email: data.email,
-        dateOfBirth: data.dateOfBirth,
+        dateOfBirth: toIsoString(data.dateOfBirth),
         contact: data.contact,
-        medicationPlan: dischargePlan.medications || [],
+        medicationPlan: data.medicationPlan || dischargePlan.medications || [],
         currentStatus: mapRiskLevel(data.riskLevel || 'GREEN'),
-        dischargePlan: dischargePlan,
+        dischargePlan: {
+            ...dischargePlan,
+            diagnosis: data.diagnosis || dischargePlan.diagnosis,
+            medications: data.medicationPlan || dischargePlan.medications,
+            criticalSymptoms: data.criticalSymptoms || dischargePlan.criticalSymptoms,
+            warningSymptoms: data.warningSymptoms || dischargePlan.warningSymptoms,
+            dischargeDate: formattedDischargeDate,
+        },
         assignedNurse: data.assignedNurse,
-        nextAppointment: data.nextAppointment,
-        lastCallSid: data.lastCallSid // For Audio-First Reporting
+        nextAppointment: data.nextAppointment ? {
+            ...data.nextAppointment,
+            date: toIsoString(data.nextAppointment.date)
+        } : undefined,
+        lastCallSid: data.lastCallSid,
+        aiBrief: data.aiBrief
     };
 };
 
@@ -111,7 +132,7 @@ const convertAlert = (doc: FirebaseFirestore.DocumentSnapshot): Alert => {
     return {
         ...raw,
         priority: mapRiskLevel(rawLevel),
-        createdAt: date,
+        createdAt: date.toISOString(), // Always convert to ISO string for React safety
         callSid: raw.callSid // Map callSid
     };
 };
@@ -234,7 +255,14 @@ export async function getInteractions(patientId: string): Promise<Interaction[]>
         .collection("interactions")
         .orderBy("timestamp", "desc")
         .get();
-    return snapshot.docs.map(doc => convertDoc<Interaction>(doc));
+
+    return snapshot.docs.map(doc => {
+        const item = convertDoc<any>(doc);
+        return {
+            ...item,
+            timestamp: item.timestamp instanceof Date ? item.timestamp.toISOString() : String(item.timestamp)
+        } as Interaction;
+    });
 }
 
 export async function getDashboardStats() {

@@ -138,10 +138,12 @@ steps:
         echo "_________________________________________________________________________"
 
 substitutions:
-  _STAGING_PROJECT_ID: YOUR_STAGING_PROJECT_ID
+  _STAGING_PROJECT_ID: careflow-478811
   _REGION: us-central1
+  _ARTIFACT_REGISTRY_REPO_NAME: careflow-agents
+  _CONTAINER_NAME: caller-agent
 
-logsBucket: gs://${PROJECT_ID}-caller-agent-logs/build-logs
+logsBucket: gs://careflow-478811-caller-agent-logs/build-logs
 options:
   substitutionOption: ALLOW_LOOSE
   defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET

@@ -73,8 +73,11 @@ export default async function PatientProfile({ params }: { params: Promise<{ pat
                     <span>{patient.email}</span>
                   </div>
                 )}
-                <div className="mt-2 text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded inline-block">
-                  Preferred: {patient.contact?.preferredMethod?.toUpperCase() || 'CALL'}
+                <div className="mt-2 text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded inline-block uppercase">
+                  Preferred Language: {patient.preferredLanguage}
+                </div>
+                <div className="mt-2 ml-2 text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded inline-block uppercase">
+                  Preferred Contact: {patient.contact?.preferredMethod || 'phone'}
                 </div>
               </div>
             </CardContent>

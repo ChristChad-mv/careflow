@@ -75,7 +75,8 @@ async def create_alert(
 async def update_patient_risk(
     patientId: str,
     riskLevel: str,
-    aiBrief: str
+    aiBrief: str,
+    callSid: Optional[str] = None
 ) -> str:
     """
     Updates the overall risk level and brief of a patient document.
@@ -84,6 +85,7 @@ async def update_patient_risk(
         patientId: ID of the patient (e.g., p_h1_001)
         riskLevel: The new risk level: 'GREEN', 'YELLOW', or 'RED'
         aiBrief: A 1-2 sentence summary of why this risk was assigned
+        callSid: Optional Twilio Call SID for the latest interaction
     """
     try:
         db = get_db()
@@ -95,6 +97,9 @@ async def update_patient_risk(
             "aiBrief": aiBrief,
             "lastAssessedAt": datetime.now(timezone.utc)
         }
+        
+        if callSid:
+            update_data["lastCallSid"] = callSid
         
         await patient_ref.update(update_data)
         

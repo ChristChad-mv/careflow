@@ -34,27 +34,27 @@ output "morning_rounds_job_names" {
   }
 }
 
-output "noon_rounds_job_names" {
-  description = "Map of noon rounds job names by environment"
-  value = {
-    for k, v in google_cloud_scheduler_job.noon_rounds : k => v.name
-  }
-}
-
-output "evening_rounds_job_names" {
-  description = "Map of evening rounds job names by environment"
-  value = {
-    for k, v in google_cloud_scheduler_job.evening_rounds : k => v.name
-  }
-}
+# output "noon_rounds_job_names" {
+#   description = "Map of noon rounds job names by environment"
+#   value = {
+#     for k, v in google_cloud_scheduler_job.noon_rounds : k => v.name
+#   }
+# }
+# 
+# output "evening_rounds_job_names" {
+#   description = "Map of evening rounds job names by environment"
+#   value = {
+#     for k, v in google_cloud_scheduler_job.evening_rounds : k => v.name
+#   }
+# }
 
 output "all_job_ids" {
   description = "Map of all Cloud Scheduler job IDs by environment and time"
   value = {
     for env in keys(local.deploy_project_ids) : env => {
       morning = google_cloud_scheduler_job.morning_rounds[env].id
-      noon    = google_cloud_scheduler_job.noon_rounds[env].id
-      evening = google_cloud_scheduler_job.evening_rounds[env].id
+      # noon    = google_cloud_scheduler_job.noon_rounds[env].id
+      # evening = google_cloud_scheduler_job.evening_rounds[env].id
     }
   }
 }
@@ -62,8 +62,8 @@ output "all_job_ids" {
 output "job_schedules" {
   description = "Human-readable schedule information"
   value = {
-    morning = "8:15 AM EST daily"
-    noon    = "12:15 PM EST daily"
-    evening = "8:15 PM EST daily"
+    morning = "8:00 AM Paris daily"
+    # noon    = "12:15 PM EST daily"
+    # evening = "8:15 PM EST daily"
   }
 }

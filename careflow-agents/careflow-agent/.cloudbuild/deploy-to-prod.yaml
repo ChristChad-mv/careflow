@@ -22,17 +22,19 @@ steps:
       - "deploy"
       - "careflow-agent"
       - "--image"
-      - "$_REGION-docker.pkg.dev/$PROJECT_ID/$_ARTIFACT_REGISTRY_REPO_NAME/$_CONTAINER_NAME"
+      - "$_REGION-docker.pkg.dev/careflow-478811/$_ARTIFACT_REGISTRY_REPO_NAME/$_CONTAINER_NAME"
       - "--region"
       - "$_REGION"
       - "--project"
       - $_PROD_PROJECT_ID
 
 substitutions:
-  _PROD_PROJECT_ID: YOUR_PROD_PROJECT_ID
+  _PROD_PROJECT_ID: careflow-478811
   _REGION: us-central1
+  _ARTIFACT_REGISTRY_REPO_NAME: careflow-agents
+  _CONTAINER_NAME: careflow-agent
 
-logsBucket: gs://${PROJECT_ID}-careflow-agent-logs/build-logs
+logsBucket: gs://careflow-478811-careflow-agent-logs/build-logs
 options:
   substitutionOption: ALLOW_LOOSE
   defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET

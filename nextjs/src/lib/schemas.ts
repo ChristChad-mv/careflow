@@ -15,6 +15,7 @@ export const MedicationSchema = z.object({
 // We explicitly exclude 'hospitalId' and 'id' to prevent Mass Assignment/Tenant hopping
 export const updatePatientSchema = z.object({
     name: z.string().min(1).optional(),
+    preferredLanguage: z.string().optional(),
     diagnosis: z.string().optional(),
     dischargeDate: z.string().optional(),
     contactNumber: z.string().optional(),
