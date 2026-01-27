@@ -7,9 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert } from "@/types/patient";
-import { updateAlert } from "@/lib/actions";
+import { updateAlertClient } from "@/lib/client-actions";
 import { toast } from "sonner";
 import { Settings2, Loader2 } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { UserContext } from "@/lib/db";
 
 export function ManageAlertDialog({ alert }: { alert: Alert }) {
     const [open, setOpen] = useState(false);
@@ -18,16 +21,32 @@ export function ManageAlertDialog({ alert }: { alert: Alert }) {
     const [note, setNote] = useState(alert.resolutionNote || "");
     const [loading, setLoading] = useState(false);
 
+    const { data: session } = useSession();
+    const router = useRouter();
+
     const handleUpdate = async () => {
+        if (!session?.user) {
+            toast.error("You must be logged in to update alerts");
+            return;
+        }
+
         setLoading(true);
         try {
-            await updateAlert(alert.id, {
+            const userContext: UserContext = {
+                hospitalId: (session.user as any).hospitalId,
+                role: (session.user as any).role,
+                email: session.user.email || undefined
+            };
+
+            await updateAlertClient(alert.id, {
                 priority: priority,
                 status: status,
                 resolutionNote: note
-            });
+            }, userContext);
+
             toast.success("Alert updated successfully");
             setOpen(false);
+            router.refresh(); // Refresh Client Components data
         } catch (error) {
             toast.error("Failed to update alert");
             console.error(error);

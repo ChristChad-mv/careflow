@@ -54,8 +54,7 @@ next-env.d.ts
 .cache/
 
 # Lock files (keep only one)
-package-lock.json
-yarn.lock
+
 pnpm-lock.yaml
 
 # OS

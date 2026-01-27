@@ -2,13 +2,13 @@
  * NextAuth Configuration for CareFlow Pulse
  * 
  * Healthcare-focused authentication with role-based access control.
- * Integrates with Firebase Authentication.
+ * Integrates with Firebase Authentication via REST API and Firestore Client SDK.
  */
 
 import NextAuth, { DefaultSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { initAdmin } from "@/lib/firebase-admin";
 import { authConfig } from "./auth.config";
+
 
 // Extend the built-in session type
 declare module "next-auth" {
@@ -49,33 +49,80 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
 
           const token = credentials.token as string;
-          const admin = await initAdmin();
 
-          // Verify the ID token sent from the client
-          const decodedToken = await admin.auth().verifyIdToken(token);
+          // 1. Verify ID Token using Google Identity Toolkit API (Stateless/Keyless)
+          // This avoids the need for Admin SDK Service Account Keys on Vercel
+          const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+          const verifyUrl = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`;
 
-          // Extract user details
-          const { uid, email, name, picture } = decodedToken;
+          const response = await fetch(verifyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken: token })
+          });
 
-          // TODO: Fetch additional user details (role, department) from Firestore
-          // For now, we'll default to "nurse" if not set in custom claims
-          // In a real app, you would read from /users/{uid} here
+          const data = await response.json();
 
-          // Mock role assignment for demonstration until Firestore user record is created
-          // You should set custom claims on the user in Firebase or read from Firestore
-          const role = (decodedToken.role as any) || "nurse";
-          const hospitalId = (decodedToken.hospitalId as any) || "HOSP001";
-          const department = (decodedToken.department as any) || "General";
+          if (!response.ok || !data.users || data.users.length === 0) {
+            console.error("Token verification failed:", data.error || "Unknown error");
+            return null;
+          }
+
+          const firebaseUser = data.users[0];
+          const uid = firebaseUser.localId;
+          const email = firebaseUser.email;
+
+          // 2. Fetch User Details from Firestore (using access token or just public read if allowed, 
+          // or strictly relying on the fact that we are the server environment with client SDK)
+          // Note: On Vercel, the Client SDK in 'db' might fall back to "Guest" mode or similar 
+          // if we don't pass the ID token to it, OR it works if rules allow.
+          // Ideally, we should use the ID token to auth the DB connection too, but for now 
+          // we assume the DB is initialized in a way that allows this read, or we trust the claim.
+
+          // Actually, we should fetch from Firestore to be secure about Role/HospitalId.
+          let role: "nurse" | "coordinator" | "admin" = "nurse";
+          let hospitalId = "HOSP001";
+          let name = firebaseUser.displayName || email?.split("@")[0] || "User";
+          let department = "General";
+
+          try {
+            // Fetch user profile from Firestore REST API to ensure we use the user's auth context
+            const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+            const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}`;
+
+            const profileResponse = await fetch(firestoreUrl, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (profileResponse.ok) {
+              const profileData = await profileResponse.json();
+              // Firestore REST API returns fields in a specific format: { fields: { role: { stringValue: "..." } } }
+              // We need a helper or manual extraction.
+              const fields = profileData.fields;
+              if (fields) {
+                if (fields.role?.stringValue) role = fields.role.stringValue as any;
+                if (fields.hospitalId?.stringValue) hospitalId = fields.hospitalId.stringValue;
+                if (fields.name?.stringValue) name = fields.name.stringValue;
+                if (fields.department?.stringValue) department = fields.department.stringValue;
+              }
+            } else {
+              console.warn(`Failed to fetch profile via REST: ${profileResponse.status} ${profileResponse.statusText}`);
+              // Fallback intended (default values)
+            }
+          } catch (dbError) {
+            console.error("Error fetching user profile from Firestore REST:", dbError);
+          }
 
           return {
             id: uid,
             email: email || "",
-            name: name || email?.split("@")[0] || "User",
-            image: picture,
+            name: name,
+            image: firebaseUser.photoUrl,
             role: role,
             department: department,
             hospitalId: hospitalId,
           };
+
         } catch (error) {
           console.error("Firebase Authentication error:", error);
           return null;

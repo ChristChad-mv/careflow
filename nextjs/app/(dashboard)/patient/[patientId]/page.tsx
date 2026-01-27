@@ -1,18 +1,57 @@
+'use client';
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Phone, Calendar, Pill, User, MapPin, Stethoscope, Mail, AlertTriangle } from "lucide-react";
-import { getPatient } from "@/lib/db";
-import { notFound } from "next/navigation";
+import { Phone, Calendar, Pill, User, MapPin, Stethoscope, Mail, AlertTriangle, Loader2 } from "lucide-react";
+import { getPatient, UserContext } from "@/lib/db";
 import { format } from "date-fns";
 import { EditMedicationDialog } from "@/components/patient/EditMedicationDialog";
 import { EditAppointmentDialog } from "@/components/patient/EditAppointmentDialog";
+import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { Patient } from "@/types/patient";
 
-export default async function PatientProfile({ params }: { params: Promise<{ patientId: string }> }) {
-  const { patientId } = await params;
-  const patient = await getPatient(patientId);
+export default function PatientProfile() {
+  const params = useParams();
+  const patientId = params.patientId as string;
+  const { data: session, status } = useSession();
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!patient) return notFound();
+  useEffect(() => {
+    async function loadPatient() {
+      if (status === 'authenticated' && session?.user && patientId) {
+        try {
+          const userContext: UserContext = {
+            hospitalId: (session.user as any).hospitalId,
+            role: (session.user as any).role,
+            email: session.user.email || undefined
+          };
+          const data = await getPatient(patientId, userContext);
+          setPatient(data);
+        } catch (error) {
+          console.error("Error loading patient:", error);
+        } finally {
+          setLoading(false);
+        }
+      } else if (status === 'unauthenticated') {
+        setLoading(false);
+      }
+    }
+    loadPatient();
+  }, [session, status, patientId]);
+
+  if (status === 'loading' || loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!patient) return <div className="p-8 text-center text-muted-foreground">Patient not found or unauthorized.</div>;
 
   // Helper for safe date formatting
   const formatDate = (date: Date | string | undefined) => {
@@ -25,7 +64,7 @@ export default async function PatientProfile({ params }: { params: Promise<{ pat
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

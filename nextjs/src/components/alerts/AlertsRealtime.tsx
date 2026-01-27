@@ -1,6 +1,7 @@
 "use client";
 
 import { useAlerts } from "@/hooks/useAlerts";
+import { useSession } from "next-auth/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,11 @@ import { formatDistanceToNow } from "date-fns";
  * Uses Firestore onSnapshot via useAlerts hook for live updates.
  */
 export function AlertsRealtime() {
-    const { alerts, loading, error } = useAlerts();
+    const { data: session } = useSession();
+    const hospitalId = (session?.user as any)?.hospitalId || "HOSP001";
+
+    // Pass dynamic hospitalId, only fetch if we have a session (or fallback)
+    const { alerts, loading, error } = useAlerts(hospitalId);
 
     // Sort by priority: critical > warning > others
     const sortedAlerts = [...alerts].sort((a, b) => {

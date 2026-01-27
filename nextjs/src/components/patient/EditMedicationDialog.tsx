@@ -14,9 +14,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Patient, Medication } from '@/types/patient';
-import { updatePatient } from '@/lib/actions';
+import { updatePatientClient } from '@/lib/client-actions';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { UserContext } from '@/lib/db';
 
 interface EditMedicationDialogProps {
     patient: Patient;
@@ -26,6 +29,9 @@ export function EditMedicationDialog({ patient }: EditMedicationDialogProps) {
     const [open, setOpen] = useState(false);
     const [medications, setMedications] = useState<Medication[]>(patient.medicationPlan || []);
     const [loading, setLoading] = useState(false);
+
+    const { data: session } = useSession();
+    const router = useRouter();
 
     // New medication state
     const [newMed, setNewMed] = useState<Medication>({
@@ -50,11 +56,22 @@ export function EditMedicationDialog({ patient }: EditMedicationDialogProps) {
     };
 
     const handleSave = async () => {
+        if (!session?.user) {
+            toast.error("Unauthorized");
+            return;
+        }
         setLoading(true);
         try {
-            await updatePatient(patient.id, { medicationPlan: medications });
+            const userContext: UserContext = {
+                hospitalId: (session.user as any).hospitalId,
+                role: (session.user as any).role,
+                email: session.user.email || undefined
+            };
+
+            await updatePatientClient(patient.id, { medicationPlan: medications }, userContext);
             toast.success("Medication plan updated");
             setOpen(false);
+            router.refresh();
         } catch (error) {
             console.error(error);
             toast.error("Failed to update medication plan");

@@ -1,4 +1,16 @@
-import { getAdminDb } from "@/lib/firebase-admin";
+import { db } from "@/lib/firebase";
+import {
+    collection,
+    doc as firestoreDoc,
+    getDoc,
+    getDocs,
+    query,
+    where,
+    orderBy,
+    limit,
+    getCountFromServer,
+    DocumentSnapshot
+} from "firebase/firestore";
 import { Patient, Alert, Interaction, RiskLevel } from "@/types/patient";
 
 // Helper to map Firestore risk levels to frontend RiskLevel type
@@ -10,7 +22,7 @@ const mapRiskLevel = (level: string): RiskLevel => {
 };
 
 // Helper to convert Firestore data to Patient object
-const convertPatient = (doc: FirebaseFirestore.DocumentSnapshot): Patient => {
+const convertPatient = (doc: DocumentSnapshot): Patient => {
     const rawData = doc.data();
     if (!rawData) throw new Error("Document not found");
 
@@ -75,7 +87,7 @@ const convertPatient = (doc: FirebaseFirestore.DocumentSnapshot): Patient => {
 const convertTimestamps = (data: any): any => {
     if (data === null || data === undefined) return data;
 
-    // Handle Firestore Timestamp
+    // Handle Client Firestore Timestamp
     if (typeof data === 'object' && typeof data.toDate === 'function') {
         return data.toDate();
     }
@@ -98,7 +110,7 @@ const convertTimestamps = (data: any): any => {
 };
 
 // Helper to convert Firestore data to typed objects (generic fallback)
-const convertDoc = <T>(doc: FirebaseFirestore.DocumentSnapshot): T => {
+const convertDoc = <T>(doc: DocumentSnapshot): T => {
     const data = doc.data();
     if (!data) throw new Error("Document not found");
 
@@ -106,8 +118,7 @@ const convertDoc = <T>(doc: FirebaseFirestore.DocumentSnapshot): T => {
 };
 
 // Helper to convert Firestore data to Alert object with normalization
-// Helper to convert Firestore data to Alert object with normalization
-const convertAlert = (doc: FirebaseFirestore.DocumentSnapshot): Alert => {
+const convertAlert = (doc: DocumentSnapshot): Alert => {
     const raw = convertDoc<any>(doc);
     // Prioritize 'priority' field, fallback to 'riskLevel' for legacy data
     const rawLevel = raw.priority || raw.riskLevel || 'GREEN';
@@ -137,80 +148,63 @@ const convertAlert = (doc: FirebaseFirestore.DocumentSnapshot): Alert => {
     };
 };
 
-import { auth } from "@/lib/auth";
-
-// Helper to get current user context
-async function getCurrentUser() {
-    const session = await auth();
-
-    // 1. If Real Session exists, return it (Production / Real Login)
-    if (session?.user) {
-        return {
-            ...session.user,
-            hospitalId: (session.user as any).hospitalId || "HOSP001"
-        } as any;
-    }
-
-    // 2. Dev Fallback (Only if no session AND in development)
-    if (process.env.NODE_ENV === 'development') {
-        console.warn("⚠️ No active session using MOCK [HOSP001] Sarah profile for DEV.");
-        return {
-            email: "sarah@hosp1.com",
-            name: "Sarah Johnson, RN",
-            role: "nurse",
-            hospitalId: "HOSP001"
-        };
-    }
-
-    // 3. No session and not dev -> Return null (will cause 401/redirect in callers)
-    return null;
+export interface UserContext {
+    hospitalId?: string;
+    role?: string;
+    email?: string;
 }
 
-export async function getPatients(): Promise<Patient[]> {
-    const user = await getCurrentUser();
+export async function getPatients(user: UserContext): Promise<Patient[]> {
     if (!user || !user.hospitalId) return [];
 
-    const db = await getAdminDb();
-    const patientsRef = db.collection("patients");
+    const patientsRef = collection(db, "patients");
 
     // Base Query: ALWAYS filter by hospitalId first (Logical Isolation)
-    let query = patientsRef.where('hospitalId', '==', user.hospitalId);
+    let q = query(patientsRef, where('hospitalId', '==', user.hospitalId));
 
     // Nurse Role: Additional filter for assignment
-    if (user.role === 'nurse') {
-        query = query.where("assignedNurse.email", "==", user.email);
+    if (user.role === 'nurse' && user.email) {
+        q = query(q, where("assignedNurse.email", "==", user.email));
     }
 
-    const snapshot = await query.get();
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => convertPatient(doc));
 }
 
-export async function getPatient(id: string): Promise<Patient | null> {
-    const db = await getAdminDb();
-    const doc = await db.collection("patients").doc(id).get();
-    if (!doc.exists) return null;
-    return convertPatient(doc);
+export async function getPatient(id: string, user: UserContext): Promise<Patient | null> {
+    if (!user || !user.hospitalId) return null;
+
+    const docRef = firestoreDoc(db, "patients", id);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) return null;
+
+    // Enforce multi-tenancy: ensure the patient belongs to the user's hospital
+    if (docSnap.data()?.hospitalId !== user.hospitalId) {
+        console.warn(`Attempted to access patient ${id} from hospital ${docSnap.data()?.hospitalId} by user from ${user.hospitalId}`);
+        return null;
+    }
+
+    return convertPatient(docSnap);
 }
 
-export async function getAlerts(): Promise<Alert[]> {
-    const user = await getCurrentUser();
+export async function getAlerts(user: UserContext): Promise<Alert[]> {
     if (!user || !user.hospitalId) return [];
 
-    const db = await getAdminDb();
+    const alertsRef = collection(db, "alerts");
 
     // Base Query: ALWAYS filter by hospitalId first
     // We fetch ALL alerts for the hospital to avoid the "10 items" limit of 'in' queries
-    let query = db.collection("alerts").where('hospitalId', '==', user.hospitalId);
+    let q = query(alertsRef, where('hospitalId', '==', user.hospitalId));
 
     // Filter by timestamp if needed, or just get latest
     // Note: Removed orderBy("createdAt", "desc") to avoid needing a composite index for (hospitalId, createdAt)
     // We sort in memory below anyway.
-    const snapshot = await query.limit(500).get(); // Safety limit
+    const snapshot = await getDocs(query(q, limit(500))); // Safety limit
     let alerts = snapshot.docs.map(doc => convertAlert(doc));
 
     // Nurse Role: Filter by assigned patients only (IN MEMORY)
     if (user.role === 'nurse') {
-        const myPatients = await getPatients();
+        const myPatients = await getPatients(user);
         const myPatientIds = new Set(myPatients.map(p => p.id));
 
         // Filter alerts where patientId is in the nurse's patient list
@@ -230,31 +224,56 @@ export async function getAlerts(): Promise<Alert[]> {
     });
 }
 
-export async function getAlert(alertId: string): Promise<Alert | null> {
-    const db = await getAdminDb();
-    const doc = await db.collection("alerts").doc(alertId).get();
-    if (!doc.exists) return null;
-    return convertAlert(doc);
+export async function getAlert(alertId: string, user: UserContext): Promise<Alert | null> {
+    if (!user || !user.hospitalId) return null;
+
+    const docRef = firestoreDoc(db, "alerts", alertId);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) return null;
+
+    // Enforce multi-tenancy: ensure the alert belongs to the user's hospital
+    if (docSnap.data()?.hospitalId !== user.hospitalId) {
+        console.warn(`Attempted to access alert ${alertId} from hospital ${docSnap.data()?.hospitalId} by user from ${user.hospitalId}`);
+        return null;
+    }
+
+    return convertAlert(docSnap);
 }
 
-export async function getPatientAlerts(patientId: string): Promise<Alert[]> {
-    const db = await getAdminDb();
-    const snapshot = await db
-        .collection("alerts")
-        .where("patientId", "==", patientId)
-        .orderBy("createdAt", "desc")
-        .get();
+export async function getPatientAlerts(patientId: string, user: UserContext): Promise<Alert[]> {
+    if (!user || !user.hospitalId) return [];
+
+    // First, verify the patient belongs to the user's hospital
+    const patient = await getPatient(patientId, user);
+    if (!patient) {
+        console.warn(`Patient ${patientId} not found or not accessible by user from ${user.hospitalId}. Cannot fetch alerts.`);
+        return [];
+    }
+
+    const alertsRef = collection(db, "alerts");
+    const q = query(
+        alertsRef,
+        where("patientId", "==", patientId),
+        where('hospitalId', '==', user.hospitalId), // Explicitly filter by hospitalId
+        orderBy("createdAt", "desc")
+    );
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => convertAlert(doc));
 }
 
-export async function getInteractions(patientId: string): Promise<Interaction[]> {
-    const db = await getAdminDb();
-    const snapshot = await db
-        .collection("patients")
-        .doc(patientId)
-        .collection("interactions")
-        .orderBy("timestamp", "desc")
-        .get();
+export async function getInteractions(patientId: string, user: UserContext): Promise<Interaction[]> {
+    if (!user || !user.hospitalId) return [];
+
+    // First, verify the patient belongs to the user's hospital
+    const patient = await getPatient(patientId, user);
+    if (!patient) {
+        console.warn(`Patient ${patientId} not found or not accessible by user from ${user.hospitalId}. Cannot fetch interactions.`);
+        return [];
+    }
+
+    const interactionsRef = collection(db, "patients", patientId, "interactions");
+    const q = query(interactionsRef, orderBy("timestamp", "desc"));
+    const snapshot = await getDocs(q);
 
     return snapshot.docs.map(doc => {
         const item = convertDoc<any>(doc);
@@ -265,8 +284,7 @@ export async function getInteractions(patientId: string): Promise<Interaction[]>
     });
 }
 
-export async function getDashboardStats() {
-    const user = await getCurrentUser();
+export async function getDashboardStats(user: UserContext) {
     if (!user || !user.hospitalId) {
         return {
             totalPatients: 0,
@@ -276,21 +294,20 @@ export async function getDashboardStats() {
         };
     }
 
-    const db = await getAdminDb();
-
     // 1. Total Patients (Aggregation)
+    const patientsRef = collection(db, "patients");
     // Filter by hospital and assigned nurse
-    let patientsQuery = db.collection("patients").where('hospitalId', '==', user.hospitalId);
-    if (user.role === 'nurse') {
-        patientsQuery = patientsQuery.where("assignedNurse.email", "==", user.email);
+    let patientsQuery = query(patientsRef, where('hospitalId', '==', user.hospitalId));
+    if (user.role === 'nurse' && user.email) {
+        patientsQuery = query(patientsQuery, where("assignedNurse.email", "==", user.email));
     }
-    const totalPatientsSnap = await patientsQuery.count().get();
+    const totalPatientsSnap = await getCountFromServer(patientsQuery);
     const totalPatients = totalPatientsSnap.data().count;
 
     // 2. Critical Alerts (Aggregation)
-    // Note: For critical alerts, we still need to respect the nurse's patient list. 
+    // Note: For critical alerts, we still need to respect the nurse's patient list.
     // Since we can't do an 'in' query with >10 items, and we can't easily join in Firestore,
-    // we have two options: 
+    // we have two options:
     // A) Fetch all nurse's patients IDs (cheap-ish) and count alerts for them (hard with limit)
     // B) Fetch all 'critical' alerts for the hospital and filter in memory (likely small-ish number)
     // C) Just counting total critical alerts for the hospital might be misleading if it's for other nurses' patients.
@@ -299,21 +316,23 @@ export async function getDashboardStats() {
     let criticalAlertsCount = 0;
 
     // Base alerts query
-    const alertsQuery = db.collection("alerts")
-        .where('hospitalId', '==', user.hospitalId)
-        .where('priority', 'in', ['critical', 'CRITICAL', 'RED']); // Handle variations
+    const alertsRef = collection(db, "alerts");
+    const alertsQuery = query(alertsRef,
+        where('hospitalId', '==', user.hospitalId),
+        where('priority', 'in', ['critical', 'CRITICAL', 'RED']) // Handle variations
+    );
 
-    const criticalSnaps = await alertsQuery.get();
+    const criticalSnaps = await getDocs(alertsQuery);
 
     if (user.role === 'nurse') {
         // We need the nurse's patient IDs to filter
         // Optimization: We could cache this list or assume getPatients is fast enough (it fetches docs)
-        // For stats, maybe we just want the number. 
-        // Let's fetch the patients query from above but we need IDs. 
-        // Actually, let's just reuse getPatients() logic but optimized? 
+        // For stats, maybe we just want the number.
+        // Let's fetch the patients query from above but we need IDs.
+        // Actually, let's just reuse getPatients() logic but optimized?
         // No, let's keep it simple: filter the cached/fetched alerts. It's robust.
 
-        const myPatients = await getPatients();
+        const myPatients = await getPatients(user);
         const myPatientIds = new Set(myPatients.map(p => p.id));
 
         criticalAlertsCount = criticalSnaps.docs.filter(doc => {
@@ -327,33 +346,32 @@ export async function getDashboardStats() {
 
     // 3. Status Counts (Aggregation)
     // We can run 3 count queries in parallel
-    const statusQueries = ['safe', 'warning', 'critical'].map(status => {
-        // status stored as 'currentStatus' or 'riskLevel' ? 
+    const statusQueries = ['safe', 'warning', 'critical'].map(async (status) => {
+        // status stored as 'currentStatus' or 'riskLevel' ?
         // The convertPatient function maps 'riskLevel' to currentStatus.
         // We need to query the raw field. Assuming it's 'riskLevel' in Firestore based on mapRiskLevel.
-        // mapRiskLevel handles RED, CRITICAL -> critical. 
+        // mapRiskLevel handles RED, CRITICAL -> critical.
         // So we need to query for multiple raw values.
 
         let q = patientsQuery;
-        if (status === 'critical') q = q.where('riskLevel', 'in', ['RED', 'CRITICAL', 'critical']);
-        else if (status === 'warning') q = q.where('riskLevel', 'in', ['YELLOW', 'WARNING', 'warning']);
-        else q = q.where('riskLevel', 'in', ['GREEN', 'SAFE', 'safe']); // Default/Safe
+        if (status === 'critical') q = query(q, where('riskLevel', 'in', ['RED', 'CRITICAL', 'critical']));
+        else if (status === 'warning') q = query(q, where('riskLevel', 'in', ['YELLOW', 'WARNING', 'warning']));
+        else q = query(q, where('riskLevel', 'in', ['GREEN', 'SAFE', 'safe'])); // Default/Safe
 
-        return q.count().get();
+        const snap = await getCountFromServer(q);
+        return snap.data().count;
     });
 
-    const [safeSnap, warningSnap, criticalSnap] = await Promise.all(statusQueries);
+    const [safeCount, warningCount, criticalCount] = await Promise.all(statusQueries);
 
     return {
         totalPatients,
         criticalAlerts: criticalAlertsCount,
         readmissionRate: 12.3, // Still hardcoded for now, potential todo
         statusCounts: {
-            safe: safeSnap.data().count,
-            warning: warningSnap.data().count,
-            critical: criticalSnap.data().count,
+            safe: safeCount,
+            warning: warningCount,
+            critical: criticalCount,
         }
     };
 }
-
-

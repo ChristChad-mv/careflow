@@ -1,10 +1,62 @@
+'use client';
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, Users, TrendingUp, Clock } from "lucide-react";
+import { AlertTriangle, Users, TrendingUp, Clock, Loader2 } from "lucide-react";
 import { getDashboardStats } from "@/lib/db";
 import { RiskTrendChart } from "@/components/dashboard/RiskTrendChart";
+import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
+import { UserContext } from "@/lib/db";
 
-export default async function Dashboard() {
-  const stats = await getDashboardStats();
+interface DashboardStats {
+  totalPatients: number;
+  criticalAlerts: number;
+  readmissionRate: number;
+  statusCounts: { safe: number; warning: number; critical: number };
+}
+
+export default function Dashboard() {
+  const { data: session, status } = useSession();
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadStats() {
+      if (status === 'authenticated' && session?.user) {
+        try {
+          // Prepare UserContext from session
+          const userContext: UserContext = {
+            hospitalId: (session.user as any).hospitalId,
+            role: (session.user as any).role,
+            email: session.user.email || undefined
+          };
+
+          const data = await getDashboardStats(userContext);
+          setStats(data);
+        } catch (error) {
+          console.error("Failed to load dashboard stats", error);
+        } finally {
+          setLoading(false);
+        }
+      } else if (status === 'unauthenticated') {
+        setLoading(false); // Or redirect
+      }
+    }
+
+    loadStats();
+  }, [session, status]);
+
+  if (status === 'loading' || loading) {
+    return (
+      <div className="flex items-center justify-center h-screen w-full">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return <div>Unable to load dashboard data. Please try refreshing.</div>;
+  }
 
   const kpiCards = [
     {
@@ -45,7 +97,7 @@ export default async function Dashboard() {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div>
         <h1 className="text-4xl font-bold tracking-tight">
-          Welcome back, <span className="text-gradient">Nurse Sarah</span>
+          Welcome back, <span className="text-gradient">{session?.user?.name || 'Nurse'}</span>
         </h1>
         <p className="text-muted-foreground mt-2 text-lg">
           Here's what's happening in your ward today.

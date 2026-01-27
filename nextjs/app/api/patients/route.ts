@@ -1,20 +1,18 @@
-/**
- * Patient API Route
- * 
- * Protected API route for managing patients with full security implementation:
- * - Authentication required
- * - Rate limiting (20 req/min)
- * - Input validation with Zod
- * - Role-based authorization
- * - Hospital isolation (multi-tenancy)
- * - Audit logging
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getRatelimit } from '@/lib/rate-limit';
 import { validateRequest, createPatientSchema } from '@/lib/api-validation';
 import { auth } from '@/lib/auth';
 import { validateCsrfToken } from '@/lib/csrf';
+import { db } from '@/lib/firebase';
+import {
+  collection,
+  query,
+  where,
+  limit as firestoreLimit,
+  getDocs,
+  addDoc,
+  getCountFromServer
+} from 'firebase/firestore';
 
 /**
  * GET /api/patients - List patients for the user's hospital
@@ -31,20 +29,20 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. Rate limiting
-    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0].trim() 
-                   || request.headers.get('x-real-ip') 
-                   || 'unknown';
-    
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0].trim()
+      || request.headers.get('x-real-ip')
+      || 'unknown';
+
     const ratelimit = getRatelimit('api');
     if (ratelimit) {
       const result = await ratelimit.limit(clientIp);
       if (!result.success) {
         const resetTime = result.reset instanceof Date ? result.reset : new Date(result.reset);
         const retryAfter = Math.ceil((resetTime.getTime() - Date.now()) / 1000);
-        
+
         return NextResponse.json(
           { error: 'Too Many Requests', retryAfter },
-          { 
+          {
             status: 429,
             headers: {
               'Retry-After': retryAfter.toString(),
@@ -60,31 +58,42 @@ export async function GET(request: NextRequest) {
     // 3. Get query parameters
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 100);
+    const limitParams = Math.min(parseInt(searchParams.get('limit') || '20', 10), 100); // Renamed to avoid conflict with firestore limit
 
     // 4. Business logic - Fetch patients from Firestore
-    const { getAdminDb } = await import('@/lib/firebase-admin');
-    const db = await getAdminDb();
-    
-    const patientsRef = db.collection('patients')
-      .where('hospitalId', '==', session.user.hospitalId)
-      .limit(limit)
-      .offset((page - 1) * limit);
-    
-    const snapshot = await patientsRef.get();
-    const patients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    
+    const patientsRef = collection(db, 'patients');
+
+    // Note: Firestore offset() is not available in lite/client SDK commonly used without deep pagination optimization 
+    // or requires additional setup, but standard SDK supports limits. 
+    // Implementing offset-like pagination or simple cursor-based is complex without cursors.
+    // For now, fetching limit * page items and slicing is a safe fallback for small-scale, 
+    // or we use firestoreLimit(limit * page) and slice in memory if strict "offset" is needed.
+    // Given the previous code used offset(), we can try to emulate or just fetch enough.
+    // Let's stick to simple limit for simplicity or emulated offset if needed.
+    // The previous code: .limit(limit).offset((page - 1) * limit) works in Node Admin SDK.
+    // Client SDK doesn't support .offset() directly in the same way query-building works easily without cursor.
+    // We will use a basic query here.
+
+    const q = query(
+      patientsRef,
+      where('hospitalId', '==', session.user.hospitalId),
+      firestoreLimit(limitParams * page) // Get enough items up to current page
+    );
+
+    const snapshot = await getDocs(q);
+    // Emulate offset/limit in memory for Client SDK (since real cursor pagination requires 'startAfter')
+    const allDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const patients = allDocs.slice((page - 1) * limitParams, page * limitParams);
+
     // Get total count for pagination
-    const totalSnapshot = await db.collection('patients')
-      .where('hospitalId', '==', session.user.hospitalId)
-      .count()
-      .get();
+    const totalQuery = query(patientsRef, where('hospitalId', '==', session.user.hospitalId));
+    const totalSnapshot = await getCountFromServer(totalQuery);
     const total = totalSnapshot.data().count;
 
     return NextResponse.json({
       data: patients,
       page,
-      limit,
+      limit: limitParams,
       total,
     });
 
@@ -121,17 +130,17 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Rate limiting
-    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0].trim() 
-                   || request.headers.get('x-real-ip') 
-                   || 'unknown';
-    
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0].trim()
+      || request.headers.get('x-real-ip')
+      || 'unknown';
+
     const ratelimit = getRatelimit('api');
     if (ratelimit) {
       const result = await ratelimit.limit(clientIp);
       if (!result.success) {
         const resetTime = result.reset instanceof Date ? result.reset : new Date(result.reset);
         const retryAfter = Math.ceil((resetTime.getTime() - Date.now()) / 1000);
-        
+
         return NextResponse.json(
           { error: 'Too Many Requests', retryAfter },
           { status: 429, headers: { 'Retry-After': retryAfter.toString() } }
@@ -160,30 +169,29 @@ export async function POST(request: NextRequest) {
     }
 
     // 7. Business logic - Create patient in Firestore
-    const { getAdminDb } = await import('@/lib/firebase-admin');
-    const db = await getAdminDb();
-    
-    const patientRef = await db.collection('patients').add({
+    const patientsRef = collection(db, 'patients');
+    const patientDoc = await addDoc(patientsRef, {
       ...validatedData,
       createdBy: session.user.id,
       createdAt: new Date().toISOString(),
     });
 
     // 8. Audit logging
-    await db.collection('auditLogs').add({
+    const auditRef = collection(db, 'audit_logs'); // Fixed collection name to match AuditService
+    await addDoc(auditRef, {
       userId: session.user.id,
       action: 'CREATE_PATIENT',
       resource: 'patients',
-      resourceId: patientRef.id,
+      resourceId: patientDoc.id,
       hospitalId: session.user.hospitalId,
       timestamp: new Date().toISOString(),
       ipAddress: clientIp,
     });
 
     return NextResponse.json(
-      { 
+      {
         message: 'Patient created successfully',
-        data: { id: patientRef.id }
+        data: { id: patientDoc.id }
       },
       { status: 201 }
     );
@@ -193,9 +201,9 @@ export async function POST(request: NextRequest) {
     if (error && typeof error === 'object' && 'status' in error && error.status === 400) {
       const validationError = error as { status: number; message: string; errors: unknown };
       return NextResponse.json(
-        { 
+        {
           error: validationError.message,
-          details: validationError.errors 
+          details: validationError.errors
         },
         { status: 400 }
       );
@@ -209,3 +217,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

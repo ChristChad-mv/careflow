@@ -21,9 +21,12 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Patient } from '@/types/patient';
-import { updatePatient } from '@/lib/actions';
+import { updatePatientClient } from '@/lib/client-actions';
 import { Pencil } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { UserContext } from '@/lib/db';
 
 interface EditAppointmentDialogProps {
     patient: Patient;
@@ -33,6 +36,9 @@ export function EditAppointmentDialog({ patient }: EditAppointmentDialogProps) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    const { data: session } = useSession();
+    const router = useRouter();
+
     // Initial state from patient or empty defaults
     const [appointment, setAppointment] = useState({
         date: patient.nextAppointment?.date || '',
@@ -41,13 +47,24 @@ export function EditAppointmentDialog({ patient }: EditAppointmentDialogProps) {
     });
 
     const handleSave = async () => {
+        if (!session?.user) {
+            toast.error("Unauthorized");
+            return;
+        }
         setLoading(true);
         try {
+            const userContext: UserContext = {
+                hospitalId: (session.user as any).hospitalId,
+                role: (session.user as any).role,
+                email: session.user.email || undefined
+            };
+
             // If fields are empty, we might want to clear the appointment
             // For now, we update whatever is there
-            await updatePatient(patient.id, { nextAppointment: appointment });
+            await updatePatientClient(patient.id, { nextAppointment: appointment }, userContext);
             toast.success("Appointment updated");
             setOpen(false);
+            router.refresh();
         } catch (error) {
             console.error(error);
             toast.error("Failed to update appointment");

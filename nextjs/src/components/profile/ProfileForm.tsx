@@ -5,11 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { updateUserProfile, signOutAction } from "@/lib/actions";
+import { signOutAction } from "@/lib/actions";
+import { updateUserProfileClient } from "@/lib/client-actions";
 import { useToast } from "@/hooks/use-toast";
 import { User as UserIcon, Building, Shield, Loader2 } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { UserContext } from "@/lib/db";
 
 interface UserData {
+    id?: string | null;
     name?: string | null;
     email?: string | null;
     role?: string | null;
@@ -19,27 +24,44 @@ interface UserData {
 export function ProfileForm({ user }: { user: UserData }) {
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
+    const { data: session } = useSession();
+    const router = useRouter();
 
-    const handleSubmit = async (formData: FormData) => {
-        setIsLoading(true);
-        try {
-            const result = await updateUserProfile(formData);
-            if (result.success) {
-                toast({
-                    title: "Profile Updated",
-                    description: "Your profile information has been saved.",
-                });
-            } else {
-                toast({
-                    title: "Error",
-                    description: result.error || "Failed to update profile.",
-                    variant: "destructive",
-                });
-            }
-        } catch (error) {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+
+        if (!session?.user?.id) {
             toast({
                 title: "Error",
-                description: "An unexpected error occurred.",
+                description: "You are not authenticated.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        setIsLoading(true);
+        const formData = new FormData(e.currentTarget);
+        const name = formData.get("name") as string;
+        const hospitalId = formData.get("hospitalId") as string;
+
+        try {
+            const userContext: UserContext = {
+                hospitalId: (session.user as any).hospitalId,
+                role: (session.user as any).role,
+                email: session.user.email || undefined
+            };
+
+            await updateUserProfileClient(session.user.id, { name, hospitalId }, userContext);
+
+            toast({
+                title: "Profile Updated",
+                description: "Your profile information has been saved.",
+            });
+            router.refresh();
+        } catch (error: any) {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to update profile.",
                 variant: "destructive",
             });
         } finally {
@@ -53,7 +75,7 @@ export function ProfileForm({ user }: { user: UserData }) {
 
     return (
         <div className="space-y-6">
-            <form action={handleSubmit}>
+            <form onSubmit={handleSubmit}>
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -103,9 +125,9 @@ export function ProfileForm({ user }: { user: UserData }) {
                                     <Building className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input
                                         id="hospitalId"
-                                        name="hospitalId"
                                         defaultValue={user.hospitalId || ""}
-                                        className="pl-9"
+                                        disabled
+                                        className="pl-9 bg-muted"
                                         placeholder="HOSP..."
                                     />
                                 </div>

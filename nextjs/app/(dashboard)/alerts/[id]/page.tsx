@@ -1,20 +1,67 @@
-import { getAlert, getPatient } from "@/lib/db";
+'use client';
+
+import { getAlert, getPatient, UserContext } from "@/lib/db";
 import { formatDistanceToNow } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ManageAlertDialog } from "@/components/alerts/ManageAlertDialog";
-import { ArrowLeft, User, FileText, Activity, AlertTriangle, Pill, Bot } from "lucide-react";
+import { ArrowLeft, User, FileText, Activity, AlertTriangle, Pill, Bot, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { useParams } from "next/navigation";
 import { ModernAudioPlayer } from "@/components/alerts/ModernAudioPlayer";
+import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
+import { Alert, Patient } from "@/types/patient";
 
-export default async function AlertDetailPage({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params;
-    const alert = await getAlert(id);
-    if (!alert) return notFound();
+export default function AlertDetailPage() {
+    const params = useParams();
+    const id = params.id as string;
+    const { data: session, status } = useSession();
 
-    const patient = await getPatient(alert.patientId);
+    const [alert, setAlert] = useState<Alert | null>(null);
+    const [patient, setPatient] = useState<Patient | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function loadData() {
+            if (status === 'authenticated' && session?.user && id) {
+                try {
+                    const userContext: UserContext = {
+                        hospitalId: (session.user as any).hospitalId,
+                        role: (session.user as any).role,
+                        email: session.user.email || undefined
+                    };
+
+                    const alertData = await getAlert(id, userContext);
+                    setAlert(alertData);
+
+                    if (alertData && alertData.patientId) {
+                        const patientData = await getPatient(alertData.patientId, userContext);
+                        setPatient(patientData);
+                    }
+                } catch (error) {
+                    console.error("Error loading alert data:", error);
+                } finally {
+                    setLoading(false);
+                }
+            } else if (status === 'unauthenticated') {
+                setLoading(false);
+            }
+        }
+        loadData();
+    }, [session, status, id]);
+
+
+    if (status === 'loading' || loading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    if (!alert) return <div className="p-8 text-center">Alert not found.</div>;
 
     const getPriorityColor = (priority: string) => {
         switch (priority) {
@@ -25,7 +72,7 @@ export default async function AlertDetailPage({ params }: { params: Promise<{ id
     };
 
     return (
-        <div className="space-y-6 max-w-7xl mx-auto">
+        <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Header */}
             <div className="flex items-center gap-4">
                 <Link href="/alerts">
@@ -41,7 +88,7 @@ export default async function AlertDetailPage({ params }: { params: Promise<{ id
                         </Badge>
                     </h1>
                     <p className="text-muted-foreground">
-                        ID: {alert.id} • Created {formatDistanceToNow(alert.createdAt, { addSuffix: true })}
+                        ID: {alert.id} • Created {alert.createdAt ? formatDistanceToNow(new Date(alert.createdAt), { addSuffix: true }) : 'N/A'}
                     </p>
                 </div>
                 <div className="ml-auto">

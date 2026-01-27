@@ -84,7 +84,7 @@ service cloud.firestore {
       // Coordinators and admins can create patients
       allow create: if (isCoordinator() || isAdmin()) 
                     && isSameHospital(request.resource.data.hospitalId)
-                    && request.resource.data.keys().hasAll(['name', 'hospitalId', 'status']);
+                    && request.resource.data.keys().hasAll(['name', 'hospitalId', 'currentStatus']);
       
       // Coordinators and admins can update patients from their hospital
       allow update: if (isCoordinator() || isAdmin()) 
@@ -120,7 +120,7 @@ service cloud.firestore {
     // AUDIT LOGS COLLECTION
     // ============================================================================
     
-    match /auditLogs/{logId} {
+    match /audit_logs/{logId} {
       // Only admins can read audit logs
       allow read: if isAdmin();
       
