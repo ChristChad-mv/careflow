@@ -90,7 +90,7 @@ export function CreatePatientDialog({ open, onOpenChange }: CreatePatientDialogP
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-4 py-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="name">Full Name *</Label>
                             <Input
@@ -111,7 +111,7 @@ export function CreatePatientDialog({ open, onOpenChange }: CreatePatientDialogP
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="phone">Phone Number *</Label>
                             <Input

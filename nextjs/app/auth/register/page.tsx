@@ -20,7 +20,7 @@ import Link from "next/link";
 
 export default function RegisterPage() {
   const router = useRouter();
-  
+
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -32,7 +32,7 @@ export default function RegisterPage() {
     employeeId: "",
     hospitalId: "",
   });
-  
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -58,24 +58,70 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
     setIsLoading(true);
 
-    // TODO: Replace with actual API call to create user
-    // For now, simulate API call
-    setTimeout(() => {
+    try {
+      // Dynamic import to ensure client-side execution if needed, though 'use client' handles it
+      const { createUserWithEmailAndPassword, updateProfile } = await import("firebase/auth");
+      const { doc, setDoc, serverTimestamp } = await import("firebase/firestore");
+      // Import initialized instances
+      const { auth, db } = await import("@/lib/firebase");
+
+      // 1. Create Authentication User
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password
+      );
+      const user = userCredential.user;
+
+      // 2. Update Auth Profile
+      await updateProfile(user, {
+        displayName: `${formData.firstName} ${formData.lastName}`
+      });
+
+      // 3. Create Firestore User Profile
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        name: `${formData.firstName} ${formData.lastName}`,
+        email: formData.email,
+        role: formData.role,
+        department: formData.department,
+        employeeId: formData.employeeId,
+        hospitalId: formData.hospitalId,
+        status: 'pending', // Requires admin approval
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
       setSuccess(true);
       setIsLoading(false);
-      
+
       // Redirect to login after 3 seconds
       setTimeout(() => {
         router.push("/auth/login?registered=true");
       }, 3000);
-    }, 2000);
+
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      let errorMessage = "Failed to create account. Please try again.";
+
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "An account with this email already exists.";
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = "Password is too weak.";
+      } else if (error.code === 'permission-denied') {
+        errorMessage = "System permissions error. Please contact support.";
+      }
+
+      setErrors(prev => ({ ...prev, apiError: errorMessage }));
+      setIsLoading(false);
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -99,7 +145,7 @@ export default function RegisterPage() {
             <div>
               <h2 className="text-2xl font-bold mb-2">Request Submitted!</h2>
               <p className="text-muted-foreground">
-                Your account request has been submitted for admin approval. 
+                Your account request has been submitted for admin approval.
                 You will receive an email once your account is activated.
               </p>
             </div>
@@ -137,6 +183,13 @@ export default function RegisterPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
+              {errors.apiError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{errors.apiError}</AlertDescription>
+                </Alert>
+              )}
+
               {/* Personal Information */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold">Personal Information</h3>
@@ -189,12 +242,12 @@ export default function RegisterPage() {
               {/* Professional Information */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold">Professional Information</h3>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="role">Role *</Label>
-                    <Select 
-                      value={formData.role} 
+                    <Select
+                      value={formData.role}
                       onValueChange={(value) => handleInputChange("role", value)}
                       disabled={isLoading}
                     >
@@ -264,7 +317,7 @@ export default function RegisterPage() {
               {/* Password */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold">Security</h3>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="password">Password *</Label>
                   <Input
@@ -308,9 +361,9 @@ export default function RegisterPage() {
               </Alert>
 
               {/* Submit Button */}
-              <Button 
-                type="submit" 
-                className="w-full" 
+              <Button
+                type="submit"
+                className="w-full"
                 disabled={isLoading}
               >
                 {isLoading ? (
