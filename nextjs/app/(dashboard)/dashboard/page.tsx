@@ -129,7 +129,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-7">
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-7">
         {/* Chart Section */}
         <div className="md:col-span-4">
           <RiskTrendChart />

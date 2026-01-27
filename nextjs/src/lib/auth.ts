@@ -104,6 +104,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 if (fields.hospitalId?.stringValue) hospitalId = fields.hospitalId.stringValue;
                 if (fields.name?.stringValue) name = fields.name.stringValue;
                 if (fields.department?.stringValue) department = fields.department.stringValue;
+
+                // Enforce Account Status
+                const status = fields.status?.stringValue || 'active'; // Default to active for legacy
+                if (status === 'pending') {
+                  console.warn(`Login attempt by pending user: ${email}`);
+                  throw new Error("Your account is pending admin approval.");
+                }
+                if (status === 'disabled') {
+                  console.warn(`Login attempt by disabled user: ${email}`);
+                  throw new Error("Your account has been disabled.");
+                }
               }
             } else {
               console.warn(`Failed to fetch profile via REST: ${profileResponse.status} ${profileResponse.statusText}`);

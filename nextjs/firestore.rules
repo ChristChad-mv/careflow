@@ -60,8 +60,8 @@ service cloud.firestore {
       // Users can only read their own profile
       allow read: if isAuthenticated() && getUserId() == userId;
       
-      // Only admins can create new users
-      allow create: if isAdmin() && hasRequiredUserFields();
+      // Only admins can create new users OR users can create their own profile (registration)
+      allow create: if (isAdmin() && hasRequiredUserFields()) || (isAuthenticated() && getUserId() == userId);
       
       // Users can update their own profile (limited fields)
       // Admins can update any user
