@@ -43,6 +43,7 @@ export function AppSidebar() {
                 src="/logo-2.png"
                 alt="CP"
                 fill
+                sizes="(max-width: 768px) 48px, 48px"
                 className="object-contain"
                 priority
               />
@@ -53,6 +54,7 @@ export function AppSidebar() {
                 src="/logo.png"
                 alt="CareFlow Pulse"
                 fill
+                sizes="(max-width: 768px) 160px, 160px"
                 className="object-contain"
                 priority
               />
