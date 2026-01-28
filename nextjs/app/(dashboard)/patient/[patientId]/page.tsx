@@ -3,22 +3,39 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Phone, Calendar, Pill, User, MapPin, Stethoscope, Mail, AlertTriangle, Loader2 } from "lucide-react";
+import { Phone, Calendar, Pill, User, MapPin, Stethoscope, Mail, AlertTriangle, Loader2, Rocket, Trash2, Activity as ActivityIcon } from "lucide-react";
 import { getPatient, UserContext } from "@/lib/db";
+import { deletePatientClient } from "@/lib/client-actions";
 import { format } from "date-fns";
 import { EditMedicationDialog } from "@/components/patient/EditMedicationDialog";
 import { EditAppointmentDialog } from "@/components/patient/EditAppointmentDialog";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Patient } from "@/types/patient";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function PatientProfile() {
   const params = useParams();
+  const router = useRouter();
   const patientId = params.patientId as string;
   const { data: session, status } = useSession();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
+  const [triggering, setTriggering] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     async function loadPatient() {
@@ -63,6 +80,57 @@ export default function PatientProfile() {
     }
   };
 
+  const handleCallDemo = async () => {
+    if (!patientId) return;
+
+    setTriggering(true);
+    try {
+      const response = await fetch('/api/demo/trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patientId, scheduleHour: 8 })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to trigger demo call');
+      }
+
+      toast.success("🚀 Agent Triggered!", {
+        description: "You should receive a call shortly. Simulate symptoms and check Alerts for the follow-up.",
+        duration: 8000,
+      });
+
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to trigger agent");
+    } finally {
+      setTriggering(false);
+    }
+  };
+
+  const handleDeletePatient = async () => {
+
+    setDeleting(true);
+    try {
+      const userContext: UserContext = {
+        hospitalId: (session?.user as any).hospitalId,
+        role: (session?.user as any).role,
+        email: session?.user?.email || undefined
+      };
+
+      const result = await deletePatientClient(patientId, userContext);
+      if (result.success) {
+        toast.success("Patient record deleted successfully");
+        router.push('/patients');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to delete patient record");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Header */}
@@ -80,6 +148,41 @@ export default function PatientProfile() {
           }>
             {patient.currentStatus.toUpperCase()}
           </Badge>
+          <Button
+            onClick={handleCallDemo}
+            disabled={triggering || deleting}
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold shadow-lg h-10 px-6 rounded-full"
+          >
+            {triggering ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}
+            Call Now (Demo)
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                disabled={deleting || triggering}
+                className="border-destructive/30 hover:bg-destructive/10 text-destructive font-semibold h-10 px-4 rounded-full"
+              >
+                {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                Delete Record
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete the patient record,
+                  all associated alerts, and interaction history from the clinical database.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeletePatient} className="bg-destructive hover:bg-destructive/90 text-white">
+                  Confirm Deletion
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -264,23 +367,4 @@ export default function PatientProfile() {
       </div>
     </div>
   );
-}
-
-function ActivityIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-    </svg>
-  )
 }

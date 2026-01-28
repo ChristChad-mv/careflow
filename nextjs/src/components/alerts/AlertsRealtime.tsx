@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, Clock } from "lucide-react";
+import { AlertTriangle, Clock, Rocket } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 
@@ -71,17 +71,26 @@ export function AlertsRealtime() {
             </Card>
         );
     }
-
     if (sortedAlerts.length === 0) {
         return (
-            <Card>
-                <CardContent className="py-12 text-center">
-                    <div className="text-success text-lg font-semibold">
-                        ✅ No critical alerts at this time
+            <Card className="border-dashed border-2 bg-muted/20">
+                <CardContent className="py-16 text-center space-y-6">
+                    <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center text-primary animate-pulse">
+                        <Rocket className="h-8 w-8" />
                     </div>
-                    <p className="text-muted-foreground mt-2">
-                        All patients are stable or in monitoring status
-                    </p>
+                    <div>
+                        <div className="text-xl font-bold">
+                            Welcome to the Hackathon Demo
+                        </div>
+                        <p className="text-muted-foreground mt-2 max-w-md mx-auto">
+                            No critical alerts yet. To start the interactive demo, go back to the Dashboard and click <strong>"Hackathon Demo"</strong> to register as a patient.
+                        </p>
+                    </div>
+                    <Link href="/dashboard">
+                        <Button variant="default" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold shadow-lg">
+                            Go to Dashboard & Start Demo
+                        </Button>
+                    </Link>
                 </CardContent>
             </Card>
         );

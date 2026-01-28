@@ -50,6 +50,8 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: https:",
               // Connect Src: Critical for Firebase, Vercel, Google APIs
               "connect-src 'self' https://vercel.live https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://www.googleapis.com https://*.firebaseapp.com https://apis.google.com",
+              // Frame Src: Allow Firebase Auth iframes
+              "frame-src 'self' https://*.firebaseapp.com https://apis.google.com",
               "frame-ancestors 'self'",
               "base-uri 'self'",
               "form-action 'self'"

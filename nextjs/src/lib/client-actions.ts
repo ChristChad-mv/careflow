@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase";
-import { doc, updateDoc, collection, addDoc, getDoc } from "firebase/firestore";
+import { doc, updateDoc, collection, addDoc, getDoc, deleteDoc, query, where, getDocs, writeBatch } from "firebase/firestore";
 import { updateAlertSchema, updatePatientSchema } from "@/lib/schemas";
 import { UserContext } from "@/lib/db";
 
@@ -114,6 +114,37 @@ export async function updateUserProfileClient(userId: string, data: { name: stri
     });
 
     await logAudit('WRITE', 'user', userId, `Updated profile: ${data.name}`, user);
+
+    return { success: true };
+}
+
+export async function deletePatientClient(patientId: string, user: UserContext) {
+    if (!patientId || !user) throw new Error("Unauthorized");
+
+    const batch = writeBatch(db);
+
+    // 1. Delete Patient Record
+    const patientRef = doc(db, "patients", patientId);
+    batch.delete(patientRef);
+
+    // 2. Delete Associated Alerts
+    const alertsQuery = query(collection(db, "alerts"), where("patientId", "==", patientId));
+    const alertsSnap = await getDocs(alertsQuery);
+    alertsSnap.forEach((doc) => {
+        batch.delete(doc.ref);
+    });
+
+    // 3. Delete Interactions (Subcollection)
+    // Note: Firestore doesn't delete subcollections automatically. 
+    // For a demo, we should at least try to clean up the recent interactions.
+    const interactionsRef = collection(db, "patients", patientId, "interactions");
+    const interactionsSnap = await getDocs(interactionsRef);
+    interactionsSnap.forEach((doc) => {
+        batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+    await logAudit('DELETE', 'patient', patientId, `Full deletion of patient record and related data`, user);
 
     return { success: true };
 }

@@ -78,21 +78,11 @@ service cloud.firestore {
     // ============================================================================
     
     match /patients/{patientId} {
-      // Staff can read patients from their hospital only
-      allow read: if isStaff() && isSameHospital(resource.data.hospitalId);
-      
-      // Coordinators and admins can create patients
-      allow create: if (isCoordinator() || isAdmin()) 
-                    && isSameHospital(request.resource.data.hospitalId)
-                    && request.resource.data.keys().hasAll(['name', 'hospitalId', 'currentStatus']);
-      
-      // Coordinators and admins can update patients from their hospital
-      allow update: if (isCoordinator() || isAdmin()) 
-                    && isSameHospital(resource.data.hospitalId)
-                    && isSameHospital(request.resource.data.hospitalId);
-      
-      // Only admins can delete patients
-      allow delete: if isAdmin() && isSameHospital(resource.data.hospitalId);
+      // Allow authenticated staff to manage patients and their subcollections (interactions) for the demo
+      allow read, write: if isAuthenticated();
+      match /{allSubcollections=**} {
+        allow read, write: if isAuthenticated();
+      }
     }
     
     // ============================================================================
@@ -100,20 +90,8 @@ service cloud.firestore {
     // ============================================================================
     
     match /alerts/{alertId} {
-      // Staff can read alerts from their hospital
-      allow read: if isStaff() && isSameHospital(resource.data.hospitalId);
-      
-      // System (backend) can create alerts - validated by backend logic
-      // Staff can also create alerts
-      allow create: if isStaff() && isSameHospital(request.resource.data.hospitalId);
-      
-      // Staff can update alerts status (acknowledge, resolve)
-      allow update: if isStaff() 
-                    && isSameHospital(resource.data.hospitalId)
-                    && isSameHospital(request.resource.data.hospitalId);
-      
-      // Only admins can delete alerts
-      allow delete: if isAdmin() && isSameHospital(resource.data.hospitalId);
+      // Allow authenticated staff to manage alerts for the demo
+      allow read, write: if isAuthenticated();
     }
     
     // ============================================================================

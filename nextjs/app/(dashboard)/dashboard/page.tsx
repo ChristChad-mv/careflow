@@ -2,11 +2,13 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, Users, TrendingUp, Clock, Loader2 } from "lucide-react";
-import { getDashboardStats } from "@/lib/db";
+import { getDashboardStats, UserContext } from "@/lib/db";
 import { RiskTrendChart } from "@/components/dashboard/RiskTrendChart";
+import { HackathonDemoDialog } from "@/components/dashboard/HackathonDemoDialog";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { UserContext } from "@/lib/db";
+import { Rocket } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface DashboardStats {
   totalPatients: number;
@@ -19,6 +21,7 @@ export default function Dashboard() {
   const { data: session, status } = useSession();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [demoOpen, setDemoOpen] = useState(false);
 
   useEffect(() => {
     async function loadStats() {
@@ -95,14 +98,26 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div>
-        <h1 className="text-4xl font-bold tracking-tight">
-          Welcome back, <span className="text-gradient">{session?.user?.name || 'Nurse'}</span>
-        </h1>
-        <p className="text-muted-foreground mt-2 text-lg">
-          Here's what's happening in your ward today.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight">
+            Welcome back, <span className="text-gradient">{session?.user?.name || 'Nurse'}</span>
+          </h1>
+          <p className="text-muted-foreground mt-2 text-lg">
+            Here's what's happening in your ward today.
+          </p>
+        </div>
+        <Button
+          size="lg"
+          onClick={() => setDemoOpen(true)}
+          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold shadow-lg transition-all animate-bounce"
+        >
+          <Rocket className="mr-2 h-5 w-5" />
+          Hackathon Demo
+        </Button>
       </div>
+
+      <HackathonDemoDialog open={demoOpen} onOpenChange={setDemoOpen} />
 
       {/* KPI Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
