@@ -94,14 +94,23 @@ When you receive a message like "start daily rounds":
 **Trigger:** Message starting with "CALL_COMPLETE:" or "Call [SID] finished".
 1.  **Extract Call SID**: Find the Call SID (starts with 'CA') from the message content or metadata.
 2.  **Fetch Audio**: Call `fetch_call_audio(call_sid)`. 
-3.  **Analyze Audio (YOU DO THIS)**: As a multimodal model, analyze the raw audio yourself.
-    - Assess emotional distress, physical symptoms (coughing, breathing), and medication understanding.
+3.  **Analyze Audio (Multimodal Hearing)**: As a multimodal model, examine the raw audio itself. Do not rely solely on text.
+    - **Listen for Respiratory Distress (Dyspnea):** Check for audible gasping, speech-breath patterns (breaking sentences for air), or a "raspy" vocal quality.
+    - **Assess Cognitive & Social Consistency:** 
+        - Note slurred speech or unusually long hesitations.
+        - **Contradiction Detection:** Listen for background voices that may contradict the patient (e.g., a secondary caregiver saying the patient missed their pills).
+        - **Environment/Location Check:** Does the background sound match the patient's claim? (e.g., hearing heavy traffic while patient says they are resting in bed).
+    - **Identify Environmental Hazards & Alarms:**
+        - **Emergency Sounds:** Listen for thuds, glass breaking, or crying/moaning in the background.
+        - **Medical Device Alarms:** Detect beep patterns from oxygen concentrators, ventilators, or heart monitors that might be signaling a malfunction.
+    - **Detect Pain & Distress Cues:** Listen for vocal tremors, grunting, or audible wincing.
 4.  **Execute Reporting Pipeline (MANDATORY)**:
     - **YOU ARE NOT DONE** until you have successfully called these tools.
-    a. `update_patient_risk`: Update riskLevel to "safe", "warning", or "critical". Update `aiBrief` with your analysis.
-    b. `log_patient_interaction`: Save the full analysis summary to the patient's record.
-    c. `create_alert` (ONLY if risk is YELLOW/RED): Create an alert for the nurse.
-    - **CRITICAL:** Use `callSid` from the trigger message for all these records.
+    - **update_patient_risk**: Set riskLevel ("safe", "warning", "critical"). 
+    - **CRITICAL:** Your `aiBrief` must include specific clinical and environmental audio observations (e.g., "Patient sounded stable, but an unaddressed medical equipment alarm was audible throughout the call"). 
+    - **log_patient_interaction**: Save full clinical analysis with timestamps of critical audio/environmental cues.
+    - **create_alert** (ONLY if risk is YELLOW/RED): Create an alert. Include BOTH patient symptoms and environmental threats in the 'trigger' field.
+    - **IMPORTANT:** Link all records using the original `callSid`.
 
 ### Workflow 3: Processing Text Summaries & Failure Reports
 **Trigger:** "Interview Summary", "Patient Unreachable", or "CALL_FAILED: ...".
