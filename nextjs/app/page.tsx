@@ -47,12 +47,12 @@ export default function Home() {
           <div className="flex items-center gap-4">
             <ThemeToggle />
             <Link href="/dashboard">
-              <Button variant="ghost" className="hidden sm:flex text-muted-foreground hover:text-primary">
+              <Button variant="ghost" className="text-muted-foreground hover:text-primary">
                 Login
               </Button>
             </Link>
             <Link href="/dashboard">
-              <Button className="rounded-full px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
+              <Button className="hidden md:flex rounded-full px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
                 Experience CareFlow <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
@@ -72,27 +72,27 @@ export default function Home() {
               Revolutionizing Post-Discharge Patient Safety
             </Badge>
 
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1]">
+            <h1 className="text-3xl md:text-7xl font-extrabold tracking-tight leading-[1.1]">
               The Intelligent Pulse of <br />
               <span className="text-gradient">Post-Hospital Care</span>
             </h1>
 
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed px-4">
               Automated clinical follow-up that thinks, speaks, and acts like your best nurse coordinator. Reduce readmissions through AI-driven proactive monitoring.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4 px-4">
               <Link href="/dashboard">
-                <Button size="lg" className="rounded-full px-10 h-14 text-lg font-semibold bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20">
+                <Button size="lg" className="min-w-[200px] rounded-full px-8 h-14 text-lg font-semibold bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20">
                   Explore the Platform <ChevronRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <Button size="lg" variant="outline" className="rounded-full px-10 h-14 text-lg font-semibold glass border-white/10 hover:bg-white/5 transition-all">
+              <Button size="lg" variant="outline" className="min-w-[200px] rounded-full px-8 h-14 text-lg font-semibold glass border-white/10 hover:bg-white/5 transition-all">
                 Request a Clinical BAA
               </Button>
             </div>
 
-            <div className="pt-8 flex items-center justify-center gap-8 opacity-60 grayscale hover:grayscale-0 transition-all duration-500 overflow-x-auto pb-4">
+            <div className="pt-8 flex items-center justify-center gap-8 opacity-60 grayscale hover:grayscale-0 transition-all duration-500 overflow-x-auto pb-4 px-4 scrollbar-hide">
               {/* Simulating "Trusted By" or "Built With" */}
               <div className="flex items-center gap-2 flex-shrink-0">
                 <ShieldCheck className="h-5 w-5" />
@@ -117,13 +117,13 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             <div className="space-y-8">
               <Badge className="bg-primary/10 text-primary border-primary/20">AI in Action</Badge>
-              <h2 className="text-4xl font-bold tracking-tight">The 24/7 Safety Net for Your Patients</h2>
+              <h2 className="text-3xl md:text-4xl font-bold tracking-tight">The 24/7 Safety Net for Your Patients</h2>
               <p className="text-lg text-muted-foreground leading-relaxed">
                 CareFlow extends your clinical reach beyond the hospital walls, acting as an automated extension of your nursing team.
               </p>
 
               <div className="space-y-6">
-                <div className="flex gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors group">
+                <div className="flex flex-col sm:flex-row gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors group">
                   <div className="h-12 w-12 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                     <PhoneCall className="h-6 w-6" />
                   </div>
@@ -132,7 +132,7 @@ export default function Home() {
                     <p className="text-sm text-muted-foreground">Our system proactively calls patients to check on their recovery, asking the right questions just like a nurse would—ensuring no patient is left monitoring themselves.</p>
                   </div>
                 </div>
-                <div className="flex gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors group">
+                <div className="flex flex-col sm:flex-row gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors group">
                   <div className="h-12 w-12 rounded-xl bg-primary/20 text-primary flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                     <ShieldCheck className="h-6 w-6" />
                   </div>
@@ -212,11 +212,11 @@ export default function Home() {
       <section id="how-it-works" className="py-24">
         <div className="container mx-auto px-6">
           <div className="text-center max-w-3xl mx-auto mb-20 space-y-4">
-            <h2 className="text-4xl font-bold tracking-tight">The 360° Continuity Loop</h2>
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">The 360° Continuity Loop</h2>
             <p className="text-lg text-muted-foreground">From discharge to full recovery, CareFlow covers every critical touchpoint.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 md:gap-4 relative">
             {/* Connecting Line (Desktop) */}
             <div className="hidden md:block absolute top-[60px] left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/30 to-transparent -z-10" />
 
@@ -263,7 +263,7 @@ export default function Home() {
 
       {/* Trust & Security Section */}
       <section id="security" className="py-24 bg-gradient-to-b from-transparent to-secondary/30 relative">
-        <div className="container mx-auto px-6 px-10">
+        <div className="container mx-auto px-4 md:px-10">
           <div className="glass rounded-[40px] p-8 md:p-16 border border-white/10 shadow-2xl relative overflow-hidden">
             {/* Abstract Security Graphic */}
             <div className="absolute top-0 right-0 h-full w-1/3 opacity-5 pointer-events-none">
@@ -275,7 +275,7 @@ export default function Home() {
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20 text-xs font-bold uppercase tracking-widest">
                   <Lock className="h-3 w-3" /> HIPAA Compliant Infrastructure
                 </div>
-                <h2 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight">Patient Safety is <br /><span className="text-gradient">Our Baseline.</span></h2>
+                <h2 className="text-3xl md:text-5xl font-bold tracking-tight leading-tight">Patient Safety is <br /><span className="text-gradient">Our Baseline.</span></h2>
                 <p className="text-lg text-muted-foreground leading-relaxed">
                   We've built CareFlow on Google Cloud's most advanced security framework. Our dual-agent architecture ensures zero-trust handling of every byte of patient data.
                 </p>
@@ -297,8 +297,8 @@ export default function Home() {
                 </ul>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-4 pt-12">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-4 pt-0 sm:pt-12">
                   <Card className="glass border-none shadow-none p-6 text-center">
                     <Activity className="h-8 w-8 text-primary mx-auto mb-4" />
                     <p className="text-2xl font-bold">100%</p>
@@ -331,19 +331,19 @@ export default function Home() {
       {/* CTA Section */}
       <section className="py-24">
         <div className="container mx-auto px-6">
-          <div className="glass rounded-[40px] p-12 md:p-20 text-center relative overflow-hidden bg-gradient-to-br from-primary/20 to-teal-500/20">
+          <div className="glass rounded-[40px] p-8 md:p-20 text-center relative overflow-hidden bg-gradient-to-br from-primary/20 to-teal-500/20">
             <div className="relative z-10 max-w-2xl mx-auto space-y-8">
-              <h2 className="text-4xl md:text-6xl font-extrabold tracking-tight">Evolve your patient <br /> outcomes today.</h2>
-              <p className="text-xl text-muted-foreground leading-relaxed">
+              <h2 className="text-3xl md:text-6xl font-extrabold tracking-tight">Evolve your patient <br /> outcomes today.</h2>
+              <p className="text-lg text-muted-foreground leading-relaxed">
                 Experience the future of healthcare monitoring. Secure, intelligent, and built for startup-speed innovation in MedTech.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link href="/dashboard">
-                  <Button size="lg" className="rounded-full px-12 h-16 text-xl font-bold bg-primary hover:bg-primary/90 shadow-2xl shadow-primary/30">
+                <Link href="/dashboard" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full sm:w-auto rounded-full px-12 h-16 text-xl font-bold bg-primary hover:bg-primary/90 shadow-2xl shadow-primary/30">
                     Get Started Free
                   </Button>
                 </Link>
-                <Button size="lg" variant="ghost" className="rounded-full px-12 h-16 text-xl font-bold hover:bg-white/5">
+                <Button size="lg" variant="ghost" className="w-full sm:w-auto rounded-full px-12 h-16 text-xl font-bold hover:bg-white/5">
                   Download Spec Sheet
                 </Button>
               </div>
@@ -359,7 +359,7 @@ export default function Home() {
             <HeartPulse className="h-6 w-6 text-primary" />
             <span className="text-xl font-bold tracking-tight">CareFlow</span>
           </div>
-          <div className="flex items-center gap-12 text-sm text-muted-foreground font-medium">
+          <div className="flex flex-col md:flex-row items-center gap-4 md:gap-12 text-sm text-muted-foreground font-medium text-center md:text-left">
             <Link href="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link>
             <Link href="/hipaa-compliance" className="hover:text-primary transition-colors">HIPAA Compliance BAA</Link>
             <Link href="/security" className="hover:text-primary transition-colors">Security Docs</Link>
