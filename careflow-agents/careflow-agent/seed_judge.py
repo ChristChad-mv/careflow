@@ -24,8 +24,10 @@ def seed_data():
     
     # 1. Config Judge
     uid = "user_nurse_sarah"
-    email = "judge-hackaton@careflow.demo"
-    password = "JudgePassword123@"
+    email = "judge-hackathon@careflow.demo"
+    password = os.environ.get("JUDGE_PASSWORD")
+    if not password:
+        raise ValueError("❌ JUDGE_PASSWORD environment variable is required. Set it before running.")
     display_name = "Sarah Johnson, RN"
     hospital_id = "HOSP001"
     
