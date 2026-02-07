@@ -60,7 +60,7 @@ const main = async () => {
         email: "christ.mvoungou@email.com",
         dateOfBirth: "1990-06-25",
         contact: { phone: "+33744533386", preferredMethod: "phone" },
-        assignedNurse: { name: "Sarah Johnson, RN", email: "sarah@hosp1.com", phone: "+15559876543" },
+        assignedNurse: { name: "Sarah Johnson, RN", email: "judge-hackathon@careflow.demo", phone: "+15559876543" },
         dischargePlan: {
             diagnosis: "Type 2 Diabetes",
             dischargeDate: Timestamp.now(),
