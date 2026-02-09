@@ -52,12 +52,14 @@ Hospital readmissions within 30 days of discharge are a critical healthcare chal
 CareFlow Pulse bridges the gap between hospital discharge and full recovery by:
 
 - **Continuous Monitoring**: 24/7 AI-powered patient surveillance
-- **Voice-First Interface**: Natural phone conversations with AI using Twilio + ElevenLabs TTS
-- **Real-Time Database Access**: Direct Firestore integration via MCP toolbox
-- **Intelligent Agent Collaboration**: A2A protocol for seamless task delegation
-- **Proactive Intervention**: Enabling nurse coordinators to act before readmission is necessary
-- **Evidence-Based Care**: Clinical guidelines integrated into AI decision-making
-- **Scalable Platform**: Monitor hundreds of patients without proportionally increasing staff
+- **AHRQ RED Compliant**: Clinical logic strictly follows the Agency for Healthcare Research and Quality's Re-Engineered Discharge toolkit.
+- **Native Multimodal Hearing**: Analyzes raw audio (not just text) to detect clinical biomarkers like dyspnea and cognitive fog.
+- **Voice-First Interface**: Natural phone conversations with AI using Gemini 2.0 Flash + Twilio + ElevenLabs TTS.
+- **Real-Time Database Access**: Direct Firestore integration via MCP toolbox.
+- **Intelligent Agent Collaboration**: A2A protocol for seamless task delegation.
+- **Proactive Intervention**: Enabling nurse coordinators to act before readmission is necessary.
+- **Evidence-Based Care**: Clinical guidelines integrated into AI decision-making.
+- **Scalable Platform**: Monitor hundreds of patients without proportionally increasing staff.
 
 ---
 
@@ -105,11 +107,18 @@ CareFlow Pulse bridges the gap between hospital discharge and full recovery by:
   - get_patient_by_id
   - query_patients_by_diagnosis
   - list_collections
-- **Clinical Decision Support**
-  - Symptom analysis based on medical guidelines
-  - Risk assessment and scoring
-  - Medication interaction checks
-  - Evidence-based recommendations
+- **AHRQ RED Framework Adherence**
+  - Medication reconciliation and adherence tracking
+  - Discharge plan verification (appointments, red flags)
+  - Patient education (Teach-Back) confirmation
+  - Clinical decision support based on RED guidelines
+- **Multimodal Audio Reasoning**
+  - Native audio analysis of call recordings
+  - Detection of "Vocal Biomarkers":
+    - **Dyspnea**: Catching breathing distress between words
+    - **Vocal Tremors**: Signs of pain or neurological distress
+    - **Cognitive Fog**: Monitoring hesitation or confusion
+  - Emotion-aware patient interaction analysis
 
 #### CareFlow Caller Agent (Voice Interface)
 - **Natural Phone Conversations** via Twilio ConversationRelay
@@ -121,13 +130,6 @@ CareFlow Pulse bridges the gap between hospital discharge and full recovery by:
   - Delegates medical queries to CareFlow Pulse Agent
   - Receives structured medical insights
   - Maintains conversation context
-
-### Coming Soon
-- 🤖 Predictive readmission risk scoring with Gemini 3's advanced reasoning
-- 📊 Advanced analytics and trend detection
-- 📱 Mobile app for nurse coordinators (React Native)
-- 🔍 EHR integration (HL7 FHIR)
-- 🖼️ Multimodal support: Photo analysis (wounds, medication compliance) via Gemini 3 Vision
 
 ---
 

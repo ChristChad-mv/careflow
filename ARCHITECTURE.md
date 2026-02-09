@@ -53,11 +53,36 @@ sequenceDiagram
         F-->>D: Real-time update (SSE)
         D->>D: 🚨 UI Flash / Alarm for Nurse
     end
+
+    %% Proactive Retry Logic
+    Note right of P: If unreachable, P schedules<br/>retry via Cloud Tasks
 ```
 
 ---
 
-## 3. The Dual-Agent Logic (A2A Protocol)
+## 3. Proactive Orchestration (Scheduler & Tasks)
+
+CareFlow Pulse is not a passive system. It implements a **Proactive Care Cycle**:
+
+1.  **Google Cloud Scheduler**: Triggers the `Pulse Agent` at 08:00 AM and 19:00 PM daily to initiate "Rounds". 
+2.  **Intelligent Retries**: If a patient doesn't answer or the call fails, the `Pulse Agent` delegates a retry task to **Google Cloud Tasks** with an exponential backoff or specific timing (e.g., "retry in 2 hours").
+3.  **Resilience**: This ensures that every discharged patient is reached, even if they were busy or asleep during the first attempt.
+
+---
+
+## 4. The AHRQ RED Framework
+
+The system's clinical intelligence is grounded in the **Agency for Healthcare Research and Quality (AHRQ) Re-Engineered Discharge (RED)** toolkit. 
+
+The **Pulse Agent** enforces the following RED components:
+- **Medication Reconciliation**: Comparing patient's reported adherence with the discharge plan.
+- **Symptom Education (Teach-Back)**: Verifying the patient knows when to call the doctor.
+- **Upcoming Appointment Confirmation**: Ensuring the patient is prepared for follow-up care.
+- **Red Flag Identification**: Immediate escalation of post-discharge complications.
+
+---
+
+## 5. The Dual-Agent Logic (A2A Protocol)
 
 CareFlow Pulse separates **Cognition** from **Interaction**. This is done using the **Agent-to-Agent (A2A) protocol**.
 
