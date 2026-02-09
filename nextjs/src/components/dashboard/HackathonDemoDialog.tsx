@@ -10,7 +10,8 @@ import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { UserContext } from '@/lib/db';
-import { Loader2, Heart, Activity, Thermometer, Pill, AlertCircle, ClipboardList } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Heart, Activity, Thermometer, Pill, AlertCircle, ClipboardList, Languages } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 
@@ -102,12 +103,24 @@ const SCENARIOS = [
     }
 ];
 
+const LANGUAGES = [
+    { code: 'en', label: 'English', flag: '🇺🇸' },
+    { code: 'fr', label: 'Français', flag: '🇫🇷' },
+    { code: 'es', label: 'Español', flag: '🇪🇸' },
+    { code: 'zh', label: 'Mandarin (中文)', flag: '🇨🇳' },
+    { code: 'ja', label: 'Japanese (日本語)', flag: '🇯🇵' },
+    { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
+    { code: 'ar', label: 'Arabic (العربية)', flag: '🇸🇦' },
+    { code: 'pt', label: 'Português', flag: '🇧🇷' },
+];
+
 export function HackathonDemoDialog({ open, onOpenChange }: HackathonDemoDialogProps) {
     const { data: session } = useSession();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
+    const [language, setLanguage] = useState('en');
     const [scenarioId, setScenarioId] = useState(SCENARIOS[0].id);
 
     const selectedScenario = SCENARIOS.find(s => s.id === scenarioId) || SCENARIOS[0];
@@ -146,7 +159,7 @@ export function HackathonDemoDialog({ open, onOpenChange }: HackathonDemoDialogP
                     phone: phone,
                     preferredMethod: 'phone'
                 },
-                preferredLanguage: 'en',
+                preferredLanguage: language,
                 riskLevel: 'green',
                 status: 'active',
                 hospitalId: (session.user as any).hospitalId || 'HOSP001',
@@ -270,10 +283,32 @@ export function HackathonDemoDialog({ open, onOpenChange }: HackathonDemoDialogP
                                 </div>
                             </div>
 
+                            {/* Language Selection */}
+                            <div className="space-y-2">
+                                <Label htmlFor="demo-language" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                                    <Languages className="h-4 w-4" /> 3. Preferred Language
+                                </Label>
+                                <Select value={language} onValueChange={setLanguage}>
+                                    <SelectTrigger id="demo-language" className="h-12 bg-background border-primary/30 focus:border-primary text-lg shadow-sm">
+                                        <SelectValue placeholder="Select Language" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {LANGUAGES.map((lang) => (
+                                            <SelectItem key={lang.code} value={lang.code} className="text-lg">
+                                                <span className="mr-2">{lang.flag}</span> {lang.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-[14px] text-muted-foreground">
+                                    CareFlow speaks multiple languages natively to ensure every patient feels understood (AHRQ Best Practice).
+                                </p>
+                            </div>
+
                             {/* Scenario Selection */}
                             <div className="space-y-4">
                                 <Label className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                                    <AlertCircle className="h-4 w-4" /> 3. Select Medical Scenario
+                                    <AlertCircle className="h-4 w-4" /> 4. Select Medical Scenario
                                 </Label>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     {SCENARIOS.map((s) => (
