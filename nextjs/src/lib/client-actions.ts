@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase";
-import { doc, updateDoc, collection, addDoc, getDoc, deleteDoc, query, where, getDocs, writeBatch } from "firebase/firestore";
+import { doc, updateDoc, collection, addDoc, getDoc, query, where, getDocs, writeBatch } from "firebase/firestore";
 import { updateAlertSchema, updatePatientSchema } from "@/lib/schemas";
 import { UserContext } from "@/lib/db";
 
