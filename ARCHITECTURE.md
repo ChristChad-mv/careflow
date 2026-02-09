@@ -8,55 +8,8 @@ The system utilizes a specialized **Dual-Agent Architecture** where clinical rea
 
 ## 1. High-Level Blueprint
 
-The following diagram illustrates the macroscopic view of the CareFlow ecosystem, showcasing the integration between Google Cloud, Twilio, and the specialized agents.
-
-```mermaid
-graph TB
-    %% Actors
-    subgraph "Healthcare Professional"
-        Nurse((Nurse <br/>Coordinator))
-    end
-
-    subgraph "Patient Environment"
-        Patient((Patient))
-    end
-
-    %% Web Layer
-    subgraph "Frontend Layer"
-        NextJS[Next.js 16 Dashboard<br/>React 19 + shadcn/ui]
-    end
-
-    %% Agent Layer
-    subgraph "Agentic Intelligence (Cloud Run)"
-        PulseAgent[CareFlow Pulse Agent<br/><b>Gemini 3 Pro</b><br/><i>Medical Brain</i>]
-        CallerAgent[CareFlow Caller Agent<br/><b>Gemini 2.0 Flash</b><br/><i>Voice Engine</i>]
-    end
-
-    %% Data & Infrastructure
-    subgraph "Data & Connectivity"
-        Firestore[(Firestore DB)]
-        MCP[MCP Toolbox<br/>Tooling Integration]
-        CloudTask[Cloud Tasks<br/>Retry Scheduling]
-        Scheduler[Cloud Scheduler<br/>Daily Rounds]
-        Twilio[Twilio / ElevenLabs<br/>Voice & TTS]
-    end
-
-    %% Connections
-    Nurse --- NextJS
-    NextJS ---|SSE / Webhook| PulseAgent
-    PulseAgent ---|A2A Protocol| CallerAgent
-    PulseAgent ---|MCP / Tooling| Firestore
-    PulseAgent ---|REST| CloudTask
-    Scheduler ---|HTTP Trigger| PulseAgent
-    CallerAgent ---|WebSocket| Twilio
-    Twilio ---|Voice Call| Patient
-    
-    %% Styling
-    style PulseAgent fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    style CallerAgent fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    style NextJS fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    style Firestore fill:#fff3e0,stroke:#e65100,stroke-width:2px
-```
+The following diagram illustrates the macroscopic view of the CareFlow ecosystem.
+![CareFlow Architecture Diagram](./careflow.png)
 
 ---
 
@@ -100,18 +53,43 @@ sequenceDiagram
         F-->>D: Real-time update (SSE)
         D->>D: 🚨 UI Flash / Alarm for Nurse
     end
+
+    %% Proactive Retry Logic
+    Note right of P: If unreachable, P schedules<br/>retry via Cloud Tasks
 ```
 
 ---
 
-## 3. The Dual-Agent Logic (A2A Protocol)
+## 3. Proactive Orchestration (Scheduler & Tasks)
+
+CareFlow Pulse is not a passive system. It implements a **Proactive Care Cycle**:
+
+1.  **Google Cloud Scheduler**: Triggers the `Pulse Agent` at 08:00 AM and 19:00 PM daily to initiate "Rounds". 
+2.  **Intelligent Retries**: If a patient doesn't answer or the call fails, the `Pulse Agent` delegates a retry task to **Google Cloud Tasks** with an exponential backoff or specific timing (e.g., "retry in 2 hours").
+3.  **Resilience**: This ensures that every discharged patient is reached, even if they were busy or asleep during the first attempt.
+
+---
+
+## 4. The AHRQ RED Framework
+
+The system's clinical intelligence is grounded in the **Agency for Healthcare Research and Quality (AHRQ) Re-Engineered Discharge (RED)** toolkit. 
+
+The **Pulse Agent** enforces the following RED components:
+- **Medication Reconciliation**: Comparing patient's reported adherence with the discharge plan.
+- **Symptom Education (Teach-Back)**: Verifying the patient knows when to call the doctor.
+- **Upcoming Appointment Confirmation**: Ensuring the patient is prepared for follow-up care.
+- **Red Flag Identification**: Immediate escalation of post-discharge complications.
+
+---
+
+## 5. The Dual-Agent Logic (A2A Protocol)
 
 CareFlow Pulse separates **Cognition** from **Interaction**. This is done using the **Agent-to-Agent (A2A) protocol**.
 
 | Agent | Model | Primary Responsibility | Key Tools |
 | :--- | :--- | :--- | :--- |
 | **Pulse Agent** | Gemini 3 Pro | High-level clinical reasoning, protocol adherence, data management. | MCP Firestore Toolbox, Cloud Tasks Scheduler. |
-| **Caller Agent**| Gemini 2.0 Flash| Low-latency voice interaction, STT/TTS management, empathetic rapport. | Twilio Voice Relay, ElevenLabs TTS. |
+| **Caller Agent** | Gemini 2.0 Flash | Low-latency voice interaction, STT/TTS management, empathetic rapport. | Twilio Voice Relay, ElevenLabs TTS. |
 
 ---
 
@@ -119,9 +97,10 @@ CareFlow Pulse separates **Cognition** from **Interaction**. This is done using 
 
 Unlike traditional systems that analyze **transcripts**, CareFlow Pulse's Gemini 3 Pro listens to the **native audio recording**. This allows the agent to detect signals that text misses:
 
-- **Breathlessness (Dyspnea)**: Detecting signs of respiratory distress between words.
-- **Cognitive Fog**: Measuring hesitation patterns or confusion during medication review.
-- **Mental Health**: Detecting vocal tremors or distress signals missed by text.
+- **Breathlessness (Dyspnea)**: Detecting signs of respiratory distress between words via audible gasping or raspy vocal quality.
+- **Cognitive & Social Context**: Detecting contradictions (background voices disagreeing with the patient) or identifying "cognitive fog" via slurred speech and long hesitations.
+- **Environmental Safety**: Hearing **Medical Alarms** (O2 sensors/ventilator beeps) that the patient may be ignoring, or identifying **Emergency Sounds** like household falls (thuds, glass breaking).
+- **Vocal Biomarkers**: Detecting vocal tremors or pain-induced grunting that signals physical distress despite the patient's verbal claims.
 
 ---
 

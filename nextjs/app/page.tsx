@@ -47,11 +47,6 @@ export default function Home() {
           <div className="flex items-center gap-4">
             <ThemeToggle />
             <Link href="/dashboard">
-              <Button variant="ghost" className="text-muted-foreground hover:text-primary">
-                Login
-              </Button>
-            </Link>
-            <Link href="/dashboard">
               <Button className="hidden md:flex rounded-full px-6 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
                 Experience CareFlow <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
