@@ -167,37 +167,6 @@ careflow/
 └── README.md                 # Central documentation
 ```
 
-### Communication Flow
-
-```
-┌─────────────────┐         ┌──────────────────┐         ┌─────────────────┐
-│                 │         │                  │         │                 │
-│  Nurse Portal   │ ◄─SSE── │  Next.js 16 API  │ ◄─HTTP─►│ CareFlow Pulse  │
-│  (shadcn/ui)    │         │  (API Routes)    │         │ Agent (Gemini 3)│
-│                 │         │                  │         │                 │
-└─────────────────┘         └──────────────────┘         └────────┬────────┘
-                                                                   │
-                                                              A2A  │
-                                                          (JSON-RPC)
-                                                                   │
-┌─────────────────┐         ┌──────────────────┐         ┌────────▼──────────┐
-│                 │         │                  │         │                   │
-│  Patient Phone  │ ◄─Call─►│ Twilio Relay     │ ◄─WS──► │ CareFlow Caller   │
-│                 │         │ + ElevenLabs TTS │         │ Agent (Gemini 2.0)│
-│                 │         │                  │         │                   │
-└─────────────────┘         └──────────────────┘         └───────────────────┘
-                                                                   │
-                                                              MCP  │
-                                                          (Toolbox)│
-                                                                   │
-                                                          ┌────────▼────────┐
-                                                          │                 │
-                                                          │  Firestore DB   │
-                                                          │  (careflow-db)  │
-                                                          │                 │
-                                                          └─────────────────┘
-```
-
 ### Protocol Integrations
 
 **MCP (Model Context Protocol)**:
