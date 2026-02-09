@@ -156,7 +156,7 @@ export function HackathonDemoDialog({ open, onOpenChange }: HackathonDemoDialogP
                 dischargingPhysician: 'Dr. A. Carter',
                 assignedNurse: {
                     name: 'Sarah Johnson, RN',
-                    email: 'judge-hackaton@careflow.demo',
+                    email: 'judge-hackathon@careflow.demo',
                     phone: '+15559876543'
                 },
                 diagnosis: selectedScenario.data.diagnosis,
