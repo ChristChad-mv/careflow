@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 import subprocess
 
 # PRODUCTION URL
-CAREFLOW_AGENT_URL = "https://careflow-agent-gr2rcg7pca-uc.a.run.app"
+# CAREFLOW_AGENT_URL = "https://careflow-agent-gr2rcg7pca-uc.a.run.app"
+CAREFLOW_AGENT_URL = "http://localhost:8080"
 
 def get_identity_token():
     try:
