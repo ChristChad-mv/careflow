@@ -7,7 +7,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from typing import Optional
-from google.cloud.firestore import AsyncClient
+from google.cloud.firestore import AsyncClient, FieldFilter
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ async def create_alert(
         
         # Check for existing active alert for this patient
         alerts_ref = db.collection("alerts")
-        query = alerts_ref.where("patientId", "==", patientId).where("status", "==", "active").limit(1)
+        query = alerts_ref.where(filter=FieldFilter("patientId", "==", patientId)).where(filter=FieldFilter("status", "==", "active")).limit(1)
         active_alerts = await query.get()
         
         alert_doc = {
@@ -57,11 +57,37 @@ async def create_alert(
         }
         
         if active_alerts:
-            # Update existing alert
-            doc_id = active_alerts[0].id
+            # Update existing alert by APPENDING instead of overwriting
+            existing_doc = active_alerts[0]
+            existing_data = existing_doc.to_dict()
+            doc_id = existing_doc.id
+            
+            # Combine triggers if different
+            new_trigger = alert_doc["trigger"]
+            if existing_data.get("trigger") and new_trigger != existing_data.get("trigger"):
+                # Avoid growing the trigger line too much, just add the new core reason
+                alert_doc["trigger"] = f"{existing_data['trigger']} | {new_trigger}"
+            
+            # Append to brief with a clear separator and timestamp
+            timestamp_str = datetime.now(timezone.utc).strftime("%H:%M")
+            existing_brief = existing_data.get("aiBrief", existing_data.get("brief", ""))
+            
+            if existing_brief and alert_doc["aiBrief"] != existing_brief:
+                alert_doc["aiBrief"] = (
+                    f"{existing_brief}\n\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📋 UPDATE [{timestamp_str} UTC]:\n\n"
+                    f"{alert_doc['aiBrief']}"
+                )
+                alert_doc["brief"] = alert_doc["aiBrief"]
+
+            # Escalation logic: if new is critical and old was warning, upgrade
+            if alert_doc["priority"] == "critical" or existing_data.get("priority") == "critical":
+                alert_doc["priority"] = "critical"
+
             await alerts_ref.document(doc_id).update(alert_doc)
-            logger.info(f"✅ Clinical alert updated: {doc_id} for {patientName}")
-            return f"SUCCESS: Alert {doc_id} updated for {patientName}. Priority: {priority}."
+            logger.info(f"✅ Clinical alert appended: {doc_id} for {patientName}")
+            return f"SUCCESS: Alert {doc_id} updated with new observations for {patientName}."
         else:
             # Create new alert
             alert_doc["createdAt"] = datetime.now(timezone.utc)
@@ -141,7 +167,7 @@ async def update_patient_risk(
         elif riskLevel.upper() == "GREEN":
             # Auto-resolve active alerts if state is now SAFE
             alerts_ref = db.collection("alerts")
-            query = alerts_ref.where("patientId", "==", patientId).where("status", "==", "active")
+            query = alerts_ref.where(filter=FieldFilter("patientId", "==", patientId)).where(filter=FieldFilter("status", "==", "active"))
             active_alerts = await query.get()
             
             resolved_count = 0

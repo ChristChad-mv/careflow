@@ -67,11 +67,25 @@ class ModelArmorPlugin(BasePlugin):
     async def after_model_callback(self, callback_context: CallbackContext, llm_response: LlmResponse) -> Optional[LlmResponse]:
         """
         Intercepts model responses to scan for PII/PHI and apply redaction.
+        Preserves function_call parts — only text is scanned/sanitized.
         """
         if not llm_response.content or not llm_response.content.parts:
             return None
-            
-        raw_response = "".join([p.text for p in llm_response.content.parts if hasattr(p, 'text') and p.text])
+        
+        # Separate text parts from non-text parts (function_call, function_response, etc.)
+        text_parts = []
+        non_text_parts = []
+        for p in llm_response.content.parts:
+            if hasattr(p, 'text') and p.text:
+                text_parts.append(p)
+            else:
+                non_text_parts.append(p)
+        
+        has_function_calls = any(
+            hasattr(p, 'function_call') and p.function_call for p in non_text_parts
+        )
+        
+        raw_response = "".join([p.text for p in text_parts])
         if not raw_response.strip():
             return None
 
@@ -79,6 +93,21 @@ class ModelArmorPlugin(BasePlugin):
         sanitize_result = await self.client.sanitize_response(raw_response)
         
         if sanitize_result.get("is_blocked"):
+            if has_function_calls:
+                # CRITICAL: Model Armor blocked the reasoning text, but there are
+                # function_call parts that MUST be preserved (e.g., fetch_daily_schedule).
+                # Drop the blocked text, keep the tool calls intact.
+                logger.warning(
+                    f"Model Armor blocked text for {callback_context.agent_name}, "
+                    f"but preserving {len(non_text_parts)} function_call part(s)"
+                )
+                return LlmResponse(
+                    content=genai_types.Content(
+                        role="model",
+                        parts=non_text_parts
+                    )
+                )
+            
             logger.warning(f"Model Armor BLOCKED response for agent {callback_context.agent_name}: {sanitize_result}")
             return LlmResponse(
                 content=genai_types.Content(
@@ -89,12 +118,13 @@ class ModelArmorPlugin(BasePlugin):
                 )
             )
         
-        # If redacted, return a new response with the sanitized text
+        # If redacted, return sanitized text + preserve all non-text parts
         if sanitize_result.get("sanitized_text") != raw_response:
-             return LlmResponse(
+            sanitized_parts = [genai_types.Part.from_text(text=sanitize_result.get("sanitized_text"))]
+            return LlmResponse(
                 content=genai_types.Content(
                     role="model",
-                    parts=[genai_types.Part.from_text(text=sanitize_result.get("sanitized_text"))]
+                    parts=sanitized_parts + non_text_parts
                 )
             )
 

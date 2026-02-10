@@ -7,7 +7,7 @@ import logging
 import json
 import os
 from datetime import datetime, timezone
-from google.cloud.firestore import AsyncClient, Query
+from google.cloud.firestore import AsyncClient, Query, FieldFilter
 from app.app_utils.retry_utils import get_schedule_slot_key
 
 logger = logging.getLogger(__name__)
@@ -42,9 +42,9 @@ async def fetch_daily_schedule(
         
         # Query active patients for this slot
         patients_ref = db.collection("patients")
-        query = patients_ref.where("hospitalId", "==", hospitalId) \
-                            .where("status", "==", "active") \
-                            .where("scheduleHour", "==", scheduleHour)
+        query = patients_ref.where(filter=FieldFilter("hospitalId", "==", hospitalId)) \
+                            .where(filter=FieldFilter("status", "==", "active")) \
+                            .where(filter=FieldFilter("scheduleHour", "==", scheduleHour))
         
         patients_docs = query.stream()
         
@@ -57,7 +57,7 @@ async def fetch_daily_schedule(
             # 1. Check Completion Status
             interactions_ref = db.collection(f"patients/{p_id}/interactions")
             # Check for interaction with same scheduleSlot
-            todays_interaction = await interactions_ref.where("scheduleSlot", "==", schedule_slot).limit(1).get()
+            todays_interaction = await interactions_ref.where(filter=FieldFilter("scheduleSlot", "==", schedule_slot)).limit(1).get()
             
             status = "completed" if todays_interaction else "pending"
             

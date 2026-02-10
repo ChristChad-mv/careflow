@@ -1,4 +1,6 @@
 import os
+import re
+import time
 import uuid
 import json
 import aiohttp
@@ -8,6 +10,11 @@ from a2a.types import AgentCard, Message, Role, Part, TextPart
 from ..app_utils.config_loader import CAREFLOW_CALLER_URL
 
 logger = logging.getLogger(__name__)
+
+# Dedup: track recently sent tasks to prevent the LLM from double-sending
+# Key: patient_id extracted from task text, Value: timestamp
+_SENT_TASKS: dict[str, float] = {}
+_TASK_DEDUP_WINDOW = 300  # 5 minutes
 
 @task(name="list_remote_agents")
 async def list_remote_agents() -> str:
@@ -49,8 +56,23 @@ async def send_remote_agent_task(task: str, server_url: str = None) -> str:
     """
     try:
         if not server_url:
-            # Use the imported CAREFLOW_CALLER_URL which correctly points to localhost:8000
             server_url = CAREFLOW_CALLER_URL
+
+        # Dedup: extract patient ID from task and check if recently sent
+        patient_id_match = re.search(r'\(ID:\s*([^)]+)\)', task)
+        if patient_id_match:
+            pid = patient_id_match.group(1).strip()
+            now = time.time()
+            # Cleanup stale entries
+            stale = [k for k, ts in _SENT_TASKS.items() if now - ts > _TASK_DEDUP_WINDOW * 2]
+            for k in stale:
+                del _SENT_TASKS[k]
+            # Check dedup
+            if pid in _SENT_TASKS and (now - _SENT_TASKS[pid]) < _TASK_DEDUP_WINDOW:
+                elapsed = int(now - _SENT_TASKS[pid])
+                logger.warning(f"🚫 Duplicate task for patient {pid} blocked ({elapsed}s ago)")
+                return f"Task for patient {pid} already sent {elapsed}s ago. Do NOT send again."
+            _SENT_TASKS[pid] = now
 
         # Generate IDs
         request_id = int(uuid.uuid1().int >> 64)

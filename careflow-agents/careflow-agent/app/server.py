@@ -71,15 +71,19 @@ a2a_subapp = create_a2a_app()
 # Mount A2A app at root (to preserve existing JSON-RPC behavior)
 app.mount("/", a2a_subapp)
 
+# Track already-triggered round slots to prevent Cloud Scheduler double-fires
+_TRIGGERED_SLOTS: set[str] = set()
+
 @app.post("/trigger-rounds")
 async def trigger_rounds(request: Request):
     """
     Endpoint triggered by Cloud Scheduler for daily patient rounds.
     
     Pattern:
-    1. Respond 200 OK immediately (don't block Scheduler)
-    2. Trigger agent in background
-    3. Schedule Cloud Task for retry safety net (15min later)
+    1. Idempotency check — reject duplicate triggers for same slot
+    2. Respond 200 OK immediately (don't block Scheduler)
+    3. Trigger agent in background
+    4. Schedule Cloud Task for retry safety net (15min later)
     
     Payload: { "scheduleHour": 8, "timezone": "...", "environment": "..." }
     """
@@ -94,6 +98,22 @@ async def trigger_rounds(request: Request):
         
         # Get schedule slot key for idempotency
         schedule_slot = get_schedule_slot_key(schedule_hour)
+        
+        # Idempotency guard: reject duplicate triggers for the same slot
+        if schedule_slot in _TRIGGERED_SLOTS:
+            logger.warning(f"⚠️ Duplicate trigger for slot {schedule_slot} — already in progress")
+            return {
+                "status": "already_triggered",
+                "scheduleSlot": schedule_slot,
+                "message": f"Rounds for {schedule_slot} already triggered — ignoring duplicate"
+            }
+        _TRIGGERED_SLOTS.add(schedule_slot)
+        
+        # Cleanup old slots (keep only today's)
+        today_prefix = schedule_slot.split("_")[0]  # "2026-02-10"
+        stale = [s for s in _TRIGGERED_SLOTS if not s.startswith(today_prefix)]
+        for s in stale:
+            _TRIGGERED_SLOTS.discard(s)
         
         # 1. Fire background task (non-blocking)
         asyncio.create_task(trigger_agent_rounds(

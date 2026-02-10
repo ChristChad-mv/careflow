@@ -117,7 +117,6 @@ class CareFlowAgentExecutor(AgentExecutor):
         await event_queue.enqueue_event(working_status)
 
         try:
-            # 3. Ensure session exists in the service before running
             session = await self.runner.session_service.get_session(
                 session_id=contextId,
                 user_id="a2a_caller",
@@ -125,7 +124,7 @@ class CareFlowAgentExecutor(AgentExecutor):
             )
             
             if not session:
-                logger.info(f"Creating new session for context {contextId}")
+                logger.info(f"Creating session for context {contextId}")
                 session = await self.runner.session_service.create_session(
                     session_id=contextId, 
                     user_id="a2a_caller",
@@ -141,7 +140,7 @@ class CareFlowAgentExecutor(AgentExecutor):
                 elif part.root.kind == "file":
                     file_data = part.root.file
                     if hasattr(file_data, "bytes"):
-                        # Inline data (base64)
+                        # Inline audio/file data (base64) — sent by Caller Agent or eval
                         gemini_parts.append(genai_types.Part.from_bytes(
                             data=base64.b64decode(file_data.bytes),
                             mime_type=file_data.mime_type or "application/octet-stream"
