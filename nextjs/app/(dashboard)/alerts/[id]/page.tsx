@@ -178,9 +178,17 @@ export default function AlertDetailPage() {
                             </CardTitle>
                             <CardDescription>Automated insights based on patient history and interaction.</CardDescription>
                         </CardHeader>
-                        <CardContent className="prose prose-sm max-w-none bg-muted/30 p-4 rounded-md">
+                        <CardContent className="bg-muted/30 p-6 rounded-md">
                             {alert.brief ? (
-                                <p>{alert.brief}</p>
+                                <div className="space-y-4">
+                                    {alert.brief.split('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━').map((section: string, idx: number) => (
+                                        <div key={idx} className={`prose prose-sm max-w-none text-foreground whitespace-pre-line leading-relaxed ${
+                                            idx > 0 ? 'border-t-2 border-border pt-4 mt-4' : ''
+                                        }`}>
+                                            {section.trim()}
+                                        </div>
+                                    ))}
+                                </div>
                             ) : (
                                 <p className="text-muted-foreground italic">No detailed AI brief available for this alert.</p>
                             )}
