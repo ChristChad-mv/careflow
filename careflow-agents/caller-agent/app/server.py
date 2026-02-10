@@ -24,12 +24,15 @@ Version: 1.0.0
 
 import os
 import json
+import base64
 import argparse
 import logging
 import aiohttp
+import requests as sync_requests
 from datetime import datetime
 from typing import Optional
 from urllib.parse import quote
+from requests.auth import HTTPBasicAuth
 
 from google.auth.transport.requests import Request as GoogleRequest
 from google.oauth2 import id_token
@@ -163,6 +166,15 @@ a2a_app = setup_a2a()
 
 
 # =============================================================================
+# DEDUPLICATION GUARDS
+# =============================================================================
+
+# Track Call SIDs already processed by call-status to prevent double CALL_COMPLETE
+_PROCESSED_CALLS: set[str] = set()
+_PROCESSED_CALLS_MAX = 500  # Prevent unbounded growth
+
+
+# =============================================================================
 # TWILIO TWIML ENDPOINT
 # =============================================================================
 
@@ -274,6 +286,18 @@ async def call_status_endpoint(request: Request):
 
     # 2. Handle "Completed" event (Successful call finished)
     elif call_status == "completed":
+        # Dedup: prevent double-processing if Twilio retries the webhook
+        dedup_key = f"{call_sid}:completed"
+        if dedup_key in _PROCESSED_CALLS:
+            logger.warning(f"⚠️ Duplicate call-status 'completed' for {call_sid} — ignoring")
+            return Response(status_code=200)
+        _PROCESSED_CALLS.add(dedup_key)
+        if len(_PROCESSED_CALLS) > _PROCESSED_CALLS_MAX:
+            # Trim oldest half (set is unordered, but that's fine for dedup)
+            to_remove = list(_PROCESSED_CALLS)[:_PROCESSED_CALLS_MAX // 2]
+            for k in to_remove:
+                _PROCESSED_CALLS.discard(k)
+        
         try:
             import uuid
             msg_id = str(uuid.uuid4())
@@ -283,6 +307,83 @@ async def call_status_endpoint(request: Request):
                 f"Call SID: {call_sid}. Analyze the audio."
             )
             
+            # ─── APPROACH A: Fetch audio HERE and send it inline ───
+            # The Caller Agent owns Twilio credentials. We fetch the recording
+            # and attach it as a FilePart so the Pulse Agent's Gemini 3 receives
+            # text + audio in a single turn — exactly like eval.py does.
+            message_parts = [{"text": instruction_text, "kind": "text"}]
+            
+            acc_sid = os.environ.get("TWILIO_ACCOUNT_SID")
+            auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
+            audio_attached = False
+            
+            if acc_sid and auth_token:
+                try:
+                    # 1. Find recordings for this call (with retry — Twilio may need time to finalize)
+                    import time as _time
+                    rec_url = f"https://api.twilio.com/2010-04-01/Accounts/{acc_sid}/Calls/{call_sid}/Recordings.json"
+                    
+                    recordings = []
+                    for attempt in range(4):  # Try up to 4 times (0s, 5s, 10s, 15s = ~30s total)
+                        if attempt > 0:
+                            wait = attempt * 5
+                            logger.info(f"⏳ Recording not ready, waiting {wait}s before retry #{attempt}...")
+                            _time.sleep(wait)
+                        
+                        rec_resp = sync_requests.get(rec_url, auth=HTTPBasicAuth(acc_sid, auth_token), timeout=15)
+                        rec_resp.raise_for_status()
+                        recordings = rec_resp.json().get("recordings", [])
+                        
+                        if recordings and recordings[0].get("status") == "completed":
+                            break
+                        elif recordings:
+                            logger.info(f"📼 Recording found but status={recordings[0].get('status')}, waiting...")
+                            recordings = []  # Not ready yet
+                    
+                    if recordings:
+                        # 2. Download the raw audio (with retry for 404)
+                        audio_dl_url = f"https://api.twilio.com/2010-04-01/Accounts/{acc_sid}/Recordings/{recordings[0]['sid']}.wav"
+                        
+                        audio_resp = None
+                        for dl_attempt in range(3):
+                            if dl_attempt > 0:
+                                _time.sleep(5)
+                                logger.info(f"⏳ Audio download retry #{dl_attempt}...")
+                            
+                            audio_resp = sync_requests.get(audio_dl_url, auth=HTTPBasicAuth(acc_sid, auth_token), timeout=60)
+                            if audio_resp.status_code == 200:
+                                break
+                            logger.warning(f"⚠️ Audio download attempt #{dl_attempt}: HTTP {audio_resp.status_code}")
+                        
+                        audio_resp.raise_for_status()
+                        
+                        # 3. Encode and attach as FilePart (same format as eval.py)
+                        audio_b64 = base64.b64encode(audio_resp.content).decode('utf-8')
+                        message_parts.append({
+                            "kind": "file",
+                            "file": {
+                                "bytes": audio_b64,
+                                "mimeType": "audio/wav"
+                            }
+                        })
+                        audio_attached = True
+                        logger.info(f"🎙️ Audio attached inline for {call_sid} ({len(audio_resp.content)} bytes)")
+                    else:
+                        logger.warning(f"⚠️ No recordings found yet for {call_sid}")
+                        message_parts.append({"text": f"\n[AUDIO_UNAVAILABLE: No recording found yet for Call SID {call_sid}. The recording may not be ready. Do NOT hallucinate an analysis — report that audio was unavailable.]", "kind": "text"})
+                except Exception as audio_err:
+                    logger.error(f"❌ Audio pre-fetch failed for {call_sid}: {audio_err}")
+                    message_parts.append({"text": f"\n[AUDIO_UNAVAILABLE: Failed to download recording for Call SID {call_sid}. Do NOT hallucinate an analysis — report that audio was unavailable.]", "kind": "text"})
+            else:
+                logger.warning("⚠️ Twilio credentials not available for audio fetch")
+                message_parts.append({"text": f"\n[AUDIO_UNAVAILABLE: Twilio credentials not configured. Do NOT hallucinate an analysis — report that audio was unavailable.]", "kind": "text"})
+            
+            if audio_attached:
+                logger.info(f"✅ Sending CALL_COMPLETE + inline audio to Pulse Agent for {patient_name}")
+            else:
+                logger.warning(f"⚠️ Sending CALL_COMPLETE WITHOUT audio to Pulse Agent for {patient_name} (fallback mode)")
+            # ─── END APPROACH A ───
+            
             payload = {
                 "jsonrpc": "2.0",
                 "method": "message/stream",
@@ -290,11 +391,12 @@ async def call_status_endpoint(request: Request):
                     "message": {
                         "messageId": msg_id,
                         "role": "user",
-                        "parts": [{"text": instruction_text, "kind": "text"}],
+                        "parts": message_parts,
                         "metadata": {
                             "task": "analyze_call_audio",
                             "call_sid": call_sid,
-                            "source": "telephony_webhook"
+                            "source": "telephony_webhook",
+                            "audio_attached": audio_attached
                         }
                     }
                 },
@@ -323,6 +425,13 @@ async def call_status_endpoint(request: Request):
     
     # 3. Handle Failed States (busy, no-answer, failed)
     elif call_status in ["busy", "no-answer", "failed"]:
+        # Dedup: prevent double-processing
+        dedup_key = f"{call_sid}:{call_status}"
+        if dedup_key in _PROCESSED_CALLS:
+            logger.warning(f"⚠️ Duplicate call-status '{call_status}' for {call_sid} — ignoring")
+            return Response(status_code=200)
+        _PROCESSED_CALLS.add(dedup_key)
+        
         logger.warning(f"⚠️ Call {call_status} for patient {patient_name} ({patient_id})")
         
         try:

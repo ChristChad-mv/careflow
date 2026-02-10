@@ -29,11 +29,20 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 # In-memory cache for call deduplication
-_CALL_CACHE: Dict[str, float] = {}
+# Key: patient_id, Value: (timestamp, call_sid)
+_CALL_CACHE: Dict[str, tuple[float, str]] = {}
 _CALL_LOCK = asyncio.Lock()
 
-# Deduplication window in seconds (configurable via env)
-CALL_DEDUP_WINDOW = int(os.environ.get("CALL_DEDUP_WINDOW_SECONDS", "60"))
+# Deduplication window — must cover a full call (default 10 min)
+CALL_DEDUP_WINDOW = int(os.environ.get("CALL_DEDUP_WINDOW_SECONDS", "600"))
+
+
+def _cleanup_stale_cache():
+    """Remove cache entries older than 2x the dedup window."""
+    cutoff = time.time() - (CALL_DEDUP_WINDOW * 2)
+    stale = [k for k, (ts, _) in _CALL_CACHE.items() if ts < cutoff]
+    for k in stale:
+        del _CALL_CACHE[k]
 
 
 def _extract_retry_count(message: str) -> int:
@@ -117,20 +126,21 @@ async def call_patient(
         
         # Deduplication check
         async with _CALL_LOCK:
+            _cleanup_stale_cache()
             current_time = time.time()
-            last_call_time = _CALL_CACHE.get(patient_id, 0)
+            cached = _CALL_CACHE.get(patient_id)
             
-            if current_time - last_call_time < CALL_DEDUP_WINDOW:
-                elapsed = int(current_time - last_call_time)
-                logger.info(f"Duplicate call blocked for {patient_name} ({elapsed}s ago)")
+            if cached and (current_time - cached[0]) < CALL_DEDUP_WINDOW:
+                elapsed = int(current_time - cached[0])
+                logger.info(f"🚫 Duplicate call blocked for {patient_name} ({elapsed}s ago, SID: {cached[1]})")
                 return (
                     f"SUCCESS: Call to {patient_name} is ALREADY IN PROGRESS "
-                    f"(initiated {elapsed}s ago). DO NOT call again. "
+                    f"(initiated {elapsed}s ago, SID: {cached[1]}). DO NOT call again. "
                     "Wait for patient response via WebSocket."
                 )
             
-            # Mark call as initiated
-            _CALL_CACHE[patient_id] = current_time
+            # Mark call as initiated (SID filled after Twilio creates it)
+            _CALL_CACHE[patient_id] = (current_time, "pending")
         
         # Create Twilio call
         logger.info(f"Initiating call to {patient_name} ({to_number})")
@@ -171,6 +181,10 @@ async def call_patient(
         )
         
         logger.info(f"Call created asynchronously - SID: {call.sid} (Recording: Enabled)")
+        
+        # Update cache with actual SID
+        async with _CALL_LOCK:
+            _CALL_CACHE[patient_id] = (time.time(), call.sid)
         
         return (
             f"SYSTEM: Call initiated (SID: {call.sid}). "
