@@ -1,4 +1,4 @@
-# 🏥 CareFlow Pulse - Frontend Dashboard
+# 🏥 CareFlow Pulse - Frontend Dashboard  
 
 The command center for **CareFlow Pulse**, a production-grade healthcare monitoring system designed for the **Gemini 3 Hackathon**. This Next.js application provides nurse coordinators with real-time patient insights, clinical alerts, and a dedicated interactive demo mode.
 
