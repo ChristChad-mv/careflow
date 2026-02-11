@@ -147,11 +147,20 @@ async def update_patient_risk(
         logger.info(f"✅ Patient {patientId} risk updated to {riskLevel}")
         
         # 3. Handle Alerts (Automatic Orchestration)
-        if riskLevel.upper() in ["YELLOW", "RED", "WARNING", "CRITICAL"]:
+        if riskLevel.upper() in ["GREEN", "SAFE", "YELLOW", "RED", "WARNING", "CRITICAL"]:
             # Priority mapping
-            priority = "critical" if riskLevel.upper() in ["RED", "CRITICAL"] else "warning"
+            priority_map = {
+                "RED": "critical",
+                "CRITICAL": "critical",
+                "YELLOW": "warning",
+                "WARNING": "warning",
+                "GREEN": "safe",
+                "SAFE": "safe"
+            }
+            priority = priority_map.get(riskLevel.upper(), "warning")
+            
             # Effective trigger fallback
-            effective_trigger = trigger if trigger else f"Risk increased to {riskLevel}: {aiBrief[:50]}..."
+            effective_trigger = trigger if trigger else f"Risk status: {riskLevel}. Observation: {aiBrief[:50]}..."
             
             alert_response = await create_alert(
                 hospitalId=hospital_id,
@@ -162,27 +171,10 @@ async def update_patient_risk(
                 brief=aiBrief,
                 callSid=callSid
             )
+            
+            # Special case for GREEN: If we just created/updated a 'safe' alert, 
+            # we might still want to call out that no action is needed.
             return f"SUCCESS: Risk updated to {riskLevel}. Alert synced: {alert_response}"
-            
-        elif riskLevel.upper() == "GREEN":
-            # Auto-resolve active alerts if state is now SAFE
-            alerts_ref = db.collection("alerts")
-            query = alerts_ref.where(filter=FieldFilter("patientId", "==", patientId)).where(filter=FieldFilter("status", "==", "active"))
-            active_alerts = await query.get()
-            
-            resolved_count = 0
-            for doc in active_alerts:
-                await doc.reference.update({
-                    "status": "resolved",
-                    "resolvedAt": datetime.now(timezone.utc),
-                    "resolutionNote": f"Auto-resolved by Pulse Agent (Risk set to GREEN). Brief: {aiBrief}"
-                })
-                resolved_count += 1
-            
-            msg = f"SUCCESS: Patient {patientId} risk updated to GREEN."
-            if resolved_count > 0:
-                msg += f" {resolved_count} alert(s) auto-resolved."
-            return msg
             
         return f"SUCCESS: Patient {patientId} risk updated to {riskLevel}."
         

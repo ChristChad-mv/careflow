@@ -11,7 +11,7 @@ The **CareFlow Caller Agent** handles all real-time voice interactions with pati
   - **Outbound**: Executes structured **AHRQ RED Protocol** interviews for post-discharge follow-ups.
   - **Inbound**: Identifies patients calling in and provides personalized assistance via A2A lookup.
 - **📞 Twilio ConversationRelay**: Uses WebSocket streaming for real-time bidirectional audio.
-- **🎙️ Call Recording v3.4**: Records all calls and sends the `CallSid` to the Pulse Agent for multimodal analysis (Audio-First Reporting).
+- **🎙️ Audio-First Capture**: Captured call recordings are fetched directly by the agent, converted to high-fidelity bitstreams, and transmitted to the Pulse Agent for sub-second multimodal audit (Clinical "Hearing").
 - **🔗 A2A Delegation**: Seamlessly hands off complex medical queries to the Pulse Agent (Medical Brain).
 
 ## 🏗️ Architecture

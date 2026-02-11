@@ -45,6 +45,13 @@ class ModelArmorClient:
                 logger.error("Neither MODEL_ARMOR_TEMPLATE nor GOOGLE_CLOUD_PROJECT is set")
                 self.template_name = None
         
+        # Check for explicit disable
+        if os.environ.get("MODEL_ARMOR_DISABLED", "false").lower() == "true":
+            self.is_disabled = True
+            self.client = None
+            logger.warning("⚠️ Model Armor is explicitly DISABLED by configuration. No PII/PHI protection active.")
+            return
+
         # Initialize client
         if modelarmor_v1 and self.template_name:
             try:
@@ -78,6 +85,9 @@ class ModelArmorClient:
                 - invocation_result (str): Result status from Model Armor
                 - error (str): Error message if scan failed
         """
+        if getattr(self, 'is_disabled', False):
+            return {"is_blocked": False, "invocation_result": "SKIPPED_BY_CONFIG", "filter_results": {}}
+
         if not self.client or not self.template_name:
             logger.error("Model Armor client not available - Fail-Closed: Blocking prompt")
             return {"is_blocked": True, "error": "Model Armor client not initialized"}
@@ -105,10 +115,22 @@ class ModelArmorClient:
             result = {
                 "is_blocked": is_blocked,
                 "invocation_result": sanitization_result.invocation_result.name,
+                "filter_results": {}
             }
             
             if is_blocked:
-                logger.warning(f"🚨 Model Armor BLOCKED prompt")
+                # Log the filter results for debugging
+                filter_info = {}
+                if hasattr(sanitization_result, 'filter_results'):
+                    try:
+                        # Attempt to get a readable dict of results
+                        for name, res in sanitization_result.filter_results.items():
+                            filter_info[name] = str(res)
+                    except Exception:
+                        filter_info = "could not parse filter results"
+                
+                logger.warning(f"🚨 Model Armor BLOCKED prompt. Filter Results: {filter_info}")
+                result["filter_results"] = filter_info
             else:
                 logger.debug(f"✅ Model Armor prompt scan passed")
             
@@ -131,6 +153,9 @@ class ModelArmorClient:
                 - invocation_result (str): Result status
                 - redactions_applied (list): List of filter names that matched
         """
+        if getattr(self, 'is_disabled', False):
+             return {"is_blocked": False, "sanitized_text": text, "invocation_result": "SKIPPED_BY_CONFIG", "redactions_applied": []}
+
         if not self.client or not self.template_name:
             logger.error("Model Armor client not available - Fail-Closed: Blocking response")
             return {"is_blocked": True, "sanitized_text": "[REDACTED]", "error": "Model Armor client not initialized"}

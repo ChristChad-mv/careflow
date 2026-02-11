@@ -51,6 +51,16 @@ inspector:
 deploy:
 	PROJECT_ID=$$(gcloud config get-value project) && \
 	PROJECT_NUMBER=$$(gcloud projects describe $$PROJECT_ID --format="value(projectNumber)") && \
+	GOOGLE_API_KEY=$$(grep '^GOOGLE_API_KEY=' .env | cut -d= -f2-) && \
+	TWILIO_ACCOUNT_SID=$$(grep '^TWILIO_ACCOUNT_SID=' .env | cut -d= -f2-) && \
+	TWILIO_AUTH_TOKEN=$$(grep '^TWILIO_AUTH_TOKEN=' .env | cut -d= -f2-) && \
+	AGENT_MODEL=$$(grep '^AGENT_MODEL=' .env | cut -d= -f2-) && \
+	CAREFLOW_CALLER_URL=$$(grep '^CAREFLOW_CALLER_URL=' .env | cut -d= -f2-) && \
+	FIRESTORE_DATABASE_ID=$$(grep '^FIRESTORE_DATABASE_ID=' .env | cut -d= -f2-) && \
+	MODEL_ARMOR_TEMPLATE=$$(grep '^MODEL_ARMOR_TEMPLATE=' .env | cut -d= -f2-) && \
+	MCP_TOOLBOX_URL=$$(grep '^MCP_TOOLBOX_URL=' .env | cut -d= -f2-) && \
+	JUDGE_PASSWORD=$$(grep '^JUDGE_PASSWORD=' .env | cut -d= -f2-) && \
+	MODEL_ARMOR_DISABLED=$$(grep '^MODEL_ARMOR_DISABLED=' .env | cut -d= -f2-) && \
 	gcloud beta run deploy careflow-agent \
 		--source . \
 		--memory "4Gi" \
@@ -61,7 +71,7 @@ deploy:
 		--labels "" \
 		--update-build-env-vars "AGENT_VERSION=$(shell awk -F'\"' '/^version = / {print $$2}' pyproject.toml || echo '0.0.0')" \
 		--update-env-vars \
-		"COMMIT_SHA=$(shell git rev-parse HEAD),APP_URL=https://careflow-agent-gr2rcg7pca-uc.a.run.app"
+		"COMMIT_SHA=$(shell git rev-parse HEAD),APP_URL=https://careflow-agent-gr2rcg7pca-uc.a.run.app,GOOGLE_API_KEY=$$GOOGLE_API_KEY,TWILIO_ACCOUNT_SID=$$TWILIO_ACCOUNT_SID,TWILIO_AUTH_TOKEN=$$TWILIO_AUTH_TOKEN,AGENT_MODEL=$$AGENT_MODEL,CAREFLOW_CALLER_URL=$$CAREFLOW_CALLER_URL,FIRESTORE_DATABASE_ID=$$FIRESTORE_DATABASE_ID,MODEL_ARMOR_TEMPLATE=$$MODEL_ARMOR_TEMPLATE,MODEL_ARMOR_DISABLED=$$MODEL_ARMOR_DISABLED,MCP_TOOLBOX_URL=$$MCP_TOOLBOX_URL,JUDGE_PASSWORD=$$JUDGE_PASSWORD,GOOGLE_CLOUD_PROJECT=$$PROJECT_ID,GOOGLE_CLOUD_LOCATION=us-central1,GOOGLE_GENAI_USE_VERTEXAI=False"
 
 # ==============================================================================
 # Testing & Code Quality

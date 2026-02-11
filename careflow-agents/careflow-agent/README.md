@@ -7,7 +7,7 @@ The **CareFlow Pulse Agent** is the analytical brain of the platform. Built with
 ## ✨ Key Capabilities
 
 - **🧠 Advanced Medical Reasoning**: Leveraging **Gemini 3 Pro** to analyze complex clinical data, identify risk factors, and generate evidence-based recommendations.
-- **🎙️ Audio-First Analysis**: Fetches raw call recordings from Twilio and uses Gemini 3's **native multimodal capabilities** to analyze tone, sentiment, and distress signals directly from audio.
+- **🎙️ Audio-First Deep Audit**: Receives high-fidelity raw audio bitstreams via A2A handoff. Uses Gemini 3's **native multimodal hearing** to detect vocal biomarkers (dyspnea, slurred speech) and environmental clinical alarms.
 - **🔄 A2A Orchestration**: Coordinates with the **Caller Agent** via the Agent-to-Agent (A2A) protocol. It delegates patient interview tasks ("outbound rounds") and handles inbound queries.
 - **🏥 Hospital-Scoped Security**: Enforces strict data isolation by `hospitalId`.
 - **🔌 MCP Integration**: Uses the **Model Context Protocol Toolbox for Databases** to interact safely with the Firestore database (CRUD operations, logging, alerts).

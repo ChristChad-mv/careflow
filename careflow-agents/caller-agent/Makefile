@@ -100,6 +100,14 @@ build-inspector-if-needed:
 deploy:
 	PROJECT_ID=$$(gcloud config get-value project) && \
 	PROJECT_NUMBER=$$(gcloud projects describe $$PROJECT_ID --format="value(projectNumber)") && \
+	GOOGLE_API_KEY=$$(grep '^GOOGLE_API_KEY=' .env | cut -d= -f2-) && \
+	TWILIO_ACCOUNT_SID=$$(grep '^TWILIO_ACCOUNT_SID=' .env | cut -d= -f2-) && \
+	TWILIO_AUTH_TOKEN=$$(grep '^TWILIO_AUTH_TOKEN=' .env | cut -d= -f2-) && \
+	TWILIO_PHONE_NUMBER=$$(grep '^TWILIO_PHONE_NUMBER=' .env | cut -d= -f2-) && \
+	MODEL_ARMOR_TEMPLATE=$$(grep '^MODEL_ARMOR_TEMPLATE=' .env | cut -d= -f2-) && \
+	CAREFLOW_AGENT_URL=$$(grep '^CAREFLOW_AGENT_URL=' .env | cut -d= -f2-) && \
+	PUBLIC_URL=$$(grep '^PUBLIC_URL=' .env | cut -d= -f2-) && \
+	MODEL_ARMOR_DISABLED=$$(grep '^MODEL_ARMOR_DISABLED=' .env | cut -d= -f2-) && \
 	gcloud beta run deploy caller-agent \
 		--source . \
 		--memory "4Gi" \
@@ -110,7 +118,7 @@ deploy:
 		--labels "" \
 		--update-build-env-vars "AGENT_VERSION=$(shell awk -F'"' '/^version = / {print $$2}' pyproject.toml || echo '0.0.0')" \
 		--update-env-vars \
-		"COMMIT_SHA=$(shell git rev-parse HEAD),APP_URL=https://caller-agent-gr2rcg7pca-uc.a.run.app" \
+		"COMMIT_SHA=$(shell git rev-parse HEAD),APP_URL=https://caller-agent-76098664470.us-central1.run.app,GOOGLE_API_KEY=$$GOOGLE_API_KEY,TWILIO_ACCOUNT_SID=$$TWILIO_ACCOUNT_SID,TWILIO_AUTH_TOKEN=$$TWILIO_AUTH_TOKEN,TWILIO_PHONE_NUMBER=$$TWILIO_PHONE_NUMBER,GOOGLE_CLOUD_PROJECT=$$PROJECT_ID,MODEL_ARMOR_TEMPLATE=$$MODEL_ARMOR_TEMPLATE,MODEL_ARMOR_DISABLED=$$MODEL_ARMOR_DISABLED,CAREFLOW_AGENT_URL=$$CAREFLOW_AGENT_URL,PUBLIC_URL=$$PUBLIC_URL,GOOGLE_CLOUD_LOCATION=us-central1,GOOGLE_GENAI_USE_VERTEXAI=False" \
 		$(if $(IAP),--iap) \
 		$(if $(PORT),--port=$(PORT))
 

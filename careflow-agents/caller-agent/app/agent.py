@@ -379,19 +379,18 @@ class CallerAgent:
                         yield content
             
             # --- MODEL ARMOR OUTPUT SCAN (Audit & Sanitize) ---
-            # NOTE: DISABLED for Caller Agent (Tier 1 Security) to optimize latency for voice.
-            # We trust the Gemini 2.0 Flash generation for outgoing messages.
-            #
-            # logger.info("🔍 Model Armor auditing caller response for PII/PHI...")
-            # sanitization_result = await model_armor_client.sanitize_response(full_response)
-            #
-            # if sanitization_result.get("is_blocked"):
-            #     logger.error("🚨 Model Armor BLOCKED entire response - critical safety issue detected")
-            # elif sanitization_result.get("redactions_applied"):
-            #     redacted = sanitization_result.get("redactions_applied", [])
-            #     logger.warning(f"🔒 Model Armor applied redactions: {', '.join(redacted)}")
-            # else:
-            #     logger.debug("✅ Model Armor output scan passed (no PHI detected)")
+            # NOTE: We audit the full response for PII/PHI to ensure compliance.
+            # While chunks are streamed for low latency, this audit provides a safety trail.
+            logger.info("🔍 Model Armor auditing caller response for PII/PHI...")
+            sanitization_result = await model_armor_client.sanitize_response(full_response)
+            
+            if sanitization_result.get("is_blocked"):
+                logger.error("🚨 Model Armor BLOCKED entire response - critical safety issue detected")
+            elif sanitization_result.get("redactions_applied"):
+                redacted = sanitization_result.get("redactions_applied", [])
+                logger.warning(f"🔒 Model Armor detected PHI/Sensitive data: {', '.join(redacted)}")
+            else:
+                logger.info("✅ Model Armor output scan passed (no PHI detected)")
             # --------------------------------------------------
 
             logger.info(f"Agent response for session {session_id}: {full_response[:100]}...")

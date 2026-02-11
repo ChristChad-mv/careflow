@@ -69,8 +69,6 @@ def create_a2a_app():
 a2a_subapp = create_a2a_app()
 
 # Mount A2A app at root (to preserve existing JSON-RPC behavior)
-app.mount("/", a2a_subapp)
-
 # Track already-triggered round slots to prevent Cloud Scheduler double-fires
 _TRIGGERED_SLOTS: set[str] = set()
 
@@ -139,18 +137,13 @@ async def trigger_rounds(request: Request):
 
 
 @app.post("/retry-rounds")
+@app.post("/retry-call")
 async def retry_rounds(request: Request):
     """
-    Endpoint triggered by Cloud Tasks for individual patient retry.
+    Endpoint triggered by Cloud Tasks for individual patient retry or slot safety net.
+    Handles both /retry-rounds and /retry-call.
     
     Receives: {patientId, retryCount, scheduleSlot, reason, scheduleHour}
-    
-    Flow:
-    1. Check if retryCount >= MAX_RETRIES (3)
-        - If yes: Create CRITICAL alert, stop retrying
-        - If no: Trigger agent to call this specific patient
-    2. Agent (Workflow 6) will fetch patient and send to Caller Agent
-    3. If call fails again, Caller Agent schedules new task with retryCount+1
     """
     import asyncio
     
@@ -158,24 +151,31 @@ async def retry_rounds(request: Request):
         payload = await request.json()
         logger.info(f"🔄 Retry Trigger Received: {json.dumps(payload)}")
         
-        # Extract required fields
+        # Extract fields
         patient_id = payload.get("patientId")
-        if not patient_id:
-            logger.error("❌ Missing patientId in retry payload")
-            return {"status": "error", "message": "patientId is required"}
-        
         retry_count = payload.get("retryCount", 1)
         schedule_slot = payload.get("scheduleSlot")
         schedule_hour = payload.get("scheduleHour")
-        reason = payload.get("reason", "unknown")
+        reason = payload.get("reason", payload.get("action", "unknown"))
         
+        # Case A: Safety net for the whole slot (no patientId)
+        if not patient_id:
+            logger.info(f"🛡️ Running safety net for slot {schedule_slot}")
+            asyncio.create_task(trigger_agent_rounds(
+                root_agent,
+                schedule_hour or 8,
+                schedule_slot,
+                retry_mode=True
+            ))
+            return {"status": "safety_net_triggered", "scheduleSlot": schedule_slot}
+        
+        # Case B: Specific patient retry
         logger.info(f"📞 Retry for patient {patient_id} (attempt #{retry_count})")
         
         # Check retry limit
         MAX_RETRIES = 3
         if retry_count >= MAX_RETRIES:
             logger.warning(f"⚠️ Max retries ({MAX_RETRIES}) reached for {patient_id}")
-            # Create CRITICAL alert - nurse must call manually
             await _create_max_retry_alert(patient_id, schedule_slot, retry_count)
             return {
                 "status": "max_retries_reached",
@@ -184,7 +184,7 @@ async def retry_rounds(request: Request):
                 "action": "critical_alert_created"
             }
         
-        # Trigger single patient call via agent (Workflow 6)
+        # Trigger single patient call via agent
         prompt = (
             f"RETRY_PATIENT: Call patient ID {patient_id} now. "
             f"This is retry attempt #{retry_count}. Schedule slot: {schedule_slot}. "
@@ -203,6 +203,15 @@ async def retry_rounds(request: Request):
     except Exception as e:
         logger.error(f"❌ Error processing retry trigger: {e}", exc_info=True)
         return {"status": "error", "message": str(e)}
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "agent": AGENT_NAME}
+
+
+# Mount A2A sub-app AFTER defining specialized routes to avoid shadowing
+app.mount("/", a2a_subapp)
 
 
 async def _create_max_retry_alert(patient_id: str, schedule_slot: str, retry_count: int):
