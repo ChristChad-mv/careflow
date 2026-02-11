@@ -3,8 +3,8 @@
 | | |
 | :--- | :--- |
 | **Document Version:** | 2.0 |
-| **Date:** | 2026-01-04 |
-| **Status:** | **Draft** |
+| **Date:** | 2026-02-11 |
+| **Status:** | **Official** |
 | **Author:** | Christ |
 
 ---
@@ -107,7 +107,7 @@ The RED consists of 12 mutually reinforcing actions that the hospital undertakes
 
 | # | Component | CareFlow Implementation |
 | :--- | :--- | :--- |
-| 1 | Ascertain need for and obtain language assistance | Future (v1.3) |
+| 1 | Ascertain need for and obtain language assistance | ✅ **Natively supported** (Gemini Multilingual) |
 | 2 | Make appointments for followup care | ✅ Verified during call |
 | 3 | Plan for followup of pending test results | Dashboard alerts |
 | 4 | Organize postdischarge services & medical equipment | ✅ Education during call |
@@ -298,3 +298,6 @@ This section outlines four specific scenarios demonstrating how CareFlow Pulse h
 | **FS-2.1** | **Real-Time Dashboard** | Displays patients sorted by Risk (Red top). Updates instantly when the Agent finishes a call. |
 | **FS-2.2** | **"Take Ownership"** | Nurse Sarah clicks to acknowledge an alert. This changes the status from "New" to "In Progress," letting the team know she is handling it. |
 | **FS-2.3** | **Audio & Transcript Access** | Nurse can replay the specific conversation segment where the patient reported the issue to verify context before calling. |
+
+---
+*CareFlow Pulse: Re-engineering the discharge process through intelligent AI orchestration.*

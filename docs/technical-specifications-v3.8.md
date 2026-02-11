@@ -3,8 +3,8 @@
 | | |
 | :--- | :--- |
 | **Document Version:** | 3.8 |
-| **Date:** | 2026-01-24 |
-| **Status:** | **Current** |
+| **Date:** | 2026-02-11 |
+| **Status:** | **Official** |
 | **Author:** | Christ |
 
 ---
@@ -67,6 +67,7 @@
 - 4.6. ADK Tools & Integrations
 - 4.7. Prompt Engineering Strategy
 - 4.8. Error Handling & Fallback Logic
+- 4.9. Native Multi-Language Support
 
 ### 5. Backend: API Endpoints
 
@@ -139,7 +140,7 @@
 
 - 15.1. Vision-Based Adherence (v3.5)
 - 15.2. EHR Integration (v4.0)
-- 15.3. Multi-Language Support
+- 4.9. Native Multi-Language Support
 
 ### **Appendices**
 
@@ -256,7 +257,7 @@ The following features are acknowledged as important but are **not included in v
 
 ❌ **Advanced Analytics & Reporting** - Predictive models for readmission risk, custom report builders, and data visualization beyond the basic dashboard
 
-❌ **Multi-Language Support** - v1.0 is English-only; internationalization is planned for v1.3
+✅ **Multi-Language Support** - Natively supported by Gemini 1.5/2.0/3.0 architecture. The system handles English, Spanish, French, Mandarin, Japanese, Korean, and more without complex configuration.
 
 ❌ **Billing & Insurance Integration** - Revenue cycle management features are out of scope for the MVP
 
@@ -2137,6 +2138,15 @@ Implement circuit breaker for external service dependencies (Twilio, Deepgram) t
 - Deepgram failure → Log error, create ORANGE alert for manual nurse follow-up
 - Firestore failure → Queue write operations, retry when connection restored
 
+#### **4.9. Native Multi-Language Support**
+
+CareFlow Pulse leverages the native multilingual capabilities of the Gemini model family. The system can conduct interviews and perform clinical analysis in any language supported by Gemini, including but not limited to:
+- English, Spanish, French, German
+- Mandarin (Traditional/Simplified), Japanese, Korean
+- Arabic, Hindi, Portuguese
+
+The ElevenLabs voice integration uses the `eleven_multilingual_v2` model, ensuring natural-sounding speech across all supported locales.
+
 ---
 
 ## **5. Backend: API Endpoints**
@@ -3366,10 +3376,6 @@ Allow patients to text photos of their medication bottles to the Pulse Agent for
 ### 15.2. EHR Integration (v4.0)
 
 Direct HL7 FHIR integration with Epic and Cerner to eliminate manual patient data entry.
-
-### 15.3. Multi-Language Support
-
-Expansion of Caller Agent to support Spanish and French using ElevenLabs' multilingual models.
 
 ---
 
